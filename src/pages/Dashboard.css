@@ -1,0 +1,241 @@
+.dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+/* Greeting */
+.greeting-section {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.greeting-left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.greeting-avatar {
+  font-size: 36px;
+}
+
+.greeting-text {
+  font-size: var(--font-size-lg);
+  font-weight: 800;
+}
+
+.greeting-sub {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.greeting-bear {
+  width: 52px;
+  height: 52px;
+  object-fit: contain;
+  border-radius: var(--radius-full);
+}
+
+/* Asset Card */
+.asset-card {
+  border-radius: var(--radius-xl) !important;
+  padding: var(--space-xl) !important;
+}
+
+.asset-label {
+  font-size: var(--font-size-sm);
+  opacity: 0.85;
+  font-weight: 700;
+  margin-bottom: var(--space-xs);
+}
+
+.asset-value {
+  font-size: var(--font-size-3xl);
+  font-weight: 900;
+  margin-bottom: var(--space-md);
+  letter-spacing: -0.5px;
+}
+
+.asset-details {
+  display: flex;
+  gap: var(--space-lg);
+  padding-top: var(--space-md);
+  border-top: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+.asset-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.asset-detail-label {
+  font-size: var(--font-size-xs);
+  opacity: 0.7;
+  font-weight: 600;
+}
+
+.asset-detail-value {
+  font-size: var(--font-size-base);
+  font-weight: 800;
+}
+
+.asset-profit {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+}
+
+.asset-profit-value {
+  font-weight: 800;
+}
+
+/* Quick Actions */
+.quick-actions {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-sm);
+}
+
+.quick-action-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-md);
+  background: var(--bg-card);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  transition: var(--transition-normal);
+  border: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+.quick-action-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.quick-action-btn:active {
+  transform: scale(0.95);
+}
+
+.qa-icon {
+  font-size: 24px;
+}
+
+.qa-label {
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+/* Holdings Preview */
+.holdings-preview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+/* Popular Grid */
+.popular-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-sm);
+}
+
+.popular-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: var(--space-md);
+  background: var(--bg-card);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  transition: var(--transition-normal);
+  border: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+.popular-item:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.popular-item:active {
+  transform: scale(0.96);
+}
+
+.popular-emoji {
+  font-size: 28px;
+}
+
+.popular-name {
+  font-size: var(--font-size-sm);
+  font-weight: 800;
+}
+
+.popular-code {
+  font-size: var(--font-size-xs);
+  color: var(--text-light);
+  font-weight: 600;
+}
+
+/* Trades List */
+.trades-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.trade-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  background: var(--bg-card);
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+.trade-type-badge {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--font-size-sm);
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.trade-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.trade-name {
+  font-weight: 700;
+  font-size: var(--font-size-sm);
+}
+
+.trade-detail {
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+}
+
+.trade-amount {
+  font-weight: 800;
+  font-size: var(--font-size-sm);
+  flex-shrink: 0;
+}

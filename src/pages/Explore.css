@@ -1,0 +1,148 @@
+.explore {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+/* Category Chips */
+.category-scroll {
+  display: flex;
+  gap: var(--space-sm);
+  overflow-x: auto;
+  padding-bottom: var(--space-sm);
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.category-scroll::-webkit-scrollbar { display: none; }
+
+.category-chip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 14px;
+  border-radius: var(--radius-full);
+  background: var(--bg-card);
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  white-space: nowrap;
+  border: 2px solid transparent;
+  box-shadow: var(--shadow-sm);
+  transition: var(--transition-fast);
+  color: var(--text-secondary);
+}
+
+.category-chip.active {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: rgba(255, 107, 107, 0.06);
+}
+
+/* Popular Section */
+.popular-section {
+  margin-bottom: 0;
+}
+
+.popular-scroll {
+  display: flex;
+  gap: var(--space-sm);
+  overflow-x: auto;
+  padding-bottom: var(--space-sm);
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.popular-scroll::-webkit-scrollbar { display: none; }
+
+.popular-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: var(--radius-full);
+  background: var(--bg-card);
+  box-shadow: var(--shadow-sm);
+  white-space: nowrap;
+  transition: var(--transition-normal);
+  border: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+.popular-chip:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+.popular-chip-name {
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+}
+
+/* Recommendation List */
+.recommendation-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.recommendation-card {
+  flex-direction: column !important;
+  gap: var(--space-md) !important;
+  padding: var(--space-lg) !important;
+}
+
+.rec-left {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  width: 100%;
+}
+
+.rec-header {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-sm);
+}
+
+.rec-header .stock-name {
+  font-size: var(--font-size-lg);
+}
+
+.rec-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.rec-category {
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.rec-stars {
+  font-size: var(--font-size-xs);
+}
+
+.rec-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+}
+
+.rec-right {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding-top: var(--space-sm);
+  border-top: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.rec-right .stock-price {
+  font-size: var(--font-size-xl);
+}
+
+.rec-trend {
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+}

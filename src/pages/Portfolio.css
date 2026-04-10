@@ -1,0 +1,254 @@
+.portfolio {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+/* Summary Card */
+.portfolio-summary-card {
+  border-radius: var(--radius-xl) !important;
+  padding: var(--space-xl) !important;
+}
+
+.ps-row {
+  display: flex;
+  gap: var(--space-lg);
+  margin-bottom: var(--space-md);
+}
+
+.ps-item {
+  flex: 1;
+}
+
+.ps-label {
+  font-size: var(--font-size-xs);
+  opacity: 0.75;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.ps-value {
+  font-size: var(--font-size-lg);
+  font-weight: 800;
+}
+
+.ps-total {
+  font-size: var(--font-size-2xl);
+  font-weight: 900;
+}
+
+.ps-profit-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-sm) var(--space-md);
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+}
+
+.ps-profit-value {
+  font-weight: 800;
+}
+
+/* Budget Card */
+.budget-card {
+  padding: var(--space-lg) !important;
+}
+
+.budget-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-sm);
+}
+
+.budget-label {
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+}
+
+.budget-pct {
+  font-size: var(--font-size-xs);
+  color: var(--primary);
+  font-weight: 800;
+}
+
+.budget-bar {
+  height: 8px;
+  background: rgba(0, 0, 0, 0.06);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  margin-bottom: var(--space-sm);
+}
+
+.budget-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--primary) 0%, var(--accent) 100%);
+  border-radius: var(--radius-full);
+  transition: width 0.8s ease;
+}
+
+.budget-detail {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--font-size-xs);
+  color: var(--text-light);
+  font-weight: 600;
+}
+
+/* Holdings List */
+.holdings-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.holding-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  background: var(--bg-card);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid rgba(0, 0, 0, 0.04);
+  cursor: pointer;
+  transition: var(--transition-normal);
+}
+
+.holding-item:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+
+.holding-item:active {
+  transform: scale(0.98);
+}
+
+.holding-left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-width: 0;
+}
+
+.holding-emoji {
+  font-size: 28px;
+  flex-shrink: 0;
+}
+
+.holding-name {
+  font-weight: 800;
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.holding-code {
+  font-size: var(--font-size-xs);
+  color: var(--text-light);
+}
+
+.holding-center {
+  flex-shrink: 0;
+  text-align: center;
+}
+
+.holding-shares {
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+}
+
+.holding-avg {
+  font-size: 10px;
+  color: var(--text-light);
+}
+
+.holding-right {
+  flex-shrink: 0;
+  text-align: right;
+  margin-left: auto;
+}
+
+.holding-current {
+  font-size: var(--font-size-sm);
+  font-weight: 800;
+}
+
+.holding-pl {
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+}
+
+.holding-pl-pct {
+  font-size: 10px;
+  font-weight: 600;
+}
+
+/* Trade History */
+.trades-history {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.trade-history-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  background: var(--bg-card);
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+.trade-type-indicator {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--font-size-sm);
+  font-weight: 900;
+  flex-shrink: 0;
+}
+
+.trade-type-indicator.buy {
+  background: rgba(0, 196, 140, 0.12);
+  color: #00C48C;
+}
+
+.trade-type-indicator.sell {
+  background: rgba(255, 100, 124, 0.12);
+  color: #FF647C;
+}
+
+.trade-history-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.trade-history-name {
+  font-weight: 700;
+  font-size: var(--font-size-sm);
+}
+
+.trade-history-detail {
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+}
+
+.trade-history-date {
+  font-size: 10px;
+  color: var(--text-light);
+}
+
+.trade-history-amount {
+  font-weight: 800;
+  font-size: var(--font-size-sm);
+  flex-shrink: 0;
+}
