@@ -114,10 +114,6 @@ export default function StockDetail() {
     setTradeResult(result);
     if (result.success) {
       setQuantity('');
-      setTimeout(() => {
-        setTradeMode(null);
-        setTradeResult(null);
-      }, 1500);
     }
   }
 
@@ -344,59 +340,77 @@ export default function StockDetail() {
         <div className="modal-overlay" onClick={() => setTradeMode(null)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-handle"></div>
-            <h3 className="trade-modal-title">
-              {tradeMode === 'buy' ? '🛒 買入' : '💰 賣出'} {stockData?.stkname || code}
-            </h3>
-
-            <div className="trade-modal-price">
-              以收盤價 <strong>NT$ {formatPrice(price)}</strong> 交易
-            </div>
-
-            {tradeMode === 'buy' && (
-              <div className="trade-modal-balance">
-                可用餘額：NT$ {formatMoney(user!.availableBalance)}
-              </div>
-            )}
-            {tradeMode === 'sell' && holding && (
-              <div className="trade-modal-balance">
-                可賣股數：{holding.totalShares} 股
-              </div>
-            )}
-
-            <div className="input-group">
-              <label className="input-label">股數</label>
-              <input
-                className="input-field"
-                type="number"
-                min="1"
-                placeholder="輸入要交易的股數"
-                value={quantity}
-                onChange={(e) => setQuantity(e.target.value)}
-              />
-            </div>
-
-            {quantity && parseInt(quantity) > 0 && (
-              <div className="trade-preview">
-                <div className="trade-preview-row">
-                  <span>預估金額</span>
-                  <span className="fw-extra">NT$ {formatMoney(parseInt(quantity) * price)}</span>
+            {tradeResult?.success ? (
+              <div className="trade-success-screen" style={{ textAlign: 'center', padding: '20px 0' }}>
+                <div style={{ fontSize: '64px', animation: 'bounce 1s infinite' }}>🎉</div>
+                <h3 style={{ margin: '16px 0', color: 'var(--text-primary)' }}>{tradeMode === 'buy' ? '買入成功！' : '賣出成功！'}</h3>
+                <div className="trade-result trade-success" style={{ marginBottom: 24, fontSize: '16px' }}>
+                  {tradeResult.message}
                 </div>
+                <button
+                  className="btn btn-buy btn-lg btn-block"
+                  onClick={() => { setTradeMode(null); setTradeResult(null); }}
+                >
+                  太棒了 🐻
+                </button>
               </div>
-            )}
+            ) : (
+              <>
+                <h3 className="trade-modal-title">
+                  {tradeMode === 'buy' ? '🛒 買入' : '💰 賣出'} {stockData?.stkname || code}
+                </h3>
 
-            {tradeResult && (
-              <div className={`trade-result ${tradeResult.success ? 'trade-success' : 'trade-error'}`}>
-                {tradeResult.message}
-              </div>
-            )}
+                <div className="trade-modal-price">
+                  以收盤價 <strong>NT$ {formatPrice(price)}</strong> 交易
+                </div>
 
-            <button
-              className={`btn ${tradeMode === 'buy' ? 'btn-buy' : 'btn-sell'} btn-lg btn-block`}
-              onClick={handleTrade}
-              disabled={!quantity || parseInt(quantity) <= 0}
-            >
-              確認{tradeMode === 'buy' ? '買入' : '賣出'}
-            </button>
+                {tradeMode === 'buy' && (
+                  <div className="trade-modal-balance">
+                    可用餘額：NT$ {formatMoney(user!.availableBalance)}
+                  </div>
+                )}
+                {tradeMode === 'sell' && holding && (
+                  <div className="trade-modal-balance">
+                    可賣股數：{holding.totalShares} 股
+                  </div>
+                )}
+
+                <div className="input-group">
+                  <label className="input-label">股數</label>
+                  <input
+                    className="input-field"
+                    type="number"
+                    min="1"
+                    placeholder="輸入要交易的股數"
+                    value={quantity}
+                    onChange={(e) => setQuantity(e.target.value)}
+                  />
+                </div>
+
+                {quantity && parseInt(quantity) > 0 && (
+                  <div className="trade-preview">
+                    <div className="trade-preview-row">
+                      <span>預估金額</span>
+                      <span className="fw-extra">NT$ {formatMoney(parseInt(quantity) * price)}</span>
+                    </div>
+                  </div>
+                )}
+
+                {tradeResult && !tradeResult.success && (
+                  <div className="trade-result trade-error">
+                    {tradeResult.message}
+                  </div>
+                )}
+
+                <button
+                  className={`btn ${tradeMode === 'buy' ? 'btn-buy' : 'btn-sell'} btn-lg btn-block`}
+                  onClick={handleTrade}
+                  disabled={!quantity || parseInt(quantity) <= 0}
+                >
+                  確認{tradeMode === 'buy' ? '買入' : '賣出'}
+                </button>
+              </>
+            )}
           </div>
         </div>
       )}
