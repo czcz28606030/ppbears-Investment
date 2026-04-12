@@ -305,9 +305,17 @@ ul, ol { list-style: none; }
 }
 
 .card-profit {
-  background: linear-gradient(135deg, var(--green) 0%, #A8DC4A 100%);
+  background: linear-gradient(135deg, var(--profit) 0%, #ff7b7f 100%);
   color: white;
   border: none;
+  box-shadow: var(--shadow-coral);
+}
+
+.card-loss {
+  background: linear-gradient(135deg, var(--loss-color) 0%, #A8DC4A 100%);
+  color: white;
+  border: none;
+  box-shadow: var(--shadow-green);
 }
 
 /* ============================================

@@ -85,7 +85,7 @@ export default function Dashboard() {
       </div>
 
       {/* 總資產卡片 */}
-      <div className={`card asset-card ${profitClass === 'profit' ? 'card-profit' : 'card-primary'}`}>
+      <div className={`card asset-card ${summary.totalCost > 0 ? (profitClass === 'profit' ? 'card-profit' : 'card-loss') : 'card-primary'}`}>
         <div className="asset-label">我的總資產 💰</div>
         <div className="asset-value">NT$ {formatMoney(summary.totalAssets)}</div>
         

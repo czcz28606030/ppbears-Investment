@@ -20,7 +20,7 @@ export default function Portfolio() {
       </div>
 
       {/* 總覽卡片 */}
-      <div className={`card portfolio-summary-card ${isProfit ? 'card-profit' : 'card-primary'}`}>
+      <div className={`card portfolio-summary-card ${summary.totalCost > 0 ? (isProfit ? 'card-profit' : 'card-loss') : 'card-primary'}`}>
         <div className="ps-row">
           <div className="ps-item">
             <div className="ps-label">總資產</div>
