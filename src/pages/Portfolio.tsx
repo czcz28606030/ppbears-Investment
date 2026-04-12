@@ -14,60 +14,103 @@ export default function Portfolio() {
   const isProfit = pl >= 0;
 
   const [aiSignals, setAiSignals] = useState<Record<string, { advice: string, color: string, icon: string }>>({});
+  const [enableCustomSignal, setEnableCustomSignal] = useState(false);
 
   useEffect(() => {
     let mounted = true;
     async function loadSignals() {
-      if (!hasAiFeature || holdings.length === 0) return;
+      if (holdings.length === 0) return;
+      if (!hasAiFeature && !enableCustomSignal) {
+        if (mounted && Object.keys(aiSignals).length > 0) setAiSignals({});
+        return;
+      }
       
       const signals: Record<string, { advice: string, color: string, icon: string }> = {};
       
-      try {
-        let buySet = new Set<string>();
-        for (let i = 0; i < 7; i++) {
-          const d = new Date();
-          d.setDate(d.getDate() - i);
-          if (d.getDay() === 0 || d.getDay() === 6) continue;
-          const dateStr = d.toISOString().split('T')[0];
-          const res = await fetch(`https://api.ifalgo.com.tw/frontapi/common/getSimonsData?searchDate=${dateStr}`);
-          const data = await res.json();
-          const items = data.data?.dataItems || [];
-          if (items.length > 0) {
-            buySet = new Set(items.map((it: any) => it.coid));
-            break;
-          }
-        }
-
-        await Promise.all(holdings.map(async (h) => {
-          if (buySet.has(h.stockCode)) {
-            signals[h.stockCode] = { advice: '加碼', color: '#FF2424', icon: '🚀' };
-            return;
-          }
-          try {
-            const res = await fetch(`https://api.ifalgo.com.tw/frontapi/stock?coid=${h.stockCode}`);
-            const json = await res.json();
-            const list = json.data?.stock?.aiQuanBackDataTradingList || [];
-            if (list.length > 0) {
-              const last = list[list.length - 1];
-              if (last.sell_sig === '出場' || last.sell_sig === '賣出') {
-                signals[h.stockCode] = { advice: '出場', color: 'var(--loss-color)', icon: '⚠️' };
-                return;
-              }
+      if (hasAiFeature) {
+        try {
+          let buySet = new Set<string>();
+          for (let i = 0; i < 7; i++) {
+            const d = new Date();
+            d.setDate(d.getDate() - i);
+            if (d.getDay() === 0 || d.getDay() === 6) continue;
+            const dateStr = d.toISOString().split('T')[0];
+            const res = await fetch(`https://api.ifalgo.com.tw/frontapi/common/getSimonsData?searchDate=${dateStr}`);
+            const data = await res.json();
+            const items = data.data?.dataItems || [];
+            if (items.length > 0) {
+              buySet = new Set(items.map((it: any) => it.coid));
+              break;
             }
-            signals[h.stockCode] = { advice: '中立', color: '#888888', icon: '⚖️' };
-          } catch {
-            signals[h.stockCode] = { advice: '中立', color: '#888888', icon: '⚖️' };
+          }
+
+          await Promise.all(holdings.map(async (h) => {
+            if (buySet.has(h.stockCode)) {
+              signals[h.stockCode] = { advice: '加碼', color: '#FF2424', icon: '🚀' };
+              return;
+            }
+            try {
+              const res = await fetch(`https://api.ifalgo.com.tw/frontapi/stock?coid=${h.stockCode}`);
+              const json = await res.json();
+              const list = json.data?.stock?.aiQuanBackDataTradingList || [];
+              if (list.length > 0) {
+                const last = list[list.length - 1];
+                if (last.sell_sig === '出場' || last.sell_sig === '賣出') {
+                  signals[h.stockCode] = { advice: '出場', color: 'var(--loss-color)', icon: '⚠️' };
+                  return;
+                }
+              }
+              signals[h.stockCode] = { advice: '中立', color: '#888888', icon: '⚖️' };
+            } catch {
+              signals[h.stockCode] = { advice: '中立', color: '#888888', icon: '⚖️' };
+            }
+          }));
+
+        } catch (err) {
+          console.error('Failed to load AI signals', err);
+        }
+      } else if (enableCustomSignal) {
+        await Promise.all(holdings.map(async (h) => {
+          try {
+             const start = new Date();
+             start.setDate(start.getDate() - 150);
+             const dateStr = start.toISOString().split('T')[0];
+             const res = await fetch(`https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockPrice&data_id=${h.stockCode}&start_date=${dateStr}`);
+             const json = await res.json();
+             const data = json.data;
+             if (data && data.length >= 60) {
+               const closes = data.map((d: any) => d.close);
+               const getSMA = (arr: number[], period: number, offset: number = 0) => {
+                 const slice = arr.slice(arr.length - period - offset, arr.length - offset);
+                 return slice.reduce((a, b) => a + b, 0) / period;
+               };
+               
+               const lastClose = closes[closes.length - 1];
+               const sma60 = getSMA(closes, 60, 0);
+               const sma60Prev = getSMA(closes, 60, 1);
+               const prevClose = closes[closes.length - 2];
+               
+               const max20 = Math.max(...closes.slice(-20));
+               
+               if (lastClose > sma60 && lastClose >= max20) {
+                 signals[h.stockCode] = { advice: '加碼', color: '#FF2424', icon: '🚀' };
+               } else if (lastClose < sma60 && prevClose < sma60Prev) {
+                 signals[h.stockCode] = { advice: '出場', color: 'var(--loss-color)', icon: '⚠️' };
+               } else {
+                 signals[h.stockCode] = { advice: '中立', color: '#888888', icon: '⚖️' };
+               }
+             }
+          } catch (e) {
+             console.error('Fetch technical fail:', e);
           }
         }));
-
-        if (mounted) setAiSignals(signals);
-      } catch (err) {
-        console.error('Failed to load AI signals', err);
       }
+
+      if (mounted) setAiSignals(signals);
     }
     loadSignals();
     return () => { mounted = false; };
-  }, [holdings, hasAiFeature]);
+  }, [holdings, hasAiFeature, enableCustomSignal]);
 
   return (
     <div className="portfolio">
@@ -124,8 +167,19 @@ export default function Portfolio() {
         </div>
       )}
 
-      <div className="section-header" style={{ marginTop: '24px', marginBottom: '16px' }}>
-        <h2 className="section-title">📊 持股清單 ({holdings.length})</h2>
+      <div className="section-header" style={{ marginTop: '24px', marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <h2 className="section-title" style={{ margin: 0 }}>📊 持股清單 ({holdings.length})</h2>
+        {!hasAiFeature && (
+          <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13.5px', color: '#555', cursor: 'pointer', fontWeight: 600, background: '#f5f5f5', padding: '6px 12px', borderRadius: '8px' }}>
+            <input 
+              type="checkbox" 
+              checked={enableCustomSignal} 
+              onChange={e => setEnableCustomSignal(e.target.checked)} 
+              style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+            />
+            顯示加碼與出場訊號
+          </label>
+        )}
       </div>
 
       {/* 持股列表 */}
