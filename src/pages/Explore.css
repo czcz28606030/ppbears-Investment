@@ -63,7 +63,10 @@
 .strategy-card-a.active { background: rgba(56, 179, 218, 0.1); border-color: #38b3da; }
 .strategy-card-b.active { background: rgba(255, 89, 94, 0.1); border-color: #FF595E; }
 .strategy-card-c.active { background: rgba(138, 201, 38, 0.1); border-color: #8AC926; }
-.strategy-card-d.active { background: rgba(157, 78, 221, 0.1); border-color: #9D4EDD; }
+.strategy-card-d.active { background: rgba(255, 202, 58, 0.1); border-color: #FFCA3A; }
+.strategy-card-e.active { background: rgba(25, 130, 196, 0.1); border-color: #1982C4; }
+.strategy-card-f.active { background: rgba(255, 146, 76, 0.1); border-color: #FF924C; }
+.strategy-card-ai.active { background: rgba(157, 78, 221, 0.1); border-color: #9D4EDD; }
 
 /* Filtered Result Header */
 .filtered-result-header {

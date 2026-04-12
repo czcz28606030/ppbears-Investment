@@ -65,15 +65,21 @@ export default function Explore() {
 
   const MOCK_STRATEGIES = useMemo(() => ({
     'A': ['2330', '2412', '2881', '2882'],
-    'B': ['2317', '2454', '2303'],
+    'B': ['2317', '2454', '2303', '3231'],
     'C': ['3711', '8454', '8464', '8462'],
+    'D': ['1301', '1303', '2308', '2886'],
+    'E': ['0056', '00878', '2884', '2890'],
+    'F': ['2891', '1101', '2603', '2609'],
   }), []);
 
   const STRATEGY_CARDS = [
     { id: 'A', title: '穩穩大公司', icon: '🏢', desc: '股本 > 100億\n成交量 > 1,000張', className: 'strategy-card-a' },
     { id: 'B', title: '最近變強公司', icon: '🚀', desc: '月營收連3月成長\n近4季ROE > 10%', className: 'strategy-card-b' },
     { id: 'C', title: '市場有注意公司', icon: '👀', desc: '股價站上季線\n外資連3日買超', className: 'strategy-card-c' },
-    { id: 'ai', title: 'AI 聰明選股', icon: '🤖', desc: '每日最新大數據\n電腦推薦標的', className: 'strategy-card-d' }
+    { id: 'D', title: '巴菲特風格公司', icon: '👴', desc: '股本 > 100億\n近4季ROE > 10%\n本益比 < 20倍', className: 'strategy-card-d' },
+    { id: 'E', title: '配息安心公司', icon: '💰', desc: '現金殖利率 > 5%\n股本 > 100億或長年配息', className: 'strategy-card-e' },
+    { id: 'F', title: '便宜好公司', icon: '🏷️', desc: '本益比 < 20倍\n股價淨值比 < 1\n近4季ROE > 10%', className: 'strategy-card-f' },
+    { id: 'ai', title: 'AI 聰明選股', icon: '🤖', desc: '每日最新大數據\n電腦推薦標的', className: 'strategy-card-ai' }
   ];
 
   const filtered = useMemo(() => {
@@ -106,13 +112,25 @@ export default function Explore() {
         const found = POPULAR_STOCKS.find(s => s.code === code);
         const twse = twsePriceMap[code];
         const stockName = found ? found.name : (twse?.name || `股票 ${code}`);
+        const getCategoryName = (id: string) => {
+          switch (id) {
+            case 'A': return '大型權值';
+            case 'B': return '高成長';
+            case 'C': return '籌碼面優';
+            case 'D': return '價值投資';
+            case 'E': return '高股息';
+            case 'F': return '低估值';
+            default: return '精選策略';
+          }
+        };
+
         return {
           coid: code,
           stkname: stockName,
           close: twse ? twse.close : '0',
           advice: 'buy',
           score: 85,
-          category: activeStrategy === 'A' ? '大型權值' : activeStrategy === 'B' ? '高成長' : '籌碼面優',
+          category: getCategoryName(activeStrategy),
           ret_w: 'rise',
           kidAdvice: '符合我們的策略選股條件喔！'
         } as StockRecommendation;
