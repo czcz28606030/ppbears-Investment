@@ -100,18 +100,18 @@ export default function Dashboard() {
           </div>
           <div className="asset-detail">
             <span className="asset-detail-label">📊 累積損益</span>
-            <span className={`asset-detail-value ${summary.totalProfitLoss >= 0 ? 'text-profit' : 'text-loss'}`} style={{ color: summary.totalProfitLoss >= 0 ? '#fff' : '#ffe1e1' }}>
-              {summary.totalProfitLoss >= 0 ? '+' : ''}NT$ {formatMoney(summary.totalProfitLoss)}
-              <span style={{ fontSize: '0.8em', marginLeft: 4 }}>({summary.profitLossPct >= 0 ? '+' : ''}{summary.profitLossPct.toFixed(1)}%)</span>
+            <span className={`asset-detail-value ${summary.totalProfitLoss > 0 ? 'text-profit' : summary.totalProfitLoss < 0 ? 'text-loss' : ''}`}>
+              {summary.totalProfitLoss > 0 ? '+' : ''}NT$ {formatMoney(summary.totalProfitLoss)}
+              <span style={{ fontSize: '0.8em', marginLeft: 4 }}>({summary.profitLossPct > 0 ? '+' : ''}{summary.profitLossPct.toFixed(1)}%)</span>
             </span>
           </div>
           <div className="asset-detail">
             <span className="asset-detail-label">⚡ 今日損益</span>
-            <span className={`asset-detail-value ${livePnL && livePnL.todayPnL >= 0 ? 'text-profit' : 'text-loss'}`} style={{ color: livePnL && livePnL.todayPnL >= 0 ? '#fff' : '#ffe1e1' }}>
+            <span className={`asset-detail-value ${livePnL && livePnL.todayPnL > 0 ? 'text-profit' : (livePnL && livePnL.todayPnL < 0 ? 'text-loss' : '')}`}>
               {livePnL ? (
                 <>
-                  {livePnL.todayPnL >= 0 ? '+' : ''}NT$ {formatMoney(livePnL.todayPnL)}
-                  <span style={{ fontSize: '0.8em', marginLeft: 4 }}>({livePnL.todayPnLPct >= 0 ? '+' : ''}{livePnL.todayPnLPct.toFixed(1)}%)</span>
+                  {livePnL.todayPnL > 0 ? '+' : ''}NT$ {formatMoney(livePnL.todayPnL)}
+                  <span style={{ fontSize: '0.8em', marginLeft: 4 }}>({livePnL.todayPnLPct > 0 ? '+' : ''}{livePnL.todayPnLPct.toFixed(1)}%)</span>
                 </>
               ) : (
                 <span style={{ fontSize: '0.9em', opacity: 0.7 }}>計算中...</span>
