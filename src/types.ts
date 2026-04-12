@@ -136,3 +136,9 @@ export interface PortfolioSnapshot {
   profitLossPct: number;
   cashBalance: number;
 }
+
+export interface SystemSettings {
+  free_max_child_accounts: number;
+  free_max_holdings: number;
+  free_max_daily_trades: number;
+}

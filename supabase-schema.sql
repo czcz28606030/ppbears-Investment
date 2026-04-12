@@ -42,6 +42,22 @@ CREATE TABLE public.feature_overrides (
 );
 
 -- ==========================================================
+-- 1c. 系統設定表（管理員可動態調整全域參數）
+-- ==========================================================
+CREATE TABLE public.system_settings (
+  setting_key text PRIMARY KEY,
+  setting_value numeric NOT NULL,
+  updated_at timestamptz DEFAULT now()
+);
+
+-- 預設值寫入
+INSERT INTO public.system_settings (setting_key, setting_value) VALUES
+('free_max_child_accounts', 2),
+('free_max_holdings', 5),
+('free_max_daily_trades', 10)
+ON CONFLICT (setting_key) DO NOTHING;
+
+-- ==========================================================
 -- 2. trades 交易紀錄
 -- ==========================================================
 CREATE TABLE public.trades (

@@ -12,7 +12,8 @@ const FEATURE_KEYS = [
 export default function AdminDashboard() {
   const navigate = useNavigate();
   const { user, allUsers, loadAllUsers, adminSetUserTier, adminDeleteUser, adminSetUserBalance,
-    adminSetFeatureOverride, adminRemoveFeatureOverride, loadFeatureOverridesForUser } = useStore();
+    adminSetFeatureOverride, adminRemoveFeatureOverride, loadFeatureOverridesForUser,
+    systemSettings, adminUpdateSetting } = useStore();
 
   const [search, setSearch] = useState('');
   const [balanceModal, setBalanceModal] = useState<{ userId: string; name: string; current: number } | null>(null);
@@ -21,6 +22,8 @@ export default function AdminDashboard() {
   const [userFeatures, setUserFeatures] = useState<Record<string, FeatureOverride[]>>({});
   const [tierModal, setTierModal] = useState<{ userId: string; name: string } | null>(null);
   const [tierDays, setTierDays] = useState('30');
+  const [settingModal, setSettingModal] = useState<{ key: string; label: string; value: number } | null>(null);
+  const [settingInput, setSettingInput] = useState('');
 
   useEffect(() => {
     if (user?.isAdmin) loadAllUsers();
@@ -94,19 +97,24 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleFeatureToggle = async (userId: string, featureKey: string, currentlyEnabled: boolean) => {
-    if (currentlyEnabled) {
+  const handleFeatureToggle = async (userId: string, featureKey: string, currentlyEnabled: boolean, userTier: string) => {
+    const newState = !currentlyEnabled;
+    const defaultState = userTier === 'premium';
+    
+    // 如果新狀態跟預設狀態一樣，就移除 override
+    if (newState === defaultState) {
       await adminRemoveFeatureOverride(userId, featureKey);
       setUserFeatures(prev => ({
         ...prev,
         [userId]: (prev[userId] || []).filter(f => f.featureKey !== featureKey),
       }));
     } else {
-      await adminSetFeatureOverride(userId, featureKey, true);
+      // 如果新狀態跟預設狀態不同，就新增/更新 override
+      await adminSetFeatureOverride(userId, featureKey, newState);
       setUserFeatures(prev => ({
         ...prev,
         [userId]: [...(prev[userId] || []).filter(f => f.featureKey !== featureKey),
-          { userId, featureKey, enabled: true }],
+          { userId, featureKey, enabled: newState }],
       }));
     }
   };
@@ -116,6 +124,14 @@ export default function AdminDashboard() {
     const override = overrides.find(f => f.featureKey === featureKey);
     if (override) return override.enabled;
     return userTier === 'premium';
+  };
+
+  const handleSettingSave = async () => {
+    if (!settingModal) return;
+    const val = parseInt(settingInput);
+    if (isNaN(val) || val < 0) return;
+    await adminUpdateSetting(settingModal.key as any, val);
+    setSettingModal(null);
   };
 
   return (
@@ -145,6 +161,7 @@ export default function AdminDashboard() {
       {/* 功能對照表 */}
       <div className="admin-user-card" style={{ marginBottom: 16 }}>
         <div style={{ fontWeight: 800, fontSize: 15, marginBottom: 12 }}>📋 免費 vs Premium 功能對照</div>
+        <div style={{ fontSize: 11, color: '#888', marginBottom: 12 }}>點擊 ✏️ 可調整免費會員的限制額度</div>
         <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
           <thead>
             <tr style={{ borderBottom: '2px solid #eee' }}>
@@ -154,20 +171,45 @@ export default function AdminDashboard() {
             </tr>
           </thead>
           <tbody>
-            {[
-              ['副帳號數量', '≤ 2 個', '無限制'],
-              ['持股檔數', '≤ 5 檔', '無限制'],
-              ['每日交易次數', '≤ 10 次', '無限制'],
-              ['AI 聯明選股', '❌ 鎖定', '✅ 開放'],
-              ['庫存 AI 建議', '❌ 鎖定', '✅ 開放'],
-              ['廣告顯示', '有廣告', '無廣告'],
-            ].map(([feat, free, premium], i) => (
-              <tr key={i} style={{ borderBottom: '1px solid #f5f5f5' }}>
-                <td style={{ padding: '8px 4px', fontWeight: 600 }}>{feat}</td>
-                <td style={{ textAlign: 'center', padding: '8px 4px' }}>{free}</td>
-                <td style={{ textAlign: 'center', padding: '8px 4px' }}>{premium}</td>
-              </tr>
-            ))}
+            <tr style={{ borderBottom: '1px solid #f5f5f5' }}>
+              <td style={{ padding: '8px 4px', fontWeight: 600 }}>副帳號數量</td>
+              <td style={{ textAlign: 'center', padding: '8px 4px' }}>
+                ≤ {systemSettings.free_max_child_accounts} 個 
+                <span style={{ cursor: 'pointer', marginLeft: 6 }} onClick={() => { setSettingModal({ key: 'free_max_child_accounts', label: '副帳號數量限制', value: systemSettings.free_max_child_accounts }); setSettingInput(String(systemSettings.free_max_child_accounts)); }}>✏️</span>
+              </td>
+              <td style={{ textAlign: 'center', padding: '8px 4px' }}>無限制</td>
+            </tr>
+            <tr style={{ borderBottom: '1px solid #f5f5f5' }}>
+              <td style={{ padding: '8px 4px', fontWeight: 600 }}>持股檔數</td>
+              <td style={{ textAlign: 'center', padding: '8px 4px' }}>
+                ≤ {systemSettings.free_max_holdings} 檔 
+                <span style={{ cursor: 'pointer', marginLeft: 6 }} onClick={() => { setSettingModal({ key: 'free_max_holdings', label: '持股檔數限制', value: systemSettings.free_max_holdings }); setSettingInput(String(systemSettings.free_max_holdings)); }}>✏️</span>
+              </td>
+              <td style={{ textAlign: 'center', padding: '8px 4px' }}>無限制</td>
+            </tr>
+            <tr style={{ borderBottom: '1px solid #f5f5f5' }}>
+              <td style={{ padding: '8px 4px', fontWeight: 600 }}>每日交易次數</td>
+              <td style={{ textAlign: 'center', padding: '8px 4px' }}>
+                ≤ {systemSettings.free_max_daily_trades} 次 
+                <span style={{ cursor: 'pointer', marginLeft: 6 }} onClick={() => { setSettingModal({ key: 'free_max_daily_trades', label: '每日交易次數限制', value: systemSettings.free_max_daily_trades }); setSettingInput(String(systemSettings.free_max_daily_trades)); }}>✏️</span>
+              </td>
+              <td style={{ textAlign: 'center', padding: '8px 4px' }}>無限制</td>
+            </tr>
+            <tr style={{ borderBottom: '1px solid #f5f5f5' }}>
+              <td style={{ padding: '8px 4px', fontWeight: 600 }}>AI 聰明選股</td>
+              <td style={{ textAlign: 'center', padding: '8px 4px' }}>❌ 鎖定</td>
+              <td style={{ textAlign: 'center', padding: '8px 4px' }}>✅ 開放</td>
+            </tr>
+            <tr style={{ borderBottom: '1px solid #f5f5f5' }}>
+              <td style={{ padding: '8px 4px', fontWeight: 600 }}>庫存 AI 建議</td>
+              <td style={{ textAlign: 'center', padding: '8px 4px' }}>❌ 鎖定</td>
+              <td style={{ textAlign: 'center', padding: '8px 4px' }}>✅ 開放</td>
+            </tr>
+            <tr style={{ borderBottom: '1px solid #f5f5f5' }}>
+              <td style={{ padding: '8px 4px', fontWeight: 600 }}>廣告顯示</td>
+              <td style={{ textAlign: 'center', padding: '8px 4px' }}>有廣告</td>
+              <td style={{ textAlign: 'center', padding: '8px 4px' }}>無廣告</td>
+            </tr>
           </tbody>
         </table>
       </div>
@@ -238,7 +280,7 @@ export default function AdminDashboard() {
                       </div>
                       <div
                         className={`toggle-switch ${enabled ? 'active' : ''}`}
-                        onClick={() => handleFeatureToggle(u.id, feat.key, enabled)}
+                        onClick={() => handleFeatureToggle(u.id, feat.key, enabled, u.tier)}
                       />
                     </div>
                   );
@@ -285,6 +327,20 @@ export default function AdminDashboard() {
             <div className="admin-modal-btns">
               <button className="btn-cancel" onClick={() => setTierModal(null)}>取消</button>
               <button className="btn-confirm" onClick={confirmUpgrade}>確認升級</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* 系統設定編輯彈窗 */}
+      {settingModal && (
+        <div className="admin-modal-overlay" onClick={() => setSettingModal(null)}>
+          <div className="admin-modal" onClick={e => e.stopPropagation()}>
+            <h3>✏️ 調整 {settingModal.label}</h3>
+            <div style={{ fontSize: 13, color: '#888', marginBottom: 8 }}>免費帳號的{settingModal.label}</div>
+            <input type="number" value={settingInput} onChange={e => setSettingInput(e.target.value)} placeholder="輸入新數值" />
+            <div className="admin-modal-btns">
+              <button className="btn-cancel" onClick={() => setSettingModal(null)}>取消</button>
+              <button className="btn-confirm" onClick={handleSettingSave}>儲存</button>
             </div>
           </div>
         </div>

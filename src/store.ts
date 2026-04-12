@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { supabase } from './supabase';
 import type { Session } from '@supabase/supabase-js';
-import type { UserAccount, Trade, Holding, WithdrawalRequest, FeatureOverride } from './types';
+import type { UserAccount, Trade, Holding, WithdrawalRequest, FeatureOverride, SystemSettings } from './types';
 
 // ==========================================
 // 輔助函式
@@ -35,6 +35,7 @@ interface InvestmentStore {
   trades: Trade[];
   withdrawalRequests: WithdrawalRequest[];
   featureOverrides: FeatureOverride[];
+  systemSettings: SystemSettings;
   allUsers: UserAccount[];
   loading: boolean;
   authLoading: boolean;
@@ -78,6 +79,7 @@ interface InvestmentStore {
   adminSetFeatureOverride: (userId: string, featureKey: string, enabled: boolean) => Promise<{ error: string | null }>;
   adminRemoveFeatureOverride: (userId: string, featureKey: string) => Promise<{ error: string | null }>;
   loadFeatureOverridesForUser: (userId: string) => Promise<FeatureOverride[]>;
+  adminUpdateSetting: (key: keyof SystemSettings, value: number) => Promise<{ error: string | null }>;
 
   // Tier & Feature Helpers
   isPremiumUser: (targetUser?: UserAccount) => boolean;
@@ -116,6 +118,7 @@ export const useStore = create<InvestmentStore>((set, get) => ({
   trades: [],
   withdrawalRequests: [],
   featureOverrides: [],
+  systemSettings: { free_max_child_accounts: 2, free_max_holdings: 5, free_max_daily_trades: 10 },
   allUsers: [],
   loading: false,
   authLoading: true,
@@ -261,6 +264,18 @@ export const useStore = create<InvestmentStore>((set, get) => ({
           userId: f.user_id, featureKey: f.feature_key, enabled: Boolean(f.enabled),
         }));
         set({ featureOverrides });
+      })(),
+      (async () => {
+        const { data: stData } = await supabase.from('system_settings').select('*');
+        if (stData) {
+          const newSettings = { ...get().systemSettings };
+          stData.forEach(row => {
+            if (row.setting_key in newSettings) {
+              (newSettings as any)[row.setting_key] = Number(row.setting_value);
+            }
+          });
+          set({ systemSettings: newSettings });
+        }
       })()
     ]);
 
@@ -307,9 +322,12 @@ export const useStore = create<InvestmentStore>((set, get) => ({
 
   createChildAccount: async (email, password, displayName, avatar, initialBalance) => {
     if (!supabase) return { error: '資料庫未連線' };
-    const { user, children } = get();
+    const { user, children, systemSettings } = get();
     if (!user || user.role !== 'parent') return { error: '只有主帳號可以建立副帳號' };
-    if (children.length >= 5) return { error: '最多只能建立 5 個副帳號' };
+    
+    if (!get().isPremiumUser() && children.length >= systemSettings.free_max_child_accounts) {
+      return { error: `免費帳號最多只能建立 ${systemSettings.free_max_child_accounts} 個副帳號！\n升級 Premium 可解鎖無限副帳號 💎` };
+    }
 
     try {
       const { data, error } = await supabase.auth.signUp({ email, password });
@@ -423,19 +441,19 @@ export const useStore = create<InvestmentStore>((set, get) => ({
     if (totalCost > user.availableBalance) return { success: false, message: '餘額不足！需要更多零用錢才能買喔 💰' };
     if (quantity <= 0) return { success: false, message: '至少要買 1 股喔！' };
 
-    // ─ Paywall: 持股上限檢查 (免費用戶 ≤ 5 檔) ─
+    // ─ Paywall: 持股上限檢查 ─
     if (!get().isPremiumUser()) {
       const uniqueStocks = new Set(holdings.map(h => h.stockCode));
-      if (!uniqueStocks.has(stockCode) && uniqueStocks.size >= 5) {
-        return { success: false, message: '🔒 免費帳號最多只能持有 5 檔股票喔！\n升級 Premium 可解鎖無限持股 💎' };
+      if (!uniqueStocks.has(stockCode) && uniqueStocks.size >= get().systemSettings.free_max_holdings) {
+        return { success: false, message: `🔒 免費帳號最多只能持有 ${get().systemSettings.free_max_holdings} 檔股票喔！\n升級 Premium 可解鎖無限持股 💎` };
       }
     }
 
-    // ─ Paywall: 每日交易次數檢查 (免費用戶 ≤ 10 次/日) ─
+    // ─ Paywall: 每日交易次數檢查 ─
     if (!get().isPremiumUser()) {
       const todayCount = get().getTodayTradeCount();
-      if (todayCount >= 10) {
-        return { success: false, message: '🔒 免費帳號每日最多交易 10 次！\n升級 Premium 可解鎖無限交易 💎' };
+      if (todayCount >= get().systemSettings.free_max_daily_trades) {
+        return { success: false, message: `🔒 免費帳號每日最多交易 ${get().systemSettings.free_max_daily_trades} 次！\n升級 Premium 可解鎖無限交易 💎` };
       }
     }
 
@@ -471,11 +489,11 @@ export const useStore = create<InvestmentStore>((set, get) => ({
     if (quantity > holding.totalShares) return { success: false, message: `你只有 ${holding.totalShares} 股，不能賣超過喔！` };
     if (quantity <= 0) return { success: false, message: '至少要賣 1 股喔！' };
 
-    // ─ Paywall: 每日交易次數檢查 (免費用戶 ≤ 10 次/日) ─
+    // ─ Paywall: 每日交易次數檢查 ─
     if (!get().isPremiumUser()) {
       const todayCount = get().getTodayTradeCount();
-      if (todayCount >= 10) {
-        return { success: false, message: '🔒 免費帳號每日最多交易 10 次！\n升級 Premium 可解鎖無限交易 💎' };
+      if (todayCount >= get().systemSettings.free_max_daily_trades) {
+        return { success: false, message: `🔒 免費帳號每日最多交易 ${get().systemSettings.free_max_daily_trades} 次！\n升級 Premium 可解鎖無限交易 💎` };
       }
     }
 
@@ -628,6 +646,30 @@ export const useStore = create<InvestmentStore>((set, get) => ({
     return (data || []).map(f => ({
       userId: f.user_id, featureKey: f.feature_key, enabled: Boolean(f.enabled),
     }));
+  },
+
+  adminUpdateSetting: async (key, value) => {
+    if (!supabase) return { error: '資料庫未連線' };
+    const { user } = get();
+    if (!user?.isAdmin) return { error: '需要管理員權限' };
+    
+    // 更新資料庫
+    const { error } = await supabase.from('system_settings').upsert({
+      setting_key: key, setting_value: value, updated_at: new Date().toISOString()
+    }, { onConflict: 'setting_key' });
+    
+    if (error) return { error: error.message };
+    
+    // 更新本地狀態
+    set(state => ({
+      ...state,
+      systemSettings: {
+        ...state.systemSettings,
+        [key]: value
+      }
+    }));
+    
+    return { error: null };
   },
 
   // ─── Tier & Feature Helpers ────────────────
