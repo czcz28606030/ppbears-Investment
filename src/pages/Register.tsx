@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useStore } from '../store';
 import './Login.css';
 
@@ -15,6 +15,7 @@ export default function Register() {
   const [needsConfirmation, setNeedsConfirmation] = useState(false);
   const [registeredEmail, setRegisteredEmail] = useState('');
   const { registerParent } = useStore();
+  const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,49 +34,7 @@ export default function Register() {
       setRegisteredEmail(email);
       setNeedsConfirmation(true);
     }
-    // If needsConfirmation is false, app already logged in → App.tsx redirects automatically
   };
-
-  // ── Email Confirmation Screen ──
-  if (needsConfirmation) {
-    return (
-      <div className="auth-page">
-        <div className="auth-bg-blobs">
-          <div className="blob blob-1"></div>
-          <div className="blob blob-2"></div>
-        </div>
-        <div className="auth-card">
-          <div className="auth-header">
-            <div style={{ fontSize: 64, marginBottom: 12 }} className="animate-bounce">📬</div>
-            <h1 className="auth-title">確認信已寄出！</h1>
-            <p className="auth-subtitle">帳號建立成功 🎉</p>
-          </div>
-          <div style={{
-            background: 'rgba(138,201,38,0.08)',
-            border: '1.5px solid rgba(138,201,38,0.3)',
-            borderRadius: 16,
-            padding: '16px 20px',
-            textAlign: 'center',
-            marginBottom: 20,
-          }}>
-            <p style={{ fontWeight: 800, fontSize: 14, color: '#2B2118', marginBottom: 6 }}>
-              請去信箱查收確認信 📧
-            </p>
-            <p style={{ fontWeight: 700, fontSize: 13, color: '#7A6A55', marginBottom: 4 }}>
-              {registeredEmail}
-            </p>
-            <p style={{ fontWeight: 600, fontSize: 12, color: '#BFB09A' }}>
-              點擊信中的連結後，再回來登入即可！
-            </p>
-          </div>
-          <div className="auth-footer" style={{ marginTop: 0 }}>
-            已確認信箱？
-            <Link to="/login" className="auth-link">立刻登入 →</Link>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="auth-page">
@@ -83,6 +42,7 @@ export default function Register() {
         <div className="blob blob-1"></div>
         <div className="blob blob-2"></div>
       </div>
+      
       <div className="auth-card">
         <div className="auth-header">
           <img src="/ppbear.png" alt="PPBear" className="auth-logo" />
@@ -164,6 +124,44 @@ export default function Register() {
           已有帳號？ <Link to="/login" className="auth-link">登入 →</Link>
         </div>
       </div>
+
+      {/* ── Email Confirmation Modal ── */}
+      {needsConfirmation && (
+        <div className="modal-overlay" style={{ alignItems: 'center' }}>
+          <div className="modal-content" style={{ borderRadius: '28px', maxWidth: '400px', margin: '0 20px', padding: '32px 24px' }}>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: 64, marginBottom: 16 }} className="animate-bounce">📬</div>
+              <h2 style={{ fontSize: 22, fontWeight: 900, color: '#2B2118', marginBottom: 8 }}>帳號建立成功！</h2>
+              <p style={{ fontSize: 14, fontWeight: 700, color: '#7A6A55', marginBottom: 20 }}>
+                請去您的信箱查收確認信
+              </p>
+              
+              <div style={{
+                background: 'rgba(138,201,38,0.1)',
+                border: '1.5px dashed rgba(138,201,38,0.4)',
+                borderRadius: 16,
+                padding: '12px',
+                marginBottom: 24,
+                wordBreak: 'break-all'
+              }}>
+                <span style={{ fontWeight: 800, color: '#8AC926' }}>{registeredEmail}</span>
+              </div>
+
+              <p style={{ fontSize: 13, fontWeight: 600, color: '#BFB09A', marginBottom: 24, lineHeight: 1.6 }}>
+                點擊信件中的驗證連結後，<br/>即可返回此頁面登入。
+              </p>
+
+              <button 
+                onClick={() => navigate('/login')}
+                className="btn btn-block btn-primary"
+                style={{ padding: '16px', fontSize: 16 }}
+              >
+                我知道了，前往登入 👉
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
