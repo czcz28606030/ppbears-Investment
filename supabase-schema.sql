@@ -148,3 +148,36 @@ CREATE POLICY "Parent can update child balance"
     auth.uid() = id OR
     parent_id = auth.uid()
   );
+
+-- ==========================================================
+-- 6. Admin RLS Policies (管理員可存取所有資料)
+-- ==========================================================
+CREATE POLICY "Admin can view all users"
+  ON public.users FOR SELECT
+  USING (EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND is_admin = true));
+
+CREATE POLICY "Admin can update all users"
+  ON public.users FOR UPDATE
+  USING (EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND is_admin = true));
+
+CREATE POLICY "Admin can delete users"
+  ON public.users FOR DELETE
+  USING (EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND is_admin = true));
+
+CREATE POLICY "Admin can view all trades"
+  ON public.trades FOR SELECT
+  USING (EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND is_admin = true));
+
+CREATE POLICY "Admin can view all holdings"
+  ON public.holdings FOR SELECT
+  USING (EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND is_admin = true));
+
+ALTER TABLE public.feature_overrides ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Admin can manage feature overrides"
+  ON public.feature_overrides FOR ALL
+  USING (EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND is_admin = true));
+
+CREATE POLICY "Users can view own feature overrides"
+  ON public.feature_overrides FOR SELECT
+  USING (auth.uid() = user_id);

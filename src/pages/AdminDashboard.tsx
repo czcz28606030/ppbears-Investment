@@ -208,25 +208,25 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* 操作按鈕：所有帳號都可管理，只排除自己 */}
-            {u.id !== user.id && (
-              <div className="admin-actions">
-                {u.tier === 'free' ? (
-                  <button className="admin-btn admin-btn-premium" onClick={() => handleUpgrade(u)}>💎 升級 Premium</button>
-                ) : (
-                  <button className="admin-btn admin-btn-downgrade" onClick={() => handleDowngrade(u)}>⬇️ 降級 Free</button>
-                )}
-                <button className="admin-btn admin-btn-balance" onClick={() => {
-                  setBalanceModal({ userId: u.id, name: u.displayName, current: u.availableBalance });
-                  setBalanceInput(String(u.availableBalance));
-                }}>💰 調餘額</button>
-                <button className="admin-btn admin-btn-feature" onClick={() => toggleFeaturePanel(u.id)}>🔧 功能開關</button>
+            {/* 操作按鈕：所有帳號都可管理 */}
+            <div className="admin-actions">
+              {u.tier === 'free' ? (
+                <button className="admin-btn admin-btn-premium" onClick={() => handleUpgrade(u)}>💎 升級 Premium</button>
+              ) : (
+                <button className="admin-btn admin-btn-downgrade" onClick={() => handleDowngrade(u)}>⬇️ 降級 Free</button>
+              )}
+              <button className="admin-btn admin-btn-balance" onClick={() => {
+                setBalanceModal({ userId: u.id, name: u.displayName, current: u.availableBalance });
+                setBalanceInput(String(u.availableBalance));
+              }}>💰 調餘額</button>
+              <button className="admin-btn admin-btn-feature" onClick={() => toggleFeaturePanel(u.id)}>🔧 功能開關</button>
+              {u.id !== user.id && (
                 <button className="admin-btn admin-btn-delete" onClick={() => handleDelete(u)}>🗑️ 刪除</button>
-              </div>
-            )}
+              )}
+            </div>
 
-            {/* 功能開關面板：所有帳號都可控制，只排除自己 */}
-            {expandedUser === u.id && u.id !== user.id && (
+            {/* 功能開關面板 */}
+            {expandedUser === u.id && (
               <div className="admin-feature-section">
                 {FEATURE_KEYS.map(feat => {
                   const enabled = isFeatureEnabled(u.id, feat.key, u.tier);
