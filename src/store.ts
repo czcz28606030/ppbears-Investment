@@ -41,7 +41,7 @@ interface InvestmentStore {
 
   // Auth
   initAuth: () => Promise<void>;
-  registerParent: (email: string, password: string, displayName: string, avatar: string) => Promise<{ error: string | null }>;
+  registerParent: (email: string, password: string, displayName: string, avatar: string) => Promise<{ error: string | null; needsConfirmation?: boolean }>;
   login: (email: string, password: string) => Promise<{ error: string | null }>;
   logout: () => Promise<void>;
   sendPasswordResetEmail: (email: string) => Promise<{ error: string | null }>;
@@ -145,14 +145,20 @@ export const useStore = create<InvestmentStore>((set, get) => ({
       }]);
       if (insertError) return { error: insertError.message };
       
-      // Explicitly load user data and session again after insert to fix race condition
+      // Check if email confirmation is required (production)
+      // data.session is null when Supabase requires email confirmation
+      if (!data.session) {
+        return { error: null, needsConfirmation: true };
+      }
+      
+      // Auto-login flow (when email confirmation is disabled)
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
         set({ session });
         await get().loadUserData(session.user.id);
       }
       
-      return { error: null };
+      return { error: null, needsConfirmation: false };
     } catch (e) { return { error: String(e) }; }
   },
 

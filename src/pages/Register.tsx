@@ -12,6 +12,8 @@ export default function Register() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [needsConfirmation, setNeedsConfirmation] = useState(false);
+  const [registeredEmail, setRegisteredEmail] = useState('');
   const { registerParent } = useStore();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -22,14 +24,58 @@ export default function Register() {
     setError('');
     setIsLoading(true);
 
-    // 預設使用 🐻，使用者可以之後在設定頁面上傳照片
     const result = await registerParent(email, password, displayName, '🐻');
     setIsLoading(false);
 
     if (result.error) {
-      setError(result.error.includes('already') ? '這個 Email 已經被使用了' : result.error);
+      setError(result.error.includes('already') ? '這個 Email 已經被使用了，請直接登入' : result.error);
+    } else if (result.needsConfirmation) {
+      setRegisteredEmail(email);
+      setNeedsConfirmation(true);
     }
+    // If needsConfirmation is false, app already logged in → App.tsx redirects automatically
   };
+
+  // ── Email Confirmation Screen ──
+  if (needsConfirmation) {
+    return (
+      <div className="auth-page">
+        <div className="auth-bg-blobs">
+          <div className="blob blob-1"></div>
+          <div className="blob blob-2"></div>
+        </div>
+        <div className="auth-card">
+          <div className="auth-header">
+            <div style={{ fontSize: 64, marginBottom: 12 }} className="animate-bounce">📬</div>
+            <h1 className="auth-title">確認信已寄出！</h1>
+            <p className="auth-subtitle">帳號建立成功 🎉</p>
+          </div>
+          <div style={{
+            background: 'rgba(138,201,38,0.08)',
+            border: '1.5px solid rgba(138,201,38,0.3)',
+            borderRadius: 16,
+            padding: '16px 20px',
+            textAlign: 'center',
+            marginBottom: 20,
+          }}>
+            <p style={{ fontWeight: 800, fontSize: 14, color: '#2B2118', marginBottom: 6 }}>
+              請去信箱查收確認信 📧
+            </p>
+            <p style={{ fontWeight: 700, fontSize: 13, color: '#7A6A55', marginBottom: 4 }}>
+              {registeredEmail}
+            </p>
+            <p style={{ fontWeight: 600, fontSize: 12, color: '#BFB09A' }}>
+              點擊信中的連結後，再回來登入即可！
+            </p>
+          </div>
+          <div className="auth-footer" style={{ marginTop: 0 }}>
+            已確認信箱？
+            <Link to="/login" className="auth-link">立刻登入 →</Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="auth-page">
@@ -63,12 +109,7 @@ export default function Register() {
                 required
                 autoComplete="new-password"
               />
-              <button
-                type="button"
-                className="password-toggle"
-                onClick={() => setShowPassword(v => !v)}
-                tabIndex={-1}
-              >
+              <button type="button" className="password-toggle" onClick={() => setShowPassword(v => !v)} tabIndex={-1}>
                 {showPassword ? '🙈' : '👁️'}
               </button>
             </div>
@@ -86,12 +127,7 @@ export default function Register() {
                 required
                 autoComplete="new-password"
               />
-              <button
-                type="button"
-                className="password-toggle"
-                onClick={() => setShowConfirmPassword(v => !v)}
-                tabIndex={-1}
-              >
+              <button type="button" className="password-toggle" onClick={() => setShowConfirmPassword(v => !v)} tabIndex={-1}>
                 {showConfirmPassword ? '🙈' : '👁️'}
               </button>
             </div>
