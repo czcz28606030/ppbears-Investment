@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore, formatMoney, formatPrice } from '../store';
 import { supabase } from '../supabase';
+import { fetchTWSEAllStocks, type TWSTEStockQuote } from '../api';
 import type { UserAccount, FeatureOverride, Trade } from '../types';
 import './AdminDashboard.css';
 
@@ -17,6 +18,7 @@ export default function AdminDashboard() {
     systemSettings, adminUpdateSetting, adminSetUserRelation } = useStore();
 
   const [allHoldings, setAllHoldings] = useState<any[]>([]);
+  const [liveQuotes, setLiveQuotes] = useState<Record<string, TWSTEStockQuote>>({});
 
   const [search, setSearch] = useState('');
   const [balanceModal, setBalanceModal] = useState<{ userId: string; name: string; current: number } | null>(null);
@@ -42,6 +44,11 @@ export default function AdminDashboard() {
           setAllHoldings(data || []);
         });
       }
+      fetchTWSEAllStocks().then((data) => {
+        const quotesMap: Record<string, TWSTEStockQuote> = {};
+        data.forEach(t => quotesMap[t.Code] = t);
+        setLiveQuotes(quotesMap);
+      });
     }
   }, [user]);
 
@@ -49,7 +56,8 @@ export default function AdminDashboard() {
     const userHoldings = allHoldings.filter(h => h.user_id === userId);
     let pnl = 0;
     userHoldings.forEach(h => {
-      const currentPrice = Number(h.current_price);
+      const q = liveQuotes[h.stock_code];
+      const currentPrice = q ? parseFloat(q.ClosingPrice) : Number(h.current_price);
       pnl += (currentPrice - Number(h.avg_cost)) * Number(h.total_shares);
     });
     return pnl;

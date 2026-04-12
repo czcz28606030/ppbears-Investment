@@ -85,10 +85,10 @@
 
 .budget-bar-fill {
   height: 100%;
-  background: linear-gradient(90deg, var(--primary) 0%, var(--accent) 100%);
+  background: linear-gradient(90deg, #64B5F6 0%, #2196F3 100%);
   border-radius: var(--radius-full);
   transition: width 0.8s ease;
-  box-shadow: 0 0 8px rgba(255, 185, 94, 0.6);
+  box-shadow: 0 0 8px rgba(33, 150, 243, 0.5);
 }
 
 .budget-detail {
