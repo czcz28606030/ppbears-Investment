@@ -11,7 +11,7 @@ export default function Explore() {
   const [search, setSearch] = useState('');
   const [activeStrategy, setActiveStrategy] = useState('ai');
   const [error, setError] = useState('');
-  const [twsePriceMap, setTwsePriceMap] = useState<Record<string, { close: string; change: string }>>({});
+  const [twsePriceMap, setTwsePriceMap] = useState<Record<string, { close: string; change: string; name: string }>>({});
 
   async function loadData() {
     setLoading(true);
@@ -22,9 +22,9 @@ export default function Explore() {
       
       // 建立 TWSE 快速查詢 map
       if (twseAll.length > 0) {
-        const map: Record<string, { close: string; change: string }> = {};
+        const map: Record<string, { close: string; change: string; name: string }> = {};
         for (const s of twseAll) {
-          if (s.ClosingPrice) map[s.Code] = { close: s.ClosingPrice, change: s.Change };
+          if (s.ClosingPrice) map[s.Code] = { close: s.ClosingPrice, change: s.Change, name: s.Name || '' };
         }
         setTwsePriceMap(map);
       }
@@ -82,9 +82,10 @@ export default function Explore() {
       list = strategyCodes.map(code => {
         const found = POPULAR_STOCKS.find(s => s.code === code);
         const twse = twsePriceMap[code];
+        const stockName = found ? found.name : (twse?.name || `股票 ${code}`);
         return {
           coid: code,
-          stkname: found ? found.name : `股票 ${code}`,
+          stkname: stockName,
           close: twse ? twse.close : '0',
           advice: 'buy',
           score: 85,
