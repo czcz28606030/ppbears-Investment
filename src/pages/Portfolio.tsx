@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore, formatMoney, formatPrice } from '../store';
 import type { Holding } from '../types';
@@ -5,11 +6,68 @@ import './Portfolio.css';
 
 export default function Portfolio() {
   const navigate = useNavigate();
-  const { holdings, getPortfolioSummary, user } = useStore();
+  const { holdings, getPortfolioSummary, user, hasFeature } = useStore();
+  const hasAiFeature = hasFeature('ai_portfolio_advice');
   const summary = getPortfolioSummary();
 
   const pl = summary.totalProfitLoss;
   const isProfit = pl >= 0;
+
+  const [aiSignals, setAiSignals] = useState<Record<string, { advice: string, color: string, icon: string }>>({});
+
+  useEffect(() => {
+    let mounted = true;
+    async function loadSignals() {
+      if (!hasAiFeature || holdings.length === 0) return;
+      
+      const signals: Record<string, { advice: string, color: string, icon: string }> = {};
+      
+      try {
+        let buySet = new Set<string>();
+        for (let i = 0; i < 7; i++) {
+          const d = new Date();
+          d.setDate(d.getDate() - i);
+          if (d.getDay() === 0 || d.getDay() === 6) continue;
+          const dateStr = d.toISOString().split('T')[0];
+          const res = await fetch(`https://api.ifalgo.com.tw/frontapi/common/getSimonsData?searchDate=${dateStr}`);
+          const data = await res.json();
+          const items = data.data?.dataItems || [];
+          if (items.length > 0) {
+            buySet = new Set(items.map((it: any) => it.coid));
+            break;
+          }
+        }
+
+        await Promise.all(holdings.map(async (h) => {
+          if (buySet.has(h.stockCode)) {
+            signals[h.stockCode] = { advice: '加碼', color: 'var(--profit-color)', icon: '🚀' };
+            return;
+          }
+          try {
+            const res = await fetch(`https://api.ifalgo.com.tw/frontapi/stock?coid=${h.stockCode}`);
+            const json = await res.json();
+            const list = json.data?.stock?.aiQuanBackDataTradingList || [];
+            if (list.length > 0) {
+              const last = list[list.length - 1];
+              if (last.sell_sig === '出場' || last.sell_sig === '賣出') {
+                signals[h.stockCode] = { advice: '出場', color: 'var(--loss-color)', icon: '⚠️' };
+                return;
+              }
+            }
+            signals[h.stockCode] = { advice: '中立', color: '#FFA000', icon: '⚖️' };
+          } catch {
+            signals[h.stockCode] = { advice: '中立', color: '#FFA000', icon: '⚖️' };
+          }
+        }));
+
+        if (mounted) setAiSignals(signals);
+      } catch (err) {
+        console.error('Failed to load AI signals', err);
+      }
+    }
+    loadSignals();
+    return () => { mounted = false; };
+  }, [holdings, hasAiFeature]);
 
   return (
     <div className="portfolio">
@@ -93,7 +151,14 @@ export default function Portfolio() {
                   onClick={() => navigate(`/stock/${h.stockCode}`)}
                 >
                   <div className="holding-left">
-                    <div className="holding-emoji">{itemIsProfit ? '😊' : '😢'}</div>
+                    {hasAiFeature && aiSignals[h.stockCode] ? (
+                      <div className="holding-emoji" style={{ display: 'flex', flexDirection: 'column', padding: '4px', background: '#f5f5f5', borderRadius: 8, textAlign: 'center' }}>
+                        <span style={{ fontSize: '18px' }}>{aiSignals[h.stockCode].icon}</span>
+                        <span style={{ fontSize: '10px', fontWeight: 800, color: aiSignals[h.stockCode].color }}>{aiSignals[h.stockCode].advice}</span>
+                      </div>
+                    ) : (
+                      <div className="holding-emoji">{itemIsProfit ? '😊' : '😢'}</div>
+                    )}
                     <div>
                       <div className="holding-name">{h.stockName}</div>
                       <div className="holding-code">{h.stockCode}</div>
