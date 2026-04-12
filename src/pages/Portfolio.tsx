@@ -156,16 +156,18 @@ export default function Portfolio() {
       {user && user.initialBalance > 0 && (
         <div className="card budget-card">
           <div className="budget-header">
-            <span className="budget-label">💰 資金使用進度</span>
-            <span className="budget-pct">
+            <span className="budget-label" style={{ fontSize: '16px' }}>💰 資金使用進度</span>
+            <span className="budget-pct" style={{ fontSize: '15px' }}>
               {Math.min(100, ((user.initialBalance - summary.cashBalance) / user.initialBalance * 100)).toFixed(0)}% 已投資
             </span>
           </div>
           <div className="budget-bar">
-            <div
-              className="budget-bar-fill"
-              style={{ width: `${Math.min(100, (user.initialBalance - summary.cashBalance) / user.initialBalance * 100)}%` }}
-            ></div>
+            {((user.initialBalance - summary.cashBalance) / user.initialBalance) > 0 && (
+              <div
+                className="budget-bar-fill"
+                style={{ width: `${Math.max(3, Math.min(100, (user.initialBalance - summary.cashBalance) / user.initialBalance * 100))}%` }}
+              ></div>
+            )}
           </div>
           <div className="budget-detail">
             <span>已投資 NT$ {formatMoney(Math.max(0, user.initialBalance - summary.cashBalance))}</span>
