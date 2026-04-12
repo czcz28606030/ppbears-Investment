@@ -109,7 +109,7 @@ export default function Dashboard() {
             <span className="asset-detail-value">NT$ {formatMoney(summary.totalMarketValue)}</span>
           </div>
           <div className="asset-detail">
-            <span className="asset-detail-label">📊 累積損益</span>
+            <span className="asset-detail-label">📊 未平倉損益</span>
             <span className={`asset-detail-value ${summary.totalProfitLoss > 0 ? 'text-profit' : summary.totalProfitLoss < 0 ? 'text-loss' : ''}`}>
               {summary.totalProfitLoss > 0 ? '+' : ''}NT$ {formatMoney(summary.totalProfitLoss)}
               <span style={{ fontSize: '0.8em', marginLeft: 4 }}>({summary.profitLossPct > 0 ? '+' : ''}{summary.profitLossPct.toFixed(1)}%)</span>
@@ -262,7 +262,7 @@ export default function Dashboard() {
                         </div>
                      </div>
                      <div style={{ display: 'flex', flexDirection: 'column', background: '#fafafa', padding: '10px', borderRadius: '10px' }}>
-                        <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '4px', fontWeight: 600 }}>累積損益</div>
+                        <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '4px', fontWeight: 600 }}>未平倉損益</div>
                         <div className={isProfit ? 'text-profit' : 'text-loss'} style={{ fontWeight: 800, fontSize: '15px' }}>
                            {isProfit ? '+' : ''}{formatMoney(totalPnL)} <span style={{fontSize: '12px', fontWeight: 500}}>({isProfit ? '+' : ''}{totalPnLPct.toFixed(1)}%)</span>
                         </div>
