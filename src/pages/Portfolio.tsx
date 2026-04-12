@@ -53,7 +53,7 @@ export default function Portfolio() {
 
           await Promise.all(holdings.map(async (h) => {
             if (buySet.has(h.stockCode)) {
-              signals[h.stockCode] = { advice: '加碼', color: '#FF2424', icon: '🚀' };
+              signals[h.stockCode] = { advice: 'AI 加碼', color: '#FF2424', icon: '👑 🚀' };
               return;
             }
             try {
@@ -63,13 +63,13 @@ export default function Portfolio() {
               if (list.length > 0) {
                 const last = list[list.length - 1];
                 if (last.sell_sig === '出場' || last.sell_sig === '賣出') {
-                  signals[h.stockCode] = { advice: '出場', color: 'var(--loss-color)', icon: '⚠️' };
+                  signals[h.stockCode] = { advice: 'AI 出場', color: 'var(--loss-color)', icon: '👑 ⚠️' };
                   return;
                 }
               }
-              signals[h.stockCode] = { advice: '中立', color: '#888888', icon: '⚖️' };
+              signals[h.stockCode] = { advice: 'AI 中立', color: '#888888', icon: '👑 ⚖️' };
             } catch {
-              signals[h.stockCode] = { advice: '中立', color: '#888888', icon: '⚖️' };
+              signals[h.stockCode] = { advice: 'AI 中立', color: '#888888', icon: '👑 ⚖️' };
             }
           }));
 
@@ -100,11 +100,11 @@ export default function Portfolio() {
                const max20 = Math.max(...closes.slice(-20));
                
                if (lastClose > sma60 && lastClose >= max20) {
-                 signals[h.stockCode] = { advice: '加碼', color: '#FF2424', icon: '🚀' };
+                 signals[h.stockCode] = { advice: '技術 加碼', color: '#FF2424', icon: '📈 🚀' };
                } else if (lastClose < sma60 && prevClose < sma60Prev) {
-                 signals[h.stockCode] = { advice: '出場', color: 'var(--loss-color)', icon: '⚠️' };
+                 signals[h.stockCode] = { advice: '技術 出場', color: 'var(--loss-color)', icon: '📉 ⚠️' };
                } else {
-                 signals[h.stockCode] = { advice: '中立', color: '#888888', icon: '⚖️' };
+                 signals[h.stockCode] = { advice: '技術 中立', color: '#888888', icon: '➖ ⚖️' };
                }
              }
           } catch (e) {
