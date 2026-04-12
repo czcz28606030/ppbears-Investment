@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore, formatMoney } from '../store';
 import { supabase } from '../supabase';
-import { fetchTWSEAllStocks, type TWSTEStockQuote } from '../api';
+import { fetchTWSEAllStocks, fetchTWSEDividendYields, type TWSTEStockQuote, type TWSEDividendYield } from '../api';
 import type { Holding } from '../types';
 import './ManageChildren.css';
 import './Login.css'; // Import for password-wrapper and toggle styles
@@ -16,15 +16,23 @@ export default function ManageChildren() {
   // 子帳號資產資料
   const [childrenHoldings, setChildrenHoldings] = useState<Record<string, Holding[]>>({});
   const [liveQuotes, setLiveQuotes] = useState<Record<string, TWSTEStockQuote>>({});
+  const [liveDividends, setLiveDividends] = useState<Record<string, TWSEDividendYield>>({});
 
   useEffect(() => {
     async function loadDetailedData() {
       if (children.length === 0) return;
       
-      const twse = await fetchTWSEAllStocks();
+      const [twse, twseDivs] = await Promise.all([
+        fetchTWSEAllStocks(),
+        fetchTWSEDividendYields()
+      ]);
       const quotesMap: Record<string, TWSTEStockQuote> = {};
       twse.forEach(t => quotesMap[t.Code] = t);
       setLiveQuotes(quotesMap);
+
+      const divsMap: Record<string, TWSEDividendYield> = {};
+      twseDivs.forEach(d => divsMap[d.Code] = d);
+      setLiveDividends(divsMap);
 
       const childIds = children.map(c => c.id);
       if (!supabase) return;
@@ -141,15 +149,22 @@ export default function ManageChildren() {
           let totalMarketValue = 0;
           let totalCost = 0;
           let todayPnL = 0;
+          let totalEstDividend = 0;
           
           cHoldings.forEach(h => {
              const quote = liveQuotes[h.stockCode];
              const currentPrice = quote ? parseFloat(quote.ClosingPrice) : h.currentPrice;
              const liveChangeAmt = quote && quote.Change ? parseFloat(quote.Change) : 0;
+             const divInfo = liveDividends[h.stockCode];
+             const divYield = divInfo && divInfo.DividendYield ? parseFloat(divInfo.DividendYield) / 100 : 0;
              
              totalMarketValue += currentPrice * h.totalShares;
              totalCost += h.avgCost * h.totalShares;
              todayPnL += liveChangeAmt * h.totalShares;
+             
+             if (divYield > 0) {
+                totalEstDividend += currentPrice * h.totalShares * divYield;
+             }
           });
           
           const totalAssets = child.availableBalance + totalMarketValue;
@@ -181,12 +196,20 @@ export default function ManageChildren() {
                 <span style={{ fontWeight: 700, fontSize: '14px' }}>NT$ {formatMoney(totalMarketValue)}</span>
               </div>
               {(totalMarketValue > 0) && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(0,0,0,0.05)', paddingTop: '12px', marginTop: '4px' }}>
-                  <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>累積獲利</span>
-                  <span className={totalPnL >= 0 ? 'text-profit' : 'text-loss'} style={{ fontWeight: 800, fontSize: '14px' }}>
-                    {totalPnL >= 0 ? '+' : ''}{formatMoney(totalPnL)} ({totalPnL >= 0 ? '+' : ''}{totalPnLPct.toFixed(1)}%)
-                  </span>
-                </div>
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(0,0,0,0.05)', paddingTop: '12px', marginTop: '4px' }}>
+                    <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>預估現金股利</span>
+                    <span style={{ fontWeight: 800, fontSize: '14px', color: 'var(--info-color)' }}>
+                      NT$ {formatMoney(totalEstDividend)}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '4px' }}>
+                    <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>累積獲利</span>
+                    <span className={totalPnL > 0 ? 'text-profit' : (totalPnL < 0 ? 'text-loss' : '')} style={{ fontWeight: 800, fontSize: '14px' }}>
+                      {totalPnL > 0 ? '+' : ''}{formatMoney(totalPnL)} ({totalPnL > 0 ? '+' : ''}{totalPnLPct.toFixed(1)}%)
+                    </span>
+                  </div>
+                </>
               )}
             </div>
 

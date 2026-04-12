@@ -44,6 +44,37 @@ export async function fetchTWSEAllStocks(): Promise<TWSTEStockQuote[]> {
   }
 }
 
+// TWSE 殖利率與本益比資料
+export interface TWSEDividendYield {
+  Code: string;
+  Name: string;
+  PEratio: string;
+  DividendYield: string;
+  PBratio: string;
+}
+
+let twseDividendCache: TWSEDividendYield[] | null = null;
+let twseDividendCacheDate: string | null = null;
+
+export async function fetchTWSEDividendYields(): Promise<TWSEDividendYield[]> {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    if (twseDividendCache && twseDividendCacheDate === today) {
+      return twseDividendCache;
+    }
+    const url = `${TWSE_BASE}/exchangeReport/BWIBBU_ALL`;
+    const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+    if (!res.ok) throw new Error(`TWSE API error: ${res.status}`);
+    const data: TWSEDividendYield[] = await res.json();
+    twseDividendCache = data;
+    twseDividendCacheDate = today;
+    return data;
+  } catch (err) {
+    console.error('fetchTWSEDividendYields error:', err);
+    return [];
+  }
+}
+
 // 查詢單一股票的 TWSE 即時收盤價
 export async function fetchTWSEStockPrice(code: string): Promise<TWSTEStockQuote | null> {
   const all = await fetchTWSEAllStocks();

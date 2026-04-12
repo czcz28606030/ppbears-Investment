@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore, formatMoney } from '../store';
-import { POPULAR_STOCKS, fetchTWSEAllStocks, type TWSTEStockQuote } from '../api';
+import { POPULAR_STOCKS, fetchTWSEAllStocks, fetchTWSEDividendYields, type TWSTEStockQuote, type TWSEDividendYield } from '../api';
 import './Dashboard.css';
 
 export default function Dashboard() {
@@ -17,15 +17,24 @@ export default function Dashboard() {
   
   const [livePnL, setLivePnL] = useState<{ todayPnL: number, todayPnLPct: number } | null>(null);
   const [liveQuotes, setLiveQuotes] = useState<Record<string, TWSTEStockQuote>>({});
+  const [liveDividends, setLiveDividends] = useState<Record<string, TWSEDividendYield>>({});
 
   useEffect(() => {
     async function fetchLive() {
       if (holdings.length === 0) {
         setLivePnL({ todayPnL: 0, todayPnLPct: 0 });
         setLiveQuotes({});
+        setLiveDividends({});
         return;
       }
-      const twse = await fetchTWSEAllStocks();
+      
+      const [twse, twseDivs] = await Promise.all([
+        fetchTWSEAllStocks(),
+        fetchTWSEDividendYields()
+      ]);
+      const divsMap: Record<string, TWSEDividendYield> = {};
+      twseDivs.forEach(d => divsMap[d.Code] = d);
+      setLiveDividends(divsMap);
       const quotesMap: Record<string, TWSTEStockQuote> = {};
       let todayPnL = 0;
       let totalYesterdayValue = 0;
@@ -249,7 +258,22 @@ export default function Dashboard() {
                      <div>
                         <div style={{ color: 'var(--text-tertiary)', fontSize: '11px', marginBottom: '2px' }}>💵 預估現金股利</div>
                         <div style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '14px' }}>
-                           NT$ 0 <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', fontWeight: 400 }}>(試算中)</span>
+                           {(() => {
+                             const divInfo = liveDividends[h.stockCode];
+                             const divYield = divInfo && divInfo.DividendYield ? parseFloat(divInfo.DividendYield) / 100 : 0;
+                             if (divYield > 0) {
+                               const estDiv = currentPrice * h.totalShares * divYield;
+                               return `NT$ ${formatMoney(estDiv)} `;
+                             }
+                             return 'NT$ 0 ';
+                           })()}
+                           {liveDividends[h.stockCode] ? (
+                              <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', fontWeight: 400 }}>
+                                (依殖利率 {liveDividends[h.stockCode].DividendYield || 0}%)
+                              </span>
+                           ) : (
+                              <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', fontWeight: 400 }}>(試算中)</span>
+                           )}
                         </div>
                      </div>
                   </div>
