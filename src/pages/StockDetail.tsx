@@ -361,28 +361,50 @@ export default function StockDetail() {
           <div className="section-header">
             <h2 className="section-title">🧮 大人們買在哪裡？</h2>
           </div>
-          <div className="chip-analysis">
-            <div className="chip-item">
-              <div className="chip-label">🌍 外資成本</div>
-              <div className="chip-value">NT$ {recommendation.wtcost}</div>
-              <div className={`chip-compare ${price < parseFloat(recommendation.wtcost) ? 'text-profit' : 'text-loss'}`}>
-                {price < parseFloat(recommendation.wtcost) ? '目前比外資便宜 👍' : '目前比外資貴'}
-              </div>
-            </div>
-            <div className="chip-item">
-              <div className="chip-label">🏢 投信成本</div>
-              <div className="chip-value">NT$ {recommendation.fcost}</div>
-              <div className={`chip-compare ${price < parseFloat(recommendation.fcost) ? 'text-profit' : 'text-loss'}`}>
-                {price < parseFloat(recommendation.fcost) ? '目前比投信便宜 👍' : '目前比投信貴'}
-              </div>
-            </div>
-            {recommendation.tcost && (
-              <div className="chip-item">
-                <div className="chip-label">🏦 自營商成本</div>
-                <div className="chip-value">NT$ {recommendation.tcost}</div>
-              </div>
-            )}
-            <div className="chip-item">
+          <div className="cost-comparison-container">
+            {(() => {
+              const wtcost = parseFloat(recommendation.wtcost || '0') || 0;
+              const fcost = parseFloat(recommendation.fcost || '0') || 0;
+              const tcost = parseFloat(recommendation.tcost || '0') || 0;
+              const maxVal = Math.max(price, wtcost, fcost, tcost) * 1.05 || 1; // 5% padding
+              
+              const renderBar = (label: string, val: number, color: string, isCurrentPrice = false) => {
+                if (val <= 0) return null;
+                const width = `${(val / maxVal) * 100}%`;
+                let diffText = '';
+                let diffClass = '';
+                if (!isCurrentPrice) {
+                  if (price < val) { diffText = '便宜 👍'; diffClass = 'text-profit'; }
+                  else if (price > val) { diffText = '較貴'; diffClass = 'text-loss'; }
+                  else { diffText = '持平'; diffClass = 'text-muted'; }
+                }
+                return (
+                  <div className="cost-bar-row" key={label}>
+                    <div className="cost-bar-header">
+                      <span className="cost-bar-label">{label}</span>
+                      <div className="cost-bar-value-wrap">
+                        <span className="cost-bar-value">NT$ {val.toFixed(2)}</span>
+                        {!isCurrentPrice && <span className={`cost-bar-diff ${diffClass}`}>{diffText}</span>}
+                      </div>
+                    </div>
+                    <div className="cost-bar-track">
+                      <div className={`cost-bar-fill ${isCurrentPrice ? 'pulse-bar' : ''}`} style={{ width, background: color }}></div>
+                    </div>
+                  </div>
+                );
+              };
+
+              return (
+                <div className="cost-comparison">
+                  {renderBar('📍 現在價格', price, 'var(--primary)', true)}
+                  {renderBar('🌍 外資成本', wtcost, '#10b981')}
+                  {renderBar('🏢 投信成本', fcost, '#3b82f6')}
+                  {renderBar('🏦 自營商成本', tcost, '#8b5cf6')}
+                </div>
+              );
+            })()}
+
+            <div className="chip-item" style={{ marginTop: '16px' }}>
               <div className="chip-label">📊 強度指標</div>
               <div className="chip-value">{recommendation.strength}</div>
               <div className="chip-compare">

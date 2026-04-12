@@ -151,47 +151,54 @@ export default function ProfileSettings() {
           </div>
         </div>
       </div>
-      {/* 券商設定 (僅主帳號) */}
-      {user?.role === 'parent' && (
-        <div className="settings-card">
-          <div className="settings-section-title">券商交易手續費設定</div>
-          <p style={{ fontSize: '13px', color: '#888', marginBottom: '12px' }}>
+      {/* 券商設定 (全角色可見，副帳號唯讀) */}
+      <div className="settings-card">
+        <div className="settings-section-title">券商交易手續費設定</div>
+        {user?.role === 'parent' ? (
+          <p style={{ fontSize: '13px', color: '#888', marginBottom: '12px', padding: '0 20px' }}>
             這些設定會同步套用到您與所有副帳號的下單計算中，讓投資體驗更貼近真實。公定券商手續費為 0.1425%，證券交易稅為 0.3%。
           </p>
-          <div className="settings-item">
-            <label className="settings-label">📈 買賣手續費率</label>
-            <input
-              type="number"
-              step="0.000001"
-              className="settings-input"
-              value={brokerFeeRate}
-              onChange={(e) => setBrokerFeeRate(e.target.value)}
-              placeholder="例如 0.001425 (千分之1.425)"
-            />
-          </div>
-          <div className="settings-item">
-            <label className="settings-label">💰 最低收費門檻 (即低消，NT$)</label>
-            <input
-              type="number"
-              className="settings-input"
-              value={brokerMinFee}
-              onChange={(e) => setBrokerMinFee(e.target.value)}
-              placeholder="例如 20"
-            />
-          </div>
-          <div className="settings-item">
-            <label className="settings-label">📉 賣出證交稅率</label>
-            <input
-              type="number"
-              step="0.0001"
-              className="settings-input"
-              value={brokerTaxRate}
-              onChange={(e) => setBrokerTaxRate(e.target.value)}
-              placeholder="例如 0.003 (千分之3)"
-            />
-          </div>
+        ) : (
+          <p style={{ fontSize: '13px', color: '#888', marginBottom: '12px', padding: '0 20px' }}>
+            以下為目前主帳號設定的手續費率，讓您的投資體驗更貼近真實市場（僅供檢視）。
+          </p>
+        )}
+        <div className="settings-item">
+          <label className="settings-label">📈 買賣手續費率</label>
+          <input
+            type="number"
+            step="0.000001"
+            className="settings-input"
+            value={brokerFeeRate}
+            onChange={(e) => setBrokerFeeRate(e.target.value)}
+            placeholder="例如 0.001425"
+            disabled={user?.role !== 'parent'}
+          />
         </div>
-      )}
+        <div className="settings-item">
+          <label className="settings-label">💰 最低收費門檻</label>
+          <input
+            type="number"
+            className="settings-input"
+            value={brokerMinFee}
+            onChange={(e) => setBrokerMinFee(e.target.value)}
+            placeholder="例如 20"
+            disabled={user?.role !== 'parent'}
+          />
+        </div>
+        <div className="settings-item">
+          <label className="settings-label">📉 賣出證交稅率</label>
+          <input
+            type="number"
+            step="0.0001"
+            className="settings-input"
+            value={brokerTaxRate}
+            onChange={(e) => setBrokerTaxRate(e.target.value)}
+            placeholder="例如 0.003"
+            disabled={user?.role !== 'parent'}
+          />
+        </div>
+      </div>
 
       {/* 訊息提示 */}
       {message && (

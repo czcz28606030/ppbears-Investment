@@ -240,6 +240,81 @@
   color: var(--primary-dark);
 }
 
+/* Cost Bar Comparison */
+.cost-comparison-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.cost-comparison {
+  background: var(--bg-card);
+  border-radius: var(--radius-lg);
+  padding: var(--space-md);
+  border: 1px solid rgba(0, 0, 0, 0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.cost-bar-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cost-bar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.cost-bar-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.cost-bar-value-wrap {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.cost-bar-value {
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.cost-bar-diff {
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.cost-bar-track {
+  width: 100%;
+  height: 8px;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.cost-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes pulse-bar {
+  0% { opacity: 1; }
+  50% { opacity: 0.7; }
+  100% { opacity: 1; }
+}
+
+.pulse-bar {
+  animation: pulse-bar 2s ease-in-out infinite;
+}
+
 @keyframes blink {
   0%, 100% { opacity: 1; }
   50% { opacity: 0; }
