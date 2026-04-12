@@ -12,10 +12,6 @@ export default function Explore() {
   const [activeCategory, setActiveCategory] = useState('all');
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
   async function loadData() {
     setLoading(true);
     setError('');
@@ -44,6 +40,10 @@ export default function Explore() {
     }
     setLoading(false);
   }
+
+  useEffect(() => {
+    loadData();
+  }, []);
 
   const filtered = useMemo(() => {
     let list = recommendations;

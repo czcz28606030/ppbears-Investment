@@ -1,16 +1,14 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getHoldings, getPortfolioSummary, getTrades, getUser, formatMoney, formatPrice } from '../store';
+import { useStore, formatMoney, formatPrice } from '../store';
 import type { Holding, Trade } from '../types';
 import './Portfolio.css';
 
 export default function Portfolio() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'holdings' | 'trades'>('holdings');
-  const holdings = getHoldings();
-  const trades = getTrades();
+  const { holdings, trades, getPortfolioSummary, user } = useStore();
   const summary = getPortfolioSummary();
-  const user = getUser();
 
   const pl = summary.totalProfitLoss;
   const isProfit = pl >= 0;
@@ -48,25 +46,27 @@ export default function Portfolio() {
         </div>
       </div>
 
-      {/* 預算進度 */}
-      <div className="card budget-card">
-        <div className="budget-header">
-          <span className="budget-label">💰 零用錢使用進度</span>
-          <span className="budget-pct">
-            {((1 - summary.cashBalance / user.totalBudget) * 100).toFixed(0)}% 已投資
-          </span>
+      {/* 資金使用進度 (只在有初始金額時顯示) */}
+      {user && user.initialBalance > 0 && (
+        <div className="card budget-card">
+          <div className="budget-header">
+            <span className="budget-label">💰 資金使用進度</span>
+            <span className="budget-pct">
+              {Math.min(100, ((user.initialBalance - summary.cashBalance) / user.initialBalance * 100)).toFixed(0)}% 已投資
+            </span>
+          </div>
+          <div className="budget-bar">
+            <div
+              className="budget-bar-fill"
+              style={{ width: `${Math.min(100, (user.initialBalance - summary.cashBalance) / user.initialBalance * 100)}%` }}
+            ></div>
+          </div>
+          <div className="budget-detail">
+            <span>已投資 NT$ {formatMoney(Math.max(0, user.initialBalance - summary.cashBalance))}</span>
+            <span>初始資金 NT$ {formatMoney(user.initialBalance)}</span>
+          </div>
         </div>
-        <div className="budget-bar">
-          <div
-            className="budget-bar-fill"
-            style={{ width: `${((user.totalBudget - summary.cashBalance) / user.totalBudget * 100)}%` }}
-          ></div>
-        </div>
-        <div className="budget-detail">
-          <span>已投資 NT$ {formatMoney(user.totalBudget - summary.cashBalance)}</span>
-          <span>總額度 NT$ {formatMoney(user.totalBudget)}</span>
-        </div>
-      </div>
+      )}
 
       {/* 標籤切換 */}
       <div className="tabs">

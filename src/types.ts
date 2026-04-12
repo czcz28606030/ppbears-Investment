@@ -46,6 +46,7 @@ export interface SimonsItem {
 export type TradeType = 'buy' | 'sell';
 export type AccountRole = 'parent' | 'child';
 export type AIAdvice = 'buy' | 'hold' | 'sell';
+export type WithdrawalStatus = 'pending' | 'approved' | 'rejected';
 
 export interface Trade {
   id: string;
@@ -69,12 +70,30 @@ export interface Holding {
 
 export interface UserAccount {
   id: string;
-  name: string;
-  role: AccountRole;
+  email: string;
+  displayName: string;
   avatar: string;
-  totalBudget: number;
-  availableBalance: number;
+  role: AccountRole;
+  availableBalance: number;  // 目前可用現金（無上限）
+  initialBalance: number;    // 主帳號初始給予（參考用）
   parentId?: string;
+}
+
+export interface ChildAccount extends UserAccount {
+  role: 'child';
+}
+
+export interface WithdrawalRequest {
+  id: string;
+  childId: string;
+  childName?: string;
+  childAvatar?: string;
+  parentId: string;
+  amount: number;
+  reason?: string;
+  status: WithdrawalStatus;
+  reviewedAt?: string;
+  createdAt: string;
 }
 
 export interface StockQuote {

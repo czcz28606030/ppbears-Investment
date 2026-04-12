@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { fetchStockData, fetchSimonsData, toRecommendation, POPULAR_STOCKS } from '../api';
-import { executeBuy, executeSell, getHoldings, getUser, formatPrice, formatMoney } from '../store';
-import type { StockData, StockPrice, StockRecommendation, Holding } from '../types';
+import { useStore, formatPrice, formatMoney } from '../store';
+import type { StockData, StockPrice, StockRecommendation } from '../types';
 import './StockDetail.css';
 
 export default function StockDetail() {
@@ -15,7 +15,9 @@ export default function StockDetail() {
   const [tradeMode, setTradeMode] = useState<'buy' | 'sell' | null>(null);
   const [quantity, setQuantity] = useState('');
   const [tradeResult, setTradeResult] = useState<{ success: boolean; message: string } | null>(null);
-  const [holding, setHolding] = useState<Holding | undefined>(undefined);
+  
+  const { user, holdings, executeBuy, executeSell } = useStore();
+  const holding = holdings.find(h => h.stockCode === code);
 
   const stockEmoji = POPULAR_STOCKS.find(s => s.code === code)?.emoji || '📊';
 
@@ -54,30 +56,30 @@ export default function StockDetail() {
         }
       }
 
-      // 載入持股
-      setHolding(getHoldings().find(h => h.stockCode === coid));
+      // 載入持股與使用者已經存在全球狀態中，這裡我們不用再特別做什麼，因為 useStore 已經訂閱了 holdings
     } catch (err) {
       console.error(err);
     }
     setLoading(false);
   }
 
-  function handleTrade() {
+
+
+  async function handleTrade() {
     if (!code || !latestPrice || !tradeMode) return;
     const qty = parseInt(quantity);
     const price = parseFloat(latestPrice.close_d);
     
     let result;
     if (tradeMode === 'buy') {
-      result = executeBuy(code, stockData?.stkname || code, qty, price, stockData?.subindustry);
+      result = await executeBuy(code, stockData?.stkname || code, qty, price, stockData?.subindustry);
     } else {
-      result = executeSell(code, qty, price);
+      result = await executeSell(code, qty, price);
     }
 
     setTradeResult(result);
     if (result.success) {
       setQuantity('');
-      setHolding(getHoldings().find(h => h.stockCode === code));
     }
   }
 
@@ -106,7 +108,6 @@ export default function StockDetail() {
   const pb = latestPrice?.pb_ratio ? parseFloat(latestPrice.pb_ratio) : 0;
   const change = latestPrice?.roia ? parseFloat(latestPrice.roia) : 0;
   const isUp = change >= 0;
-  const user = getUser();
 
   if (loading) {
     return (
@@ -306,7 +307,7 @@ export default function StockDetail() {
 
             {tradeMode === 'buy' && (
               <div className="trade-modal-balance">
-                可用餘額：NT$ {formatMoney(user.availableBalance)}
+                可用餘額：NT$ {formatMoney(user!.availableBalance)}
               </div>
             )}
             {tradeMode === 'sell' && holding && (
