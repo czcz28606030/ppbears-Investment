@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { fetchStockData, fetchSimonsData, toRecommendation, POPULAR_STOCKS, fetchTWSEStockPrice } from '../api';
+import { fetchStockData, fetchSimonsData, toRecommendation, POPULAR_STOCKS, fetchTWSEStockPrice, makeKidFriendly } from '../api';
 import type { TWSTEStockQuote } from '../api';
 import { useStore, formatPrice, formatMoney } from '../store';
 import type { StockData, StockPrice, StockRecommendation } from '../types';
@@ -71,23 +71,10 @@ export default function StockDetail() {
   }
 
   function getKidDescription(): string {
-    if (!stockData) return '';
-    const status = stockData.status || '';
-    const industry = stockData.subindustry || '';
-    
-    if (status.includes('全球第一') || status.includes('全球最大')) {
-      return `🏆 哇！這間公司是世界第一名耶！它${status}`;
-    }
-    if (status.includes('台灣第一') || status.includes('台灣最大')) {
-      return `🇹🇼 這間公司是台灣最厲害的！它${status}`;
-    }
-    if (industry.includes('半導體') || industry.includes('晶圓')) {
-      return `🧠 這間公司是做電腦和手機「大腦」（晶片）的工廠！${status}`;
-    }
-    if (industry.includes('電路板') || industry.includes('PCB')) {
-      return `🔩 這間公司幫電子產品做「骨架」（電路板），就像蓋房子要先打地基一樣！${status}`;
-    }
-    return `🏢 ${status || '這是一間認真做生意的好公司！'}`;
+    const rawName = stockData?.stkname || twseQuote?.Name || code || '';
+    const status = stockData?.status || '';
+    const industry = stockData?.subindustry || '';
+    return makeKidFriendly(code || '', rawName, status, industry);
   }
 
   // 價格優先展示：TWSE 即時收盤價 > ifalgo 歷史 K 線
@@ -153,14 +140,16 @@ export default function StockDetail() {
   return (
     <div className="stock-detail">
       {/* Header */}
-      <div className="page-header">
+      <div className="page-header" style={{ justifyContent: 'space-between', borderBottom: 'none', paddingBottom: 0 }}>
         <button className="page-header-back" onClick={() => navigate(-1)}>←</button>
-        <h1 className="page-title">{stockEmoji} {stockData?.stkname || code}</h1>
-        <span className="detail-code">{code}</span>
+        <span className="detail-code" style={{ opacity: 0.5 }}>{code}</span>
       </div>
 
       {/* 價格區 */}
-      <div className="price-hero">
+      <div className="price-hero" style={{ textAlign: 'center', paddingTop: '12px' }}>
+        <div style={{ fontSize: '36px', fontWeight: 900, marginBottom: '16px', color: 'var(--text-primary)' }}>
+          {stockEmoji} {stockData?.stkname || twseQuote?.Name || code}
+        </div>
         <div className="price-main">NT$ {formatPrice(price)}</div>
         <div className={`price-change ${isUp ? 'text-profit' : 'text-loss'}`}>
           {isUp ? '▲' : '▼'} {Math.abs(change).toFixed(2)}%

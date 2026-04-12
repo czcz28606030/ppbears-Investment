@@ -83,15 +83,31 @@ export async function fetchTWSEStockPrice(code: string): Promise<TWSTEStockQuote
 }
 
 // 用小朋友聽得懂的方式描述公司
-function makeKidFriendly(status: string, industry: string): string {
+export function makeKidFriendly(code: string, name: string, status: string, industry: string): string {
+  // 針對熱門股票提供客製化的豐富介紹
+  const specificDescriptions: Record<string, string> = {
+    '2330': '台積電是台灣的驕傲！他們就像是世界上最厲害的「超微小樂高積木大師」，專門幫蘋果手機、電腦甚至是 AI 機器人打造最重要的「大腦晶片」。全世界有一半以上的最強晶片都是在台灣製造的喔！🏆🧠',
+    '2317': '鴻海是全世界最大的電子產品代工廠！你手上的 iPhone、家裡的遊戲機，很有可能都是由他們的機器人與超大工廠組裝出來的。他們現在也開始製造很酷的電動車囉！🚗📱',
+    '2454': '聯發科是設計手機大腦（晶片）的天才團隊！很多安卓手機裡面能夠跑超快、玩遊戲不會卡的晶片，都是他們畫出設計圖的喔！📱💡',
+    '2412': '中華電信是全台灣最大的電信公司！我們平常在家裡能用超快的網路看影片、在外面能用手機抓寶可夢，都是因為他們建了超多基地台跟海底電纜喔！🌐📡',
+    '2881': '富邦金是一間超級大金庫！除了幫很多人存錢的銀行之外，還有我們生病或發生意外時可以理賠的保險業務，是保護大家財產的小幫手！🏦💰',
+    '2882': '國泰金就像是一棵庇護著大家的大樹！從銀行存錢到買人壽保險，他們幫助許多叔叔阿姨規劃未來的財富，是台灣歷史非常悠久的大型金融機構！🌳💵',
+  };
+
+  if (specificDescriptions[code]) {
+    return specificDescriptions[code];
+  }
+
   const industryMap: Record<string, string> = {
-    '半導體': '做電腦「大腦」的工廠 🧠',
-    '電子組件': '做電子零件的工廠 🔩',
-    '光電業': '做螢幕和LED燈的工廠 💡',
-    '電機機械': '做大型機器的工廠 ⚙️',
-    '電器電纜': '做電線電纜的工廠 🔌',
-    '通信網路': '做網路設備的工廠 📡',
-    '電腦週邊': '做電腦配件的工廠 🖥️',
+    '半導體': '這是一間做電腦和手機「大腦」的科技工廠，裡面的工程師都穿著無塵衣在超乾淨的房間裡工作喔！ 🧠💻',
+    '電子組件': '他們專門為各種電子產品製造最重要的靈魂零件，就像是在做無敵鐵金剛的螺絲釘與關節！ 🔩🤖',
+    '光電業': '這是一間施展光學魔法的公司！我們平常用來看卡通的螢幕、或是漂亮的LED燈光，都是他們做出來的喔！ 💡📺',
+    '電機機械': '這是一間做超大型機器設備的工廠！不管是幫工廠做大馬達，還是巨大的齒輪，他們都是機械專家！ ⚙️🏭',
+    '電器電纜': '想要有電可以用，就必須要有這間公司！他們專門製造讓電流可以安全通過的超級電線和電纜！ 🔌⚡',
+    '通信網路': '他們幫忙把全世界連接在一起！製作各式各樣的網路設備，讓魔法般的 Wi-Fi 訊號可以飛過天際傳給你！ 📡🌐',
+    '電腦週邊': '你用的滑鼠、鍵盤、或是超酷的電競耳機，很可能就是這間創意豐富的公司為電腦量身打造的酷裝備喔！ 🖥️🎮',
+    '金融': '這是一間保管很多錢的銀行或保險機構！他們幫我們錢滾錢，或是保護我們的財產安全！ 🏦💰',
+    '航運': '他們有超巨大的貨船或是飛機，就像是海上的巨無霸快遞員，幫忙把全世界的東西運送到我們手上！ 🚢✈️',
   };
 
   for (const [key, desc] of Object.entries(industryMap)) {
@@ -99,12 +115,12 @@ function makeKidFriendly(status: string, industry: string): string {
   }
   
   if (status?.includes('全球第一') || status?.includes('全球最大')) {
-    return `世界第一名的大公司！超厲害！🏆`;
+    return `這是一間世界第一名的大公司！他們把產品賣到全世界各地，真的超厲害！🏆🌍`;
   }
-  if (status?.includes('台灣')) {
-    return `台灣很有名的好公司 🇹🇼`;
+  if (status?.includes('台灣') || name) {
+    return `這是一間在台灣努力打拼的好公司！他們認真製造很棒的產品給大家使用喔！🇹🇼🏢`;
   }
-  return '一間認真做事的好公司 🏢';
+  return '一間認真做事、努力賺錢，也為社會貢獻的好公司 🏢✨';
 }
 
 // 取得個股資料
@@ -228,7 +244,7 @@ export function simonsToQuote(item: SimonsItem): StockQuote {
     volume: 0,
     industry: item.category || '',
     status: item.status || '',
-    kidFriendlyDesc: makeKidFriendly(item.status || '', item.category || ''),
+    kidFriendlyDesc: makeKidFriendly(item.coid || '', item.stkname || '', item.status || '', item.category || ''),
   };
 }
 
