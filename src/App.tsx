@@ -7,6 +7,7 @@ import Explore from './pages/Explore';
 import Portfolio from './pages/Portfolio';
 import StockDetail from './pages/StockDetail';
 import Learn from './pages/Learn';
+import TradeHistory from './pages/TradeHistory';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import ManageChildren from './pages/ManageChildren';
@@ -66,6 +67,7 @@ function AppContent() {
           <Route path="/portfolio" element={<Portfolio />} />
           <Route path="/stock/:code" element={<StockDetail />} />
           <Route path="/learn" element={<Learn />} />
+          <Route path="/history" element={<TradeHistory />} />
 
           {/* Parent-only Routes */}
           <Route path="/manage-children" element={<ManageChildren />} />

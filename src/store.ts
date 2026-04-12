@@ -61,8 +61,8 @@ interface InvestmentStore {
   requestWithdrawal: (amount: number, reason: string) => Promise<{ error: string | null }>;
 
   // Trading
-  executeBuy: (stockCode: string, stockName: string, quantity: number, price: number, industry?: string) => Promise<{ success: boolean; message: string }>;
-  executeSell: (stockCode: string, quantity: number, price: number) => Promise<{ success: boolean; message: string }>;
+  executeBuy: (stockCode: string, stockName: string, quantity: number, price: number, industry?: string, reason?: string) => Promise<{ success: boolean; message: string }>;
+  executeSell: (stockCode: string, quantity: number, price: number, reason?: string) => Promise<{ success: boolean; message: string }>;
 
   // Profile
   updateProfile: (displayName: string, avatarUrl: string) => Promise<{ error: string | null }>;
@@ -226,7 +226,7 @@ export const useStore = create<InvestmentStore>((set, get) => ({
           id: t.id, stockCode: t.stock_code, stockName: t.stock_name,
           tradeType: t.trade_type as 'buy' | 'sell',
           quantity: Number(t.quantity), price: Number(t.price),
-          totalAmount: Number(t.total_amount), timestamp: Number(t.timestamp),
+          totalAmount: Number(t.total_amount), reason: t.reason as string | undefined, timestamp: Number(t.timestamp),
         }));
         set({ trades });
       })(),
@@ -386,7 +386,7 @@ export const useStore = create<InvestmentStore>((set, get) => ({
   },
 
   // ─── Trading ───────────────────────────────
-  executeBuy: async (stockCode, stockName, quantity, price, industry) => {
+  executeBuy: async (stockCode, stockName, quantity, price, industry, reason) => {
     const { user, holdings } = get();
     if (!user || !supabase) return { success: false, message: '尚未登入' };
     const totalCost = quantity * price;
@@ -396,7 +396,7 @@ export const useStore = create<InvestmentStore>((set, get) => ({
     await supabase.from('users').update({ available_balance: user.availableBalance - totalCost }).eq('id', user.id);
     await supabase.from('trades').insert([{
       user_id: user.id, stock_code: stockCode, stock_name: stockName,
-      trade_type: 'buy', quantity, price, total_amount: totalCost, timestamp: Date.now(),
+      trade_type: 'buy', quantity, price, total_amount: totalCost, reason: reason || null, timestamp: Date.now(),
     }]);
 
     const existing = holdings.find(h => h.stockCode === stockCode);
@@ -417,7 +417,7 @@ export const useStore = create<InvestmentStore>((set, get) => ({
     return { success: true, message: `成功買入 ${stockName} ${quantity} 股 🎉` };
   },
 
-  executeSell: async (stockCode, quantity, price) => {
+  executeSell: async (stockCode, quantity, price, reason) => {
     const { user, holdings } = get();
     if (!user || !supabase) return { success: false, message: '尚未登入' };
     const holding = holdings.find(h => h.stockCode === stockCode);
@@ -429,7 +429,7 @@ export const useStore = create<InvestmentStore>((set, get) => ({
     await supabase.from('users').update({ available_balance: user.availableBalance + totalReceived }).eq('id', user.id);
     await supabase.from('trades').insert([{
       user_id: user.id, stock_code: stockCode, stock_name: holding.stockName,
-      trade_type: 'sell', quantity, price, total_amount: totalReceived, timestamp: Date.now(),
+      trade_type: 'sell', quantity, price, total_amount: totalReceived, reason: reason || null, timestamp: Date.now(),
     }]);
 
     const remaining = holding.totalShares - quantity;

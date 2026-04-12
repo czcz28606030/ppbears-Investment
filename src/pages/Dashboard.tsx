@@ -151,9 +151,9 @@ export default function Dashboard() {
             <span className="qa-label">申請出金</span>
           </button>
         )}
-        <button className="quick-action-btn" onClick={() => navigate('/learn')}>
-          <span className="qa-icon">📚</span>
-          <span className="qa-label">學投資</span>
+        <button className="quick-action-btn" onClick={() => navigate('/history')}>
+          <span className="qa-icon">🕒</span>
+          <span className="qa-label">交易紀錄</span>
         </button>
       </div>
 

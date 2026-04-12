@@ -16,6 +16,7 @@ export default function StockDetail() {
   const [loading, setLoading] = useState(true);
   const [tradeMode, setTradeMode] = useState<'buy' | 'sell' | null>(null);
   const [quantity, setQuantity] = useState('');
+  const [tradeReason, setTradeReason] = useState('');
   const [tradeResult, setTradeResult] = useState<{ success: boolean; message: string } | null>(null);
   
   const { user, holdings, executeBuy, executeSell } = useStore();
@@ -89,14 +90,15 @@ export default function StockDetail() {
     let result;
     if (tradeMode === 'buy') {
       const name = stockData?.stkname || twseQuote?.Name || code;
-      result = await executeBuy(code, name, qty, price, stockData?.subindustry || '');
+      result = await executeBuy(code, name, qty, price, stockData?.subindustry || '', tradeReason.trim());
     } else {
-      result = await executeSell(code, qty, price);
+      result = await executeSell(code, qty, price, tradeReason.trim());
     }
 
     setTradeResult(result);
     if (result.success) {
       setQuantity('');
+      setTradeReason('');
     }
   }
 
@@ -372,6 +374,17 @@ export default function StockDetail() {
                   />
                 </div>
 
+                <div className="input-group" style={{ marginTop: 16 }}>
+                  <label className="input-label">投資筆記（告訴 PPBear 為什麼想{tradeMode === 'buy' ? '買' : '賣'}？）</label>
+                  <textarea
+                    className="input-field"
+                    style={{ minHeight: 80, resize: 'vertical' }}
+                    placeholder="我想要因為..."
+                    value={tradeReason}
+                    onChange={(e) => setTradeReason(e.target.value)}
+                  />
+                </div>
+
                 {quantity && parseInt(quantity) > 0 && (
                   <div className="trade-preview">
                     <div className="trade-preview-row">
@@ -390,7 +403,7 @@ export default function StockDetail() {
                 <button
                   className={`btn ${tradeMode === 'buy' ? 'btn-buy' : 'btn-sell'} btn-lg btn-block`}
                   onClick={handleTrade}
-                  disabled={!quantity || parseInt(quantity) <= 0}
+                  disabled={!quantity || parseInt(quantity) <= 0 || !tradeReason.trim()}
                 >
                   確認{tradeMode === 'buy' ? '買入' : '賣出'}
                 </button>

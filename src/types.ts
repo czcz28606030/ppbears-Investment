@@ -56,6 +56,7 @@ export interface Trade {
   quantity: number;
   price: number;
   totalAmount: number;
+  reason?: string;
   timestamp: number;
 }
 
