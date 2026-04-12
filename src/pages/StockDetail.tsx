@@ -239,7 +239,7 @@ export default function StockDetail() {
       {/* 價格區 */}
       <div className="price-hero" style={{ textAlign: 'center', paddingTop: '12px' }}>
         <div style={{ fontSize: '36px', fontWeight: 900, marginBottom: '16px', color: 'var(--text-primary)' }}>
-          {stockEmoji} {stockData?.stkname || twseQuote?.Name || code}
+          {stockEmoji} {code} {stockData?.stkname || twseQuote?.Name || ''}
         </div>
         <div className="price-main">NT$ {formatPrice(price)}</div>
         <div className={`price-change ${isUp ? 'text-profit' : 'text-loss'}`}>
