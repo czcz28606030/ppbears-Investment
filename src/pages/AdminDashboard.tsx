@@ -142,6 +142,36 @@ export default function AdminDashboard() {
         </div>
       </div>
 
+      {/* 功能對照表 */}
+      <div className="admin-user-card" style={{ marginBottom: 16 }}>
+        <div style={{ fontWeight: 800, fontSize: 15, marginBottom: 12 }}>📋 免費 vs Premium 功能對照</div>
+        <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
+          <thead>
+            <tr style={{ borderBottom: '2px solid #eee' }}>
+              <th style={{ textAlign: 'left', padding: '6px 4px', color: '#888' }}>功能</th>
+              <th style={{ textAlign: 'center', padding: '6px 4px', color: '#616161' }}>🆓 Free</th>
+              <th style={{ textAlign: 'center', padding: '6px 4px', color: '#FFA000' }}>💎 Premium</th>
+            </tr>
+          </thead>
+          <tbody>
+            {[
+              ['副帳號數量', '≤ 2 個', '無限制'],
+              ['持股檔數', '≤ 5 檔', '無限制'],
+              ['每日交易次數', '≤ 10 次', '無限制'],
+              ['AI 聯明選股', '❌ 鎖定', '✅ 開放'],
+              ['庫存 AI 建議', '❌ 鎖定', '✅ 開放'],
+              ['廣告顯示', '有廣告', '無廣告'],
+            ].map(([feat, free, premium], i) => (
+              <tr key={i} style={{ borderBottom: '1px solid #f5f5f5' }}>
+                <td style={{ padding: '8px 4px', fontWeight: 600 }}>{feat}</td>
+                <td style={{ textAlign: 'center', padding: '8px 4px' }}>{free}</td>
+                <td style={{ textAlign: 'center', padding: '8px 4px' }}>{premium}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
       {/* 搜尋 */}
       <div className="admin-search">
         <span>🔎</span>
@@ -178,8 +208,8 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* 操作按鈕 */}
-            {!u.isAdmin && (
+            {/* 操作按鈕：所有帳號都可管理，只排除自己 */}
+            {u.id !== user.id && (
               <div className="admin-actions">
                 {u.tier === 'free' ? (
                   <button className="admin-btn admin-btn-premium" onClick={() => handleUpgrade(u)}>💎 升級 Premium</button>
@@ -195,8 +225,8 @@ export default function AdminDashboard() {
               </div>
             )}
 
-            {/* 功能開關面板 */}
-            {expandedUser === u.id && !u.isAdmin && (
+            {/* 功能開關面板：所有帳號都可控制，只排除自己 */}
+            {expandedUser === u.id && u.id !== user.id && (
               <div className="admin-feature-section">
                 {FEATURE_KEYS.map(feat => {
                   const enabled = isFeatureEnabled(u.id, feat.key, u.tier);
