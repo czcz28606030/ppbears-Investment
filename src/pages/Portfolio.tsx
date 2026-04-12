@@ -6,7 +6,7 @@ import './Portfolio.css';
 
 export default function Portfolio() {
   const navigate = useNavigate();
-  const { holdings, getPortfolioSummary, user, hasFeature } = useStore();
+  const { holdings, getPortfolioSummary, hasFeature } = useStore();
   const hasAiFeature = hasFeature('ai_portfolio_advice');
   const summary = getPortfolioSummary();
 
@@ -151,30 +151,6 @@ export default function Portfolio() {
           </span>
         </div>
       </div>
-
-      {/* 資金使用進度 (只在有初始金額時顯示) */}
-      {user && user.initialBalance > 0 && (
-        <div className="card budget-card">
-          <div className="budget-header">
-            <span className="budget-label" style={{ fontSize: '16px' }}>💰 資金使用進度</span>
-            <span className="budget-pct" style={{ fontSize: '15px' }}>
-              {Math.min(100, ((user.initialBalance - summary.cashBalance) / user.initialBalance * 100)).toFixed(0)}% 已投資
-            </span>
-          </div>
-          <div className="budget-bar">
-            {((user.initialBalance - summary.cashBalance) / user.initialBalance) > 0 && (
-              <div
-                className="budget-bar-fill"
-                style={{ width: `${Math.max(3, Math.min(100, (user.initialBalance - summary.cashBalance) / user.initialBalance * 100))}%` }}
-              ></div>
-            )}
-          </div>
-          <div className="budget-detail">
-            <span>已投資 NT$ {formatMoney(Math.max(0, user.initialBalance - summary.cashBalance))}</span>
-            <span>初始資金 NT$ {formatMoney(user.initialBalance)}</span>
-          </div>
-        </div>
-      )}
 
       <div className="section-header" style={{ marginTop: '24px', marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h2 className="section-title" style={{ margin: 0 }}>📊 持股清單 ({holdings.length})</h2>
