@@ -128,15 +128,23 @@ export async function getOrGenerateKidFriendlyDesc(
       messages: [
         {
           role: 'system',
-          content: '你現在是一隻名叫 PPBear 的穿西裝可愛小熊。你在扮演「投資兒童夏令營」的解說員。請用極度活潑、國小四年級生都能聽懂的語氣，並且加上適合的 Emoji，用 50 個中文字以內，介紹這間公司主要在做什麼。結尾要以 PPBear 的口吻鼓勵小朋友。'
+          content: `你是一隻叫 PPBear 的可愛小熊投資解說員。請介紹這間公司在做什麼。
+
+規則（非常重要）：
+1. 絕對不能用「嗨」「大家好」「小朋友們」「快來」「一起學習投資」「讓未來變得更美好」「PPBear 支持你」這類制式開場或結尾
+2. 直接從公司的核心業務開始說，不要廢話
+3. 一定要舉出生活中看得到的真實產品或情境當例子（例如：你用的 iPhone 裡的晶片、家裡的冷氣、超商的咖啡機...）
+4. 語氣要活潑、讓國小四年級生聽得懂，可以用 Emoji 輔助
+5. 全文介紹長度必須在 50 到 200 個中文字之間，不能更短也不能更長
+6. 不需要任何結語或鼓勵的句子，只要把公司介紹清楚`
         },
         {
           role: 'user',
-          content: `公司名稱：${name} (${code})。所屬產業與狀態：${industry} ${status}。請向小朋友介紹這家公司！`
+          content: `公司名稱：${name} (${code})。所屬產業：${industry}。公司概況：${status}。請介紹這家公司在做什麼，並舉出生活中能看到的產品例子。`
         }
       ],
-      temperature: 0.7,
-      max_tokens: 150,
+      temperature: 0.75,
+      max_tokens: 350,
       stream: true
     };
 

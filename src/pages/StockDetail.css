@@ -319,3 +319,89 @@
   0%, 100% { opacity: 1; }
   50% { opacity: 0; }
 }
+
+/* Stat Value Row + Badges */
+.stat-value-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.stat-badge {
+  font-size: 13px;
+  font-weight: 800;
+  padding: 5px 12px;
+  border-radius: 20px;
+  white-space: nowrap;
+  letter-spacing: 0.01em;
+}
+
+.badge-cheap {
+  background: rgba(22, 163, 74, 0.12);
+  color: #16a34a;
+  border: 1.5px solid rgba(22, 163, 74, 0.25);
+}
+
+.badge-ok {
+  background: rgba(234, 179, 8, 0.12);
+  color: #ca8a04;
+  border: 1.5px solid rgba(234, 179, 8, 0.25);
+}
+
+.badge-expensive {
+  background: rgba(239, 68, 68, 0.1);
+  color: #dc2626;
+  border: 1.5px solid rgba(239, 68, 68, 0.2);
+}
+
+/* Strength Card */
+.strength-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 16px;
+  padding: 14px 16px;
+  background: var(--card-bg);
+  border-radius: 16px;
+  border: 1px solid var(--border-color);
+}
+
+.strength-left {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.strength-value {
+  font-size: 28px;
+  font-weight: 900;
+  color: var(--text-primary);
+  line-height: 1;
+}
+
+.strength-badge {
+  font-size: 17px;
+  font-weight: 800;
+  padding: 8px 18px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+
+.strength-strong {
+  background: rgba(16, 185, 129, 0.12);
+  color: #059669;
+  border: 2px solid rgba(16, 185, 129, 0.25);
+}
+
+.strength-medium {
+  background: rgba(251, 146, 60, 0.12);
+  color: #ea580c;
+  border: 2px solid rgba(251, 146, 60, 0.25);
+}
+
+.strength-weak {
+  background: rgba(148, 163, 184, 0.12);
+  color: #64748b;
+  border: 2px solid rgba(148, 163, 184, 0.25);
+}

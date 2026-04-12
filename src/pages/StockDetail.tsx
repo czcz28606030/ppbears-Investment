@@ -317,29 +317,26 @@ export default function StockDetail() {
         <div className="stat-grid">
           <div className="stat-item">
             <div className="stat-label">本益比 (P/E)</div>
-            <div className="stat-value">{pe.toFixed(1)}</div>
-            <div className="stat-bar">
-              <div 
-                className="stat-bar-fill" 
-                style={{ width: `${Math.min(pe / 30 * 100, 100)}%` }}
-                data-label={pe < 15 ? '便宜 🤑' : pe < 25 ? '合理 😊' : '偏貴 🤔'}
-              ></div>
-            </div>
-            <div className="stat-hint">
-              {pe < 15 ? '←便宜' : pe < 25 ? '合理→' : '偏貴→→'}
+            <div className="stat-value-row">
+              <div className="stat-value">{pe.toFixed(1)}</div>
+              <div className={`stat-badge ${
+                pe < 15 ? 'badge-cheap' : pe < 25 ? 'badge-ok' : 'badge-expensive'
+              }`}>
+                {pe < 15 ? '便宜 🤑' : pe < 25 ? '合理 😊' : '偏貴 🤔'}
+              </div>
             </div>
           </div>
           <div className="stat-item">
             <div className="stat-label">股價淨值比 (P/B)</div>
-            <div className="stat-value">{pb > 0 ? pb.toFixed(2) : '--'}</div>
-            <div className="stat-bar">
-              <div 
-                className="stat-bar-fill stat-bar-secondary" 
-                style={{ width: `${pb > 0 ? Math.min(pb / 6 * 100, 100) : 0}%` }}
-              ></div>
-            </div>
-            <div className="stat-hint">
-              {pb <= 0 ? '資料更新中' : pb < 2 ? '←可能低估' : pb < 4 ? '合理範圍' : '可能高估→'}
+            <div className="stat-value-row">
+              <div className="stat-value">{pb > 0 ? pb.toFixed(2) : '--'}</div>
+              {pb > 0 && (
+                <div className={`stat-badge ${
+                  pb < 2 ? 'badge-cheap' : pb < 4 ? 'badge-ok' : 'badge-expensive'
+                }`}>
+                  {pb < 2 ? '可能低估 💰' : pb < 4 ? '合理範圍 😊' : '可能高估 💡'}
+                </div>
+              )}
             </div>
           </div>
           <div className="stat-item">
@@ -404,11 +401,16 @@ export default function StockDetail() {
               );
             })()}
 
-            <div className="chip-item" style={{ marginTop: '16px' }}>
-              <div className="chip-label">📊 強度指標</div>
-              <div className="chip-value">{recommendation.strength}</div>
-              <div className="chip-compare">
-                {parseFloat(recommendation.strength) > 1.5 ? '很有力道 💪' : '力道普通'}
+            <div className="strength-card">
+              <div className="strength-left">
+                <div className="chip-label">📊 強度指標</div>
+                <div className="strength-value">{recommendation.strength}</div>
+              </div>
+              <div className={`strength-badge ${
+                parseFloat(recommendation.strength) > 2 ? 'strength-strong' :
+                parseFloat(recommendation.strength) > 1.5 ? 'strength-medium' : 'strength-weak'
+              }`}>
+                {parseFloat(recommendation.strength) > 2 ? '💪 力道強勁' : parseFloat(recommendation.strength) > 1.5 ? '🔥 很有力道' : '💤 力道普通'}
               </div>
             </div>
           </div>
