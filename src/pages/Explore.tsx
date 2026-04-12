@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { fetchSimonsData, toRecommendation, POPULAR_STOCKS, INDUSTRY_CATEGORIES, fetchTWSEAllStocks } from '../api';
+import { fetchSimonsData, toRecommendation, POPULAR_STOCKS, fetchTWSEAllStocks } from '../api';
 import type { StockRecommendation } from '../types';
 import './Explore.css';
 
@@ -9,7 +9,7 @@ export default function Explore() {
   const [recommendations, setRecommendations] = useState<StockRecommendation[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [activeCategory, setActiveCategory] = useState('all');
+  const [activeStrategy, setActiveStrategy] = useState('ai');
   const [error, setError] = useState('');
   const [twsePriceMap, setTwsePriceMap] = useState<Record<string, { close: string; change: string }>>({});
 
@@ -59,11 +59,40 @@ export default function Explore() {
   }, []);
 
 
+  const MOCK_STRATEGIES = useMemo(() => ({
+    'A': ['2330', '2412', '2881', '2882'],
+    'B': ['2317', '2454', '2303'],
+    'C': ['3711', '8454', '8464', '8462'],
+  }), []);
+
+  const STRATEGY_CARDS = [
+    { id: 'A', title: '穩穩大公司', icon: '🏢', desc: '股本 > 100億\n成交量 > 1,000張', className: 'strategy-card-a' },
+    { id: 'B', title: '最近變強公司', icon: '🚀', desc: '月營收連3月成長\n近4季ROE > 10%', className: 'strategy-card-b' },
+    { id: 'C', title: '市場有注意公司', icon: '👀', desc: '股價站上季線\n外資連3日買超', className: 'strategy-card-c' },
+    { id: 'ai', title: 'AI 聰明選股', icon: '🤖', desc: '每日最新大數據\n電腦推薦標的', className: 'strategy-card-d' }
+  ];
+
   const filtered = useMemo(() => {
-    let list = recommendations;
+    let list: StockRecommendation[] = [];
     
-    if (activeCategory !== 'all') {
-      list = list.filter(r => r.category?.includes(activeCategory));
+    if (activeStrategy === 'ai') {
+      list = recommendations;
+    } else {
+      const strategyCodes = MOCK_STRATEGIES[activeStrategy as keyof typeof MOCK_STRATEGIES] || [];
+      list = strategyCodes.map(code => {
+        const found = POPULAR_STOCKS.find(s => s.code === code);
+        const twse = twsePriceMap[code];
+        return {
+          coid: code,
+          stkname: found ? found.name : `股票 ${code}`,
+          close: twse ? twse.close : '0',
+          advice: 'buy',
+          score: 85,
+          category: activeStrategy === 'A' ? '大型權值' : activeStrategy === 'B' ? '高成長' : '籌碼面優',
+          ret_w: 'rise',
+          kidAdvice: '符合我們的策略選股條件喔！'
+        } as StockRecommendation;
+      });
     }
     
     if (search.trim()) {
@@ -76,7 +105,7 @@ export default function Explore() {
     }
     
     return list;
-  }, [recommendations, activeCategory, search]);
+  }, [recommendations, activeStrategy, search, twsePriceMap, MOCK_STRATEGIES]);
 
   function getAdviceBadge(advice: string) {
     switch (advice) {
@@ -111,48 +140,35 @@ export default function Explore() {
         />
       </div>
 
-      {/* 分類標籤 */}
-      <div className="category-scroll">
-        {INDUSTRY_CATEGORIES.map((cat) => (
-          <button
-            key={cat.key}
-            className={`category-chip ${activeCategory === cat.key ? 'active' : ''}`}
-            onClick={() => setActiveCategory(cat.key)}
-          >
-            {cat.emoji} {cat.label}
-          </button>
-        ))}
-      </div>
-
-      {/* 熱門股票快捷 */}
-      {!search && activeCategory === 'all' && (
-        <section className="popular-section">
-          <div className="section-header">
-            <h2 className="section-title">🌟 熱門股票</h2>
-          </div>
-          <div className="popular-scroll">
-            {POPULAR_STOCKS.map((s) => (
-              <button
-                key={s.code}
-                className="popular-chip"
-                onClick={() => navigate(`/stock/${s.code}`)}
+      {/* 策略選股卡片 */}
+      {!search && (
+        <section>
+          <div className="strategy-grid">
+            {STRATEGY_CARDS.map(card => (
+              <div
+                key={card.id}
+                className={`strategy-card ${card.className} ${activeStrategy === card.id ? 'active' : ''}`}
+                onClick={() => setActiveStrategy(card.id)}
               >
-                <span>{s.emoji}</span>
-                <span className="popular-chip-name">{s.name}</span>
-              </button>
+                <div className="strategy-icon">{card.icon}</div>
+                <div className="strategy-title">{card.title}</div>
+                <div className="strategy-desc">
+                  {card.desc.split('\n').map((line, i) => <div key={i}>{line}</div>)}
+                </div>
+              </div>
             ))}
           </div>
         </section>
       )}
 
-      {/* AI 推薦列表 */}
+      {/* 篩選結果列表 */}
       <section>
-        <div className="section-header">
-          <h2 className="section-title">🤖 AI 每日推薦</h2>
-          <span className="section-action" onClick={loadData}>重新整理</span>
+        <div className="filtered-result-header">
+          {activeStrategy === 'ai' ? '🤖 AI 每日推薦結果' : `🎯 「${STRATEGY_CARDS.find(c => c.id === activeStrategy)?.title}」策略篩選結果`}
+          {activeStrategy === 'ai' && <span className="section-action" onClick={loadData} style={{ marginLeft: 'auto', fontWeight: 600 }}>重新整理</span>}
         </div>
 
-        {loading && (
+        {loading && activeStrategy === 'ai' && (
           <div className="loading-spinner">
             <div className="spinner"></div>
             <div className="loading-text">PPBear 正在分析股票... 🐻</div>

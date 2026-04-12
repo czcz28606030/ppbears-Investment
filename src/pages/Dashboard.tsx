@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore, formatMoney } from '../store';
-import { POPULAR_STOCKS, fetchTWSEAllStocks, fetchTWSEDividendYields, type TWSTEStockQuote, type TWSEDividendYield } from '../api';
+import { fetchTWSEAllStocks, fetchTWSEDividendYields, type TWSTEStockQuote, type TWSEDividendYield } from '../api';
 import './Dashboard.css';
 
 export default function Dashboard() {
@@ -283,27 +283,6 @@ export default function Dashboard() {
           </div>
         </section>
       )}
-
-      {/* 熱門股票 */}
-      <section>
-        <div className="section-header">
-          <h2 className="section-title">🔥 熱門股票</h2>
-          <span className="section-action" onClick={() => navigate('/explore')}>更多</span>
-        </div>
-        <div className="popular-grid">
-          {POPULAR_STOCKS.slice(0, 6).map((s) => (
-            <div
-              key={s.code}
-              className="popular-item"
-              onClick={() => navigate(`/stock/${s.code}`)}
-            >
-              <span className="popular-emoji">{s.emoji}</span>
-              <span className="popular-name">{s.name}</span>
-              <span className="popular-code">{s.code}</span>
-            </div>
-          ))}
-        </div>
-      </section>
 
       {/* 最近交易 */}
       {trades.length > 0 && (
