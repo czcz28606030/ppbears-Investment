@@ -40,7 +40,7 @@ export default function Portfolio() {
 
         await Promise.all(holdings.map(async (h) => {
           if (buySet.has(h.stockCode)) {
-            signals[h.stockCode] = { advice: '加碼', color: 'var(--profit-color)', icon: '🚀' };
+            signals[h.stockCode] = { advice: '加碼', color: '#FF2424', icon: '🚀' };
             return;
           }
           try {
@@ -54,9 +54,9 @@ export default function Portfolio() {
                 return;
               }
             }
-            signals[h.stockCode] = { advice: '中立', color: '#FFA000', icon: '⚖️' };
+            signals[h.stockCode] = { advice: '中立', color: '#888888', icon: '⚖️' };
           } catch {
-            signals[h.stockCode] = { advice: '中立', color: '#FFA000', icon: '⚖️' };
+            signals[h.stockCode] = { advice: '中立', color: '#888888', icon: '⚖️' };
           }
         }));
 
