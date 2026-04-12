@@ -72,22 +72,6 @@ export default function StockDetail() {
 
 
 
-  async function handleTrade() {
-    if (!code || !latestPrice || !tradeMode) return;
-    const qty = parseInt(quantity);
-    const price = parseFloat(latestPrice.close_d);
-    
-    let result;
-    if (tradeMode === 'buy') {
-      result = await executeBuy(code, stockData?.stkname || code, qty, price, stockData?.subindustry);
-    } else {
-      result = await executeSell(code, qty, price);
-    }
-
-    setTradeResult(result);
-    if (result.success) {
-      setQuantity('');
-    }
   }
 
   function getKidDescription(): string {
@@ -114,6 +98,24 @@ export default function StockDetail() {
   const price = twseQuote?.ClosingPrice
     ? parseFloat(twseQuote.ClosingPrice)
     : (latestPrice ? parseFloat(latestPrice.close_d) : 0);
+
+  async function handleTrade() {
+    if (!code || !tradeMode || price <= 0) return;
+    const qty = parseInt(quantity);
+    
+    let result;
+    if (tradeMode === 'buy') {
+      const name = stockData?.stkname || twseQuote?.Name || code;
+      result = await executeBuy(code, name, qty, price, stockData?.subindustry || '');
+    } else {
+      result = await executeSell(code, qty, price);
+    }
+
+    setTradeResult(result);
+    if (result.success) {
+      setQuantity('');
+    }
+  }
 
   // 漲跌計算：TWSE Change 是絕對金額，轉為%
   const changeAbsolute = twseQuote?.Change ? parseFloat(twseQuote.Change) : null;
