@@ -100,9 +100,17 @@ CREATE POLICY "Users manage own trades"
   ON public.trades FOR ALL
   USING (auth.uid() = user_id);
 
+CREATE POLICY "Parents can view children trades"
+  ON public.trades FOR SELECT
+  USING (user_id IN (SELECT id FROM public.users WHERE parent_id = auth.uid()));
+
 CREATE POLICY "Users manage own holdings"
   ON public.holdings FOR ALL
   USING (auth.uid() = user_id);
+
+CREATE POLICY "Parents can view children holdings"
+  ON public.holdings FOR SELECT
+  USING (user_id IN (SELECT id FROM public.users WHERE parent_id = auth.uid()));
 
 CREATE POLICY "Withdrawal visible to involved parties"
   ON public.withdrawal_requests FOR SELECT
