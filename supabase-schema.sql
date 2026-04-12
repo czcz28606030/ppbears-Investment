@@ -26,6 +26,9 @@ CREATE TABLE public.users (
   parent_id uuid REFERENCES public.users(id) ON DELETE CASCADE,  -- null = 主帳號
   available_balance numeric NOT NULL DEFAULT 0,   -- 目前可用現金（無上限）
   initial_balance numeric NOT NULL DEFAULT 0,     -- 主帳號初始給予的金額（僅參考用）
+  broker_fee_rate numeric DEFAULT 0.001425,       -- 買賣手續費率（預設 0.1425%）
+  broker_min_fee numeric DEFAULT 20,              -- 買賣最低手續費（預設 20 元）
+  broker_tax_rate numeric DEFAULT 0.003,          -- 賣出證交稅率（預設 0.3%）
   created_at timestamptz DEFAULT now() NOT NULL
 );
 
@@ -211,3 +214,11 @@ CREATE POLICY "Admin can manage feature overrides"
 CREATE POLICY "Users can view own feature overrides"
   ON public.feature_overrides FOR SELECT
   USING (auth.uid() = user_id);
+
+-- ==========================================================
+-- 升級 v2.1 (加入手續費設定): 若您的資料庫已經存在 users 表且不想清空
+-- 請您單獨複製以下指令在 SQL Editor 執行：
+-- ==========================================================
+-- ALTER TABLE public.users ADD COLUMN broker_fee_rate numeric DEFAULT 0.001425;
+-- ALTER TABLE public.users ADD COLUMN broker_min_fee numeric DEFAULT 20;
+-- ALTER TABLE public.users ADD COLUMN broker_tax_rate numeric DEFAULT 0.003;

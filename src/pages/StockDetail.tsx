@@ -462,14 +462,40 @@ export default function StockDetail() {
                   />
                 </div>
 
-                {quantity && parseInt(quantity) > 0 && (
-                  <div className="trade-preview">
-                    <div className="trade-preview-row">
-                      <span>預估金額</span>
-                      <span className="fw-extra">NT$ {formatMoney(parseInt(quantity) * price)}</span>
+                {quantity && parseInt(quantity) > 0 && (() => {
+                  const q = parseInt(quantity);
+                  const baseValue = q * price;
+                  const feeRate = user?.brokerFeeRate ?? 0.001425;
+                  const minFee = user?.brokerMinFee ?? 20;
+                  const taxRate = user?.brokerTaxRate ?? 0.003;
+                  
+                  const estFee = Math.max(minFee, Math.round(baseValue * feeRate));
+                  const estTax = tradeMode === 'sell' ? Math.round(baseValue * taxRate) : 0;
+                  const finalTotal = tradeMode === 'buy' ? baseValue + estFee : baseValue - estFee - estTax;
+
+                  return (
+                    <div className="trade-preview" style={{ background: '#f8f9fa', padding: '12px', borderRadius: '8px', marginTop: '12px' }}>
+                      <div className="trade-preview-row" style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: '#666', marginBottom: '4px' }}>
+                        <span>股票市值</span>
+                        <span>NT$ {formatMoney(baseValue)}</span>
+                      </div>
+                      <div className="trade-preview-row" style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: '#666', marginBottom: '4px' }}>
+                        <span>券商手續費</span>
+                        <span>NT$ {formatMoney(estFee)}</span>
+                      </div>
+                      {tradeMode === 'sell' && (
+                        <div className="trade-preview-row" style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: '#666', marginBottom: '8px' }}>
+                          <span>證交稅</span>
+                          <span>NT$ {formatMoney(estTax)}</span>
+                        </div>
+                      )}
+                      <div className="trade-preview-row" style={{ display: 'flex', justifyContent: 'space-between', fontSize: '15px', fontWeight: 'bold', color: 'var(--text-primary)', borderTop: '1px solid #ddd', paddingTop: '8px', marginTop: '4px' }}>
+                        <span>預估{tradeMode === 'buy' ? '總花費' : '實收金額'}</span>
+                        <span className={tradeMode === 'buy' ? '' : 'text-profit'}>NT$ {formatMoney(finalTotal)}</span>
+                      </div>
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
 
                 {tradeResult && !tradeResult.success && (
                   <div className="trade-result trade-error">

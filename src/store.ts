@@ -70,6 +70,7 @@ interface InvestmentStore {
   // Profile
   updateProfile: (displayName: string, avatarUrl: string) => Promise<{ error: string | null }>;
   uploadAvatar: (file: File) => Promise<{ url: string | null; error: string | null }>;
+  updateBrokerSettings: (brokerFeeRate: number, brokerMinFee: number, brokerTaxRate: number) => Promise<{ error: string | null }>;
 
   // Admin Actions
   loadAllUsers: () => Promise<void>;
@@ -104,6 +105,9 @@ function rowToUser(row: Record<string, unknown>): UserAccount {
     subscriptionExpiresAt: (row.subscription_expires_at as string) || undefined,
     availableBalance: Number(row.available_balance),
     initialBalance: Number(row.initial_balance),
+    brokerFeeRate: row.broker_fee_rate !== undefined ? Number(row.broker_fee_rate) : 0.001425,
+    brokerMinFee: row.broker_min_fee !== undefined ? Number(row.broker_min_fee) : 20,
+    brokerTaxRate: row.broker_tax_rate !== undefined ? Number(row.broker_tax_rate) : 0.003,
     parentId: (row.parent_id as string) || undefined,
   };
 }
@@ -438,8 +442,23 @@ export const useStore = create<InvestmentStore>((set, get) => ({
   executeBuy: async (stockCode, stockName, quantity, price, industry, reason) => {
     const { user, holdings } = get();
     if (!user || !supabase) return { success: false, message: '尚未登入' };
-    const totalCost = quantity * price;
-    if (totalCost > user.availableBalance) return { success: false, message: '餘額不足！需要更多零用錢才能買喔 💰' };
+    
+    // Fetch broker settings Context (use parent's if child)
+    let feeRate = user.brokerFeeRate;
+    let minFee = user.brokerMinFee;
+    if (user.role === 'child' && user.parentId) {
+      const { data: parentData } = await supabase.from('users').select('broker_fee_rate, broker_min_fee').eq('id', user.parentId).single();
+      if (parentData) {
+        feeRate = parentData.broker_fee_rate !== null ? Number(parentData.broker_fee_rate) : 0.001425;
+        minFee = parentData.broker_min_fee !== null ? Number(parentData.broker_min_fee) : 20;
+      }
+    }
+
+    const baseCost = quantity * price;
+    const fee = Math.max(minFee, Math.round(baseCost * feeRate));
+    const totalCost = baseCost + fee;
+
+    if (totalCost > user.availableBalance) return { success: false, message: `餘額不足！需要更多零用錢才能買喔 💰\n(預估總金額含手續費: NT$ ${formatMoney(totalCost)})` };
     if (quantity <= 0) return { success: false, message: '至少要買 1 股喔！' };
 
     // ─ Paywall: 持股上限檢查 ─
@@ -467,7 +486,8 @@ export const useStore = create<InvestmentStore>((set, get) => ({
     const existing = holdings.find(h => h.stockCode === stockCode);
     if (existing) {
       const newShares = existing.totalShares + quantity;
-      const newAvgCost = (existing.avgCost * existing.totalShares + totalCost) / newShares;
+      // 加總總花費 / 總股數
+      const newAvgCost = parseFloat(((existing.avgCost * existing.totalShares + totalCost) / newShares).toFixed(2));
       await supabase.from('holdings').update({
         total_shares: newShares, avg_cost: newAvgCost, current_price: price,
         updated_at: new Date().toISOString(),
@@ -498,8 +518,26 @@ export const useStore = create<InvestmentStore>((set, get) => ({
       }
     }
 
-    const totalReceived = quantity * price;
-    const profit = (price - holding.avgCost) * quantity;
+    // Fetch broker settings Context (use parent's if child)
+    let feeRate = user.brokerFeeRate;
+    let minFee = user.brokerMinFee;
+    let taxRate = user.brokerTaxRate;
+    if (user.role === 'child' && user.parentId) {
+      const { data: parentData } = await supabase.from('users').select('broker_fee_rate, broker_min_fee, broker_tax_rate').eq('id', user.parentId).single();
+      if (parentData) {
+        feeRate = parentData.broker_fee_rate !== null ? Number(parentData.broker_fee_rate) : 0.001425;
+        minFee = parentData.broker_min_fee !== null ? Number(parentData.broker_min_fee) : 20;
+        taxRate = parentData.broker_tax_rate !== null ? Number(parentData.broker_tax_rate) : 0.003;
+      }
+    }
+
+    const baseValue = quantity * price;
+    const fee = Math.max(minFee, Math.round(baseValue * feeRate));
+    const tax = Math.round(baseValue * taxRate);
+    const totalReceived = baseValue - fee - tax;
+    
+    // profit 計算: 實收金額 - (當初買這些股票的總成本)
+    const profit = totalReceived - (holding.avgCost * quantity);
     
     await supabase.from('users').update({ available_balance: user.availableBalance + totalReceived }).eq('id', user.id);
     await supabase.from('trades').insert([{
@@ -538,6 +576,22 @@ export const useStore = create<InvestmentStore>((set, get) => ({
 
     if (error) return { error: error.message };
     set({ user: { ...user, displayName, avatar: avatarUrl } });
+    return { error: null };
+  },
+
+  updateBrokerSettings: async (brokerFeeRate, brokerMinFee, brokerTaxRate) => {
+    if (!supabase) return { error: '資料庫未連線' };
+    const { user } = get();
+    if (!user || user.role !== 'parent') return { error: '只有主帳號可以修改手續費設定' };
+
+    const { error } = await supabase.from('users').update({
+      broker_fee_rate: brokerFeeRate,
+      broker_min_fee: brokerMinFee,
+      broker_tax_rate: brokerTaxRate,
+    }).eq('id', user.id);
+
+    if (error) return { error: error.message };
+    set({ user: { ...user, brokerFeeRate, brokerMinFee, brokerTaxRate } });
     return { error: null };
   },
 

@@ -81,6 +81,9 @@ export interface UserAccount {
   subscriptionExpiresAt?: string;
   availableBalance: number;  // 目前可用現金（無上限）
   initialBalance: number;    // 主帳號初始給予（參考用）
+  brokerFeeRate: number;     // 交易手續費率 (e.g., 0.001425)
+  brokerMinFee: number;      // 交易手續費低消 (e.g., 20)
+  brokerTaxRate: number;     // 交易證交稅率 (e.g., 0.003)
   parentId?: string;
 }
 

@@ -5,9 +5,13 @@ import './ProfileSettings.css';
 
 export default function ProfileSettings() {
   const navigate = useNavigate();
-  const { user, updateProfile, uploadAvatar, logout } = useStore();
+  const { user, updateProfile, uploadAvatar, logout, updateBrokerSettings } = useStore();
 
   const [displayName, setDisplayName] = useState(user?.displayName || '');
+  const [brokerFeeRate, setBrokerFeeRate] = useState(user?.brokerFeeRate?.toString() || '0.001425');
+  const [brokerMinFee, setBrokerMinFee] = useState(user?.brokerMinFee?.toString() || '20');
+  const [brokerTaxRate, setBrokerTaxRate] = useState(user?.brokerTaxRate?.toString() || '0.003');
+
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -56,10 +60,20 @@ export default function ProfileSettings() {
     }
 
     const result = await updateProfile(displayName.trim(), avatarUrl);
+    
+    let brokerError = null;
+    if (user?.role === 'parent') {
+      const bfr = parseFloat(brokerFeeRate) || 0;
+      const bmf = parseFloat(brokerMinFee) || 0;
+      const btr = parseFloat(brokerTaxRate) || 0;
+      const bResult = await updateBrokerSettings(bfr, bmf, btr);
+      if (bResult.error) brokerError = bResult.error;
+    }
+
     setIsSaving(false);
 
-    if (result.error) {
-      setMessage({ text: result.error, type: 'error' });
+    if (result.error || brokerError) {
+      setMessage({ text: result.error || brokerError || '儲存失敗', type: 'error' });
     } else {
       setMessage({ text: '✅ 設定已儲存！', type: 'success' });
       setSelectedFile(null);
@@ -137,6 +151,47 @@ export default function ProfileSettings() {
           </div>
         </div>
       </div>
+      {/* 券商設定 (僅主帳號) */}
+      {user?.role === 'parent' && (
+        <div className="settings-card">
+          <div className="settings-section-title">券商交易手續費設定</div>
+          <p style={{ fontSize: '13px', color: '#888', marginBottom: '12px' }}>
+            這些設定會同步套用到您與所有副帳號的下單計算中，讓投資體驗更貼近真實。公定券商手續費為 0.1425%，證券交易稅為 0.3%。
+          </p>
+          <div className="settings-item">
+            <label className="settings-label">📈 買賣手續費率</label>
+            <input
+              type="number"
+              step="0.000001"
+              className="settings-input"
+              value={brokerFeeRate}
+              onChange={(e) => setBrokerFeeRate(e.target.value)}
+              placeholder="例如 0.001425 (千分之1.425)"
+            />
+          </div>
+          <div className="settings-item">
+            <label className="settings-label">💰 最低收費門檻 (即低消，NT$)</label>
+            <input
+              type="number"
+              className="settings-input"
+              value={brokerMinFee}
+              onChange={(e) => setBrokerMinFee(e.target.value)}
+              placeholder="例如 20"
+            />
+          </div>
+          <div className="settings-item">
+            <label className="settings-label">📉 賣出證交稅率</label>
+            <input
+              type="number"
+              step="0.0001"
+              className="settings-input"
+              value={brokerTaxRate}
+              onChange={(e) => setBrokerTaxRate(e.target.value)}
+              placeholder="例如 0.003 (千分之3)"
+            />
+          </div>
+        </div>
+      )}
 
       {/* 訊息提示 */}
       {message && (
