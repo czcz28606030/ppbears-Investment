@@ -2,6 +2,15 @@
 
 所有關於 PPBears Investment 的版本變更都會記錄在此檔案中。我們遵循 [語意化版本控制](https://semver.org/lang/zh-TW/) 的規範。
 
+## [1.5.2] - 2026-04-12
+
+### 新增與優化 (Added & Changed)
+- **AI 公司介紹修正 (CORS Bypass)**:
+  - 修復了前端瀏覽器直接呼叫 OpenAI API 發生 CORS 阻擋導致退回預設文字的問題。
+  - 將呼叫邏輯全面改為透過系統開發伺服器與 Vercel Edge Serverless (Proxy) 同步發起，有效繞過瀏覽器限制。
+- **動態版本號顯示 (Dynamic Version)**:
+  - 修正了前端頁尾持續顯示舊版硬編碼 (1.4.0) 的問題，改為透過 Vite 在打包時自動寫入並同步 `package.json` 的最新版本號。
+
 ## [1.5.1] - 2026-04-12
 
 ### 新增與優化 (Added & Changed)
