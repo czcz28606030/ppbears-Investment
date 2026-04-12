@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore, formatMoney } from '../store';
 import './ManageChildren.css';
+import './Login.css'; // Import for password-wrapper and toggle styles
 
 const AVATARS = ['🐻', '🐼', '🐨', '🦁', '🦊', '🐯', '🐸', '🦄'];
 
@@ -13,6 +14,9 @@ export default function ManageChildren() {
   const [showCreate, setShowCreate] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [displayName, setDisplayName] = useState('');
   const [avatar, setAvatar] = useState('🐼');
   const [initialBalance, setInitialBalance] = useState('');
@@ -32,6 +36,8 @@ export default function ManageChildren() {
     e.preventDefault();
     setCreateError('');
     if (password.length < 6) { setCreateError('密碼至少需要 6 個字元'); return; }
+    if (password !== confirmPassword) { setCreateError('兩次輸入的密碼不一致，請再確認！'); return; }
+    
     setIsCreating(true);
     const result = await createChildAccount(email, password, displayName, avatar, Number(initialBalance) || 0);
     setIsCreating(false);
@@ -46,7 +52,7 @@ export default function ManageChildren() {
     } else {
       setShowCreate(false);
       setRegisteredChildEmail(email);
-      setEmail(''); setPassword(''); setDisplayName(''); setInitialBalance('');
+      setEmail(''); setPassword(''); setConfirmPassword(''); setDisplayName(''); setInitialBalance('');
       if (result.needsConfirmation) {
         setShowSuccessModal(true);
       }
@@ -156,8 +162,42 @@ export default function ManageChildren() {
             </div>
             <div className="form-group">
               <label className="form-label">🔒 密碼 (至少 6 字元)</label>
-              <input type="password" className="form-input" placeholder="設定密碼"
-                value={password} onChange={(e) => setPassword(e.target.value)} required />
+              <div className="password-wrapper">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  className="form-input password-input"
+                  placeholder="設定密碼"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+                <button type="button" className="password-toggle" onClick={() => setShowPassword(v => !v)} tabIndex={-1}>
+                  {showPassword ? '🙈' : '👁️'}
+                </button>
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">🔒 確認密碼</label>
+              <div className="password-wrapper">
+                <input
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  className={`form-input password-input ${confirmPassword && confirmPassword !== password ? 'input-error' : ''} ${confirmPassword && confirmPassword === password ? 'input-success' : ''}`}
+                  placeholder="再輸入一次密碼"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                />
+                <button type="button" className="password-toggle" onClick={() => setShowConfirmPassword(v => !v)} tabIndex={-1}>
+                  {showConfirmPassword ? '🙈' : '👁️'}
+                </button>
+              </div>
+              {confirmPassword && confirmPassword !== password && (
+                <span className="field-hint error">密碼不一致</span>
+              )}
+              {confirmPassword && confirmPassword === password && (
+                <span className="field-hint success">✓ 密碼一致</span>
+              )}
             </div>
             <div className="form-group">
               <label className="form-label">😊 暱稱</label>
@@ -185,8 +225,8 @@ export default function ManageChildren() {
             {createError && <div className="error-msg">{createError}</div>}
 
             <div className="form-actions">
-              <button type="button" className="btn-cancel" onClick={() => { setShowCreate(false); setCreateError(''); }}>取消</button>
-              <button type="submit" className="btn-save" disabled={isCreating}>
+              <button type="button" className="btn-cancel" onClick={() => { setShowCreate(false); setCreateError(''); setConfirmPassword(''); }}>取消</button>
+              <button type="submit" className="btn-save" disabled={isCreating || !password || !confirmPassword || password !== confirmPassword}>
                 {isCreating ? '建立中...' : '建立副帳號 ✅'}
               </button>
             </div>
