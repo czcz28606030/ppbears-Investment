@@ -149,28 +149,17 @@ export default function Explore() {
       {!search && (
         <section>
           <div className="strategy-grid">
-            {STRATEGY_CARDS.map(card => (
+            {STRATEGY_CARDS.filter(card => card.id !== 'ai' || hasAiFeature).map(card => (
               <div
                 key={card.id}
-                className={`strategy-card ${card.className} ${activeStrategy === card.id ? 'active' : ''} ${card.id === 'ai' && !hasAiFeature ? 'locked' : ''}`}
-                onClick={() => {
-                  if (card.id === 'ai' && !hasAiFeature) return;
-                  setActiveStrategy(card.id);
-                }}
+                className={`strategy-card ${card.className} ${activeStrategy === card.id ? 'active' : ''}`}
+                onClick={() => setActiveStrategy(card.id)}
               >
                 <div className="strategy-icon">{card.icon}</div>
                 <div className="strategy-title">{card.title}</div>
                 <div className="strategy-desc">
                   {card.desc.split('\n').map((line, i) => <div key={i}>{line}</div>)}
                 </div>
-                {card.id === 'ai' && !hasAiFeature && (
-                  <div style={{
-                    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-                    background: 'rgba(0,0,0,0.35)', borderRadius: 16,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    color: '#fff', fontWeight: 800, fontSize: 14, gap: 4,
-                  }}>🔒 Premium</div>
-                )}
               </div>
             ))}
           </div>
