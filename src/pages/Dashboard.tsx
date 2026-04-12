@@ -246,7 +246,7 @@ export default function Dashboard() {
 
       {/* 頁尾版本號 */}
       <div className="dashboard-footer" style={{ textAlign: 'center', padding: '20px', color: 'var(--color-text-tertiary, #aaa)', fontSize: '0.85rem' }}>
-        PPBears Investment v1.1.0
+        PPBears Investment v1.2.0
       </div>
     </div>
   );
