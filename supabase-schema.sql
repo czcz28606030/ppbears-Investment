@@ -152,31 +152,45 @@ CREATE POLICY "Parent can update child balance"
 -- ==========================================================
 -- 6. Admin RLS Policies (管理員可存取所有資料)
 -- ==========================================================
+-- 先建立一個 SECURITY DEFINER 函數，用來判斷是否為管理員
+-- 這個函數可以繞過 RLS，避免在 users 資料表查詢時產生 Infinite Recursion
+CREATE OR REPLACE FUNCTION public.is_admin()
+RETURNS BOOLEAN
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.users
+    WHERE id = auth.uid() AND is_admin = true
+  );
+$$;
+
 CREATE POLICY "Admin can view all users"
   ON public.users FOR SELECT
-  USING (EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND is_admin = true));
+  USING (public.is_admin());
 
 CREATE POLICY "Admin can update all users"
   ON public.users FOR UPDATE
-  USING (EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND is_admin = true));
+  USING (public.is_admin());
 
 CREATE POLICY "Admin can delete users"
   ON public.users FOR DELETE
-  USING (EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND is_admin = true));
+  USING (public.is_admin());
 
 CREATE POLICY "Admin can view all trades"
   ON public.trades FOR SELECT
-  USING (EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND is_admin = true));
+  USING (public.is_admin());
 
 CREATE POLICY "Admin can view all holdings"
   ON public.holdings FOR SELECT
-  USING (EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND is_admin = true));
+  USING (public.is_admin());
 
 ALTER TABLE public.feature_overrides ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Admin can manage feature overrides"
   ON public.feature_overrides FOR ALL
-  USING (EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND is_admin = true));
+  USING (public.is_admin());
 
 CREATE POLICY "Users can view own feature overrides"
   ON public.feature_overrides FOR SELECT
