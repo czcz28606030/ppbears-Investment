@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useStore, formatMoney } from '../store';
-import type { UserAccount, FeatureOverride } from '../types';
+import { useStore, formatMoney, formatPrice } from '../store';
+import { supabase } from '../supabase';
+import type { UserAccount, FeatureOverride, Trade } from '../types';
 import './AdminDashboard.css';
 
 const FEATURE_KEYS = [
@@ -24,6 +25,10 @@ export default function AdminDashboard() {
   const [tierDays, setTierDays] = useState('30');
   const [settingModal, setSettingModal] = useState<{ key: string; label: string; value: number } | null>(null);
   const [settingInput, setSettingInput] = useState('');
+
+  const [tradesModal, setTradesModal] = useState<{ userId: string; name: string } | null>(null);
+  const [userTrades, setUserTrades] = useState<Trade[]>([]);
+  const [tradesLoading, setTradesLoading] = useState(false);
 
   useEffect(() => {
     if (user?.isAdmin) loadAllUsers();
@@ -49,14 +54,58 @@ export default function AdminDashboard() {
     children: allUsers.filter(u => u.role === 'child').length,
   };
 
-  const filtered = allUsers.filter(u => {
-    if (!search.trim()) return true;
-    const q = search.trim().toLowerCase();
-    return u.email.toLowerCase().includes(q) || u.displayName.toLowerCase().includes(q);
-  });
+  const displayedUsers = useMemo(() => {
+    const parents = allUsers.filter(u => !u.parentId);
+    const result: UserAccount[] = [];
+    
+    parents.forEach(p => {
+      const children = allUsers.filter(c => c.parentId === p.id);
+      const pMatch = !search.trim() || p.email.toLowerCase().includes(search.trim().toLowerCase()) || p.displayName.toLowerCase().includes(search.trim().toLowerCase());
+      const cMatch = children.some(c => !search.trim() || c.email.toLowerCase().includes(search.trim().toLowerCase()) || c.displayName.toLowerCase().includes(search.trim().toLowerCase()));
+      
+      if (pMatch || cMatch) {
+         result.push(p);
+         children.forEach(c => result.push(c));
+      }
+    });
+
+    const orphans = allUsers.filter(u => u.parentId && !allUsers.some(p => p.id === u.parentId));
+    orphans.forEach(o => {
+      if (!search.trim() || o.email.toLowerCase().includes(search.trim().toLowerCase()) || o.displayName.toLowerCase().includes(search.trim().toLowerCase())) {
+        result.push(o);
+      }
+    });
+    
+    return result;
+  }, [allUsers, search]);
 
   const handleUpgrade = async (u: UserAccount) => {
     setTierModal({ userId: u.id, name: u.displayName });
+  };
+
+  const handleViewTrades = async (u: UserAccount) => {
+    setTradesModal({ userId: u.id, name: u.displayName });
+    setTradesLoading(true);
+    setUserTrades([]);
+    
+    if (!supabase) {
+      setTradesLoading(false);
+      return;
+    }
+
+    const { data } = await supabase.from('trades').select('*').eq('user_id', u.id).order('timestamp', { ascending: false });
+    if (data) {
+      const formattedTrades: Trade[] = data.map(t => ({
+        id: t.id, stockCode: t.stock_code, stockName: t.stock_name,
+        tradeType: t.trade_type as any, quantity: Number(t.quantity),
+        price: Number(t.price), totalAmount: Number(t.total_amount),
+        profit: t.profit != null ? Number(t.profit) : undefined,
+        timestamp: new Date(t.timestamp).getTime(),
+        reason: t.reason
+      }));
+      setUserTrades(formattedTrades);
+    }
+    setTradesLoading(false);
   };
 
   const confirmUpgrade = async () => {
@@ -222,15 +271,26 @@ export default function AdminDashboard() {
 
       {/* 用戶列表 */}
       <div className="admin-user-list">
-        {filtered.map(u => (
-          <div key={u.id} className="admin-user-card">
+        {displayedUsers.map(u => {
+          const isChild = !!u.parentId;
+          const parent = isChild ? allUsers.find(p => p.id === u.parentId) : null;
+          
+          return (
+          <div key={u.id} className="admin-user-card" style={{ marginLeft: isChild ? 32 : 0, borderLeft: isChild ? '4px solid #FFA000' : 'none' }}>
             <div className="admin-user-header">
               <div className="admin-user-avatar">
                 {u.avatar.startsWith('http') || u.avatar.startsWith('data:') ?
                   <img src={u.avatar} alt="" style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover' }} /> : u.avatar}
               </div>
               <div className="admin-user-info">
-                <div className="admin-user-name">{u.displayName}</div>
+                <div className="admin-user-name" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  {u.displayName}
+                  {isChild && parent && (
+                    <span style={{ fontSize: 11, padding: '2px 6px', background: 'rgba(0,0,0,0.06)', color: '#666', borderRadius: 4, fontWeight: 600 }}>
+                      ↳ 屬主帳號: {parent.displayName}
+                    </span>
+                  )}
+                </div>
                 <div className="admin-user-email">{u.email}</div>
                 <div className="admin-user-balance">💰 NT$ {formatMoney(u.availableBalance)}</div>
                 <div className="admin-user-badges">
@@ -261,6 +321,7 @@ export default function AdminDashboard() {
                 setBalanceModal({ userId: u.id, name: u.displayName, current: u.availableBalance });
                 setBalanceInput(String(u.availableBalance));
               }}>💰 調餘額</button>
+              <button className="admin-btn admin-btn-feature" onClick={() => handleViewTrades(u)}>📄 交易紀錄</button>
               <button className="admin-btn admin-btn-feature" onClick={() => toggleFeaturePanel(u.id)}>🔧 功能開關</button>
               {u.id !== user.id && (
                 <button className="admin-btn admin-btn-delete" onClick={() => handleDelete(u)}>🗑️ 刪除</button>
@@ -288,8 +349,54 @@ export default function AdminDashboard() {
               </div>
             )}
           </div>
-        ))}
+        )})}
       </div>
+
+      {/* 交易紀錄彈窗 */}
+      {tradesModal && (
+        <div className="admin-modal-overlay" onClick={() => setTradesModal(null)}>
+          <div className="admin-modal" style={{ maxWidth: 600, width: '90%', maxHeight: '80vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+            <h3 style={{ marginBottom: 16 }}>📄 {tradesModal.name} 的交易紀錄</h3>
+            {tradesLoading ? (
+               <div style={{ textAlign: 'center', padding: 20 }}>載入中...</div>
+            ) : userTrades.length === 0 ? (
+               <div style={{ textAlign: 'center', padding: 20, color: '#888' }}>目前沒有任何交易紀錄</div>
+            ) : (
+               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                 {userTrades.map(trade => (
+                   <div key={trade.id} style={{ display: 'flex', justifyContent: 'space-between', padding: 12, background: '#f9f9f9', borderRadius: 8 }}>
+                     <div>
+                       <div style={{ fontWeight: 800, marginBottom: 4 }}>
+                         <span style={{ color: trade.tradeType === 'buy' ? 'var(--loss-color)' : 'var(--profit-color)', marginRight: 8 }}>
+                           {trade.tradeType === 'buy' ? '買入' : '賣出'}
+                         </span>
+                         {trade.stockName} ({trade.stockCode})
+                       </div>
+                       <div style={{ fontSize: 12, color: '#666' }}>
+                         數量: {trade.quantity} 股 | 價格: NT$ {formatPrice(trade.price)}
+                       </div>
+                       <div style={{ fontSize: 11, color: '#888', marginTop: 4 }}>
+                         {new Date(trade.timestamp).toLocaleString('zh-TW')}
+                       </div>
+                     </div>
+                     <div style={{ textAlign: 'right', fontWeight: 700 }}>
+                       <div style={{ color: '#333' }}>NT$ {formatMoney(trade.totalAmount)}</div>
+                       {trade.tradeType === 'sell' && trade.profit !== undefined && (
+                         <div style={{ fontSize: 12, marginTop: 4, color: trade.profit >= 0 ? 'var(--profit-color)' : 'var(--loss-color)' }}>
+                           損益: {trade.profit > 0 ? '+' : ''}NT$ {formatMoney(trade.profit)}
+                         </div>
+                       )}
+                     </div>
+                   </div>
+                 ))}
+               </div>
+            )}
+            <div className="admin-modal-btns" style={{ marginTop: 24 }}>
+              <button className="btn-confirm" onClick={() => setTradesModal(null)} style={{ width: '100%' }}>關閉頁面</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 餘額調整彈窗 */}
       {balanceModal && (
