@@ -6,8 +6,65 @@ const IFALGO_BASE = 'https://api.ifalgo.com.tw/frontapi';
 // CORS proxy (for development) - in production, use your own backend proxy
 const PROXY = 'https://corsproxy.io/?url=';
 
+// TWSE OpenAPI Base
+const TWSE_BASE = 'https://openapi.twse.com.tw/v1';
+
 function proxyUrl(url: string): string {
   return PROXY + encodeURIComponent(url);
+}
+
+// TWSE 即時行情資料 (毎交易日更新)
+export interface TWSTEStockQuote {
+  Code: string;
+  Name: string;
+  ClosingPrice: string;
+  Change: string;
+  OpeningPrice: string;
+  HighestPrice: string;
+  LowestPrice: string;
+  TradeVolume: string;
+  Transaction: string;
+  Date: string;
+}
+
+// 快取 TWSE 全市場資料（避免重複請求）
+let twseCache: TWSTEStockQuote[] | null = null;
+let twseCacheDate: string | null = null;
+
+export async function fetchTWSEAllStocks(): Promise<TWSTEStockQuote[]> {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    // 使用快取（同一天同一個執行期間只抓一次）
+    if (twseCache && twseCacheDate === today) {
+      return twseCache;
+    }
+    const url = `${TWSE_BASE}/exchangeReport/STOCK_DAY_ALL`;
+    const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+    if (!res.ok) throw new Error(`TWSE API error: ${res.status}`);
+    const data: TWSTEStockQuote[] = await res.json();
+    twseCache = data;
+    twseCacheDate = today;
+    return data;
+  } catch (err) {
+    console.error('fetchTWSEAllStocks error:', err);
+    // 嘗試透過 proxy
+    try {
+      const url = `${TWSE_BASE}/exchangeReport/STOCK_DAY_ALL`;
+      const res = await fetch(proxyUrl(url));
+      const data: TWSTEStockQuote[] = await res.json();
+      twseCache = data;
+      return data;
+    } catch {
+      return [];
+    }
+  }
+}
+
+// 查詢單一股票的 TWSE 即時收盤價
+export async function fetchTWSEStockPrice(code: string): Promise<TWSTEStockQuote | null> {
+  const all = await fetchTWSEAllStocks();
+  const stock = all.find(s => s.Code === code);
+  return stock || null;
 }
 
 // 用小朋友聽得懂的方式描述公司

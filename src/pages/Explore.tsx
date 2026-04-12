@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { fetchSimonsData, toRecommendation, POPULAR_STOCKS, INDUSTRY_CATEGORIES } from '../api';
+import { fetchSimonsData, toRecommendation, POPULAR_STOCKS, INDUSTRY_CATEGORIES, fetchTWSEAllStocks } from '../api';
 import type { StockRecommendation } from '../types';
 import './Explore.css';
 
@@ -11,11 +11,24 @@ export default function Explore() {
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState('all');
   const [error, setError] = useState('');
+  const [twsePriceMap, setTwsePriceMap] = useState<Record<string, { close: string; change: string }>>({});
 
   async function loadData() {
     setLoading(true);
     setError('');
     try {
+      // 同時抓 TWSE 全市場資料和 Simons 推薦
+      const [twseAll] = await Promise.all([fetchTWSEAllStocks()]);
+      
+      // 建立 TWSE 快速查詢 map
+      if (twseAll.length > 0) {
+        const map: Record<string, { close: string; change: string }> = {};
+        for (const s of twseAll) {
+          if (s.ClosingPrice) map[s.Code] = { close: s.ClosingPrice, change: s.Change };
+        }
+        setTwsePriceMap(map);
+      }
+
       // Try today first, then yesterday, then last few days
       const today = new Date();
       for (let i = 0; i < 7; i++) {
@@ -44,6 +57,7 @@ export default function Explore() {
   useEffect(() => {
     loadData();
   }, []);
+
 
   const filtered = useMemo(() => {
     let list = recommendations;
@@ -183,7 +197,12 @@ export default function Explore() {
                   </div>
                 </div>
                 <div className="rec-right">
-                  <div className="stock-price">NT${rec.close}</div>
+                  <div className="stock-price">
+                    NT${twsePriceMap[rec.coid]?.close || rec.close}
+                    {twsePriceMap[rec.coid] && (
+                      <span style={{ fontSize: '0.65em', marginLeft: 4, color: '#aaa' }}>TWSE</span>
+                    )}
+                  </div>
                   <div className={`rec-trend ${rec.ret_w === 'rise' ? 'text-profit' : 'text-loss'}`}>
                     {rec.ret_w === 'rise' ? '📈 週漲' : '📉 週跌'}
                   </div>

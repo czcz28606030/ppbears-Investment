@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { fetchStockData, fetchSimonsData, toRecommendation, POPULAR_STOCKS } from '../api';
+import { fetchStockData, fetchSimonsData, toRecommendation, POPULAR_STOCKS, fetchTWSEStockPrice } from '../api';
+import type { TWSTEStockQuote } from '../api';
 import { useStore, formatPrice, formatMoney } from '../store';
 import type { StockData, StockPrice, StockRecommendation } from '../types';
 import './StockDetail.css';
@@ -11,6 +12,7 @@ export default function StockDetail() {
   const [stockData, setStockData] = useState<StockData | null>(null);
   const [recommendation, setRecommendation] = useState<StockRecommendation | null>(null);
   const [latestPrice, setLatestPrice] = useState<StockPrice | null>(null);
+  const [twseQuote, setTwseQuote] = useState<TWSTEStockQuote | null>(null);
   const [loading, setLoading] = useState(true);
   const [tradeMode, setTradeMode] = useState<'buy' | 'sell' | null>(null);
   const [quantity, setQuantity] = useState('');
@@ -28,9 +30,10 @@ export default function StockDetail() {
   async function loadStock(coid: string) {
     setLoading(true);
     try {
-      // 同時載入股票資料和推薦
-      const [stockRes] = await Promise.all([
+      // 同時載入 ifalgo 資料、TWSE 即時行情、推薦
+      const [stockRes, twseRes] = await Promise.all([
         fetchStockData(coid),
+        fetchTWSEStockPrice(coid),
       ]);
 
       if (stockRes) {
@@ -39,6 +42,11 @@ export default function StockDetail() {
         if (prices?.length > 0) {
           setLatestPrice(prices[prices.length - 1]);
         }
+      }
+
+      // TWSE 即時行情（收盤價最新）
+      if (twseRes && twseRes.ClosingPrice) {
+        setTwseQuote(twseRes);
       }
 
       // 嘗試載入推薦
@@ -56,7 +64,6 @@ export default function StockDetail() {
         }
       }
 
-      // 載入持股與使用者已經存在全球狀態中，這裡我們不用再特別做什麼，因為 useStore 已經訂閱了 holdings
     } catch (err) {
       console.error(err);
     }
@@ -103,11 +110,32 @@ export default function StockDetail() {
     return `🏢 ${status || '這是一間認真做生意的好公司！'}`;
   }
 
-  const price = latestPrice ? parseFloat(latestPrice.close_d) : 0;
+  // 價格優先展示：TWSE 即時收盤價 > ifalgo 歷史 K 線
+  const price = twseQuote?.ClosingPrice
+    ? parseFloat(twseQuote.ClosingPrice)
+    : (latestPrice ? parseFloat(latestPrice.close_d) : 0);
+
+  // 漲跌計算：TWSE Change 是絕對金額，轉為%
+  const changeAbsolute = twseQuote?.Change ? parseFloat(twseQuote.Change) : null;
+  const prevPrice = price - (changeAbsolute ?? 0);
+  const change = twseQuote?.ClosingPrice && changeAbsolute !== null && prevPrice > 0
+    ? (changeAbsolute / prevPrice) * 100
+    : (latestPrice?.roia ? parseFloat(latestPrice.roia) : 0);
+  const isUp = change >= 0;
+
   const pe = latestPrice?.pe_ratio ? parseFloat(latestPrice.pe_ratio) : 0;
   const pb = latestPrice?.pb_ratio ? parseFloat(latestPrice.pb_ratio) : 0;
-  const change = latestPrice?.roia ? parseFloat(latestPrice.roia) : 0;
-  const isUp = change >= 0;
+
+  // 資料日期顯示
+  const priceDate = twseQuote?.Date
+    ? (() => {
+        const d = twseQuote.Date; // 民國日期如 "1150410"
+        if (d.length === 7) {
+          return `民國 ${d.slice(0, 3)} 年 ${d.slice(3, 5)} 月 ${d.slice(5, 7)} 日 (TWSE)`;
+        }
+        return d;
+      })()
+    : (latestPrice?.mdate || '');
 
   if (loading) {
     return (
@@ -138,10 +166,23 @@ export default function StockDetail() {
         <div className="price-main">NT$ {formatPrice(price)}</div>
         <div className={`price-change ${isUp ? 'text-profit' : 'text-loss'}`}>
           {isUp ? '▲' : '▼'} {Math.abs(change).toFixed(2)}%
+          {changeAbsolute !== null && (
+            <span style={{ fontSize: '0.85em', marginLeft: 6 }}>
+              ({isUp ? '+' : ''}{changeAbsolute.toFixed(2)} 元)
+            </span>
+          )}
           <span className="price-change-emoji">{isUp ? '📈' : '📉'}</span>
         </div>
+        {twseQuote && (
+          <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 8, fontSize: '0.82rem', color: 'var(--color-text-secondary, #888)' }}>
+            <span>開 {twseQuote.OpeningPrice}</span>
+            <span style={{ color: '#e05050' }}>高 {twseQuote.HighestPrice}</span>
+            <span style={{ color: '#3cc464' }}>低 {twseQuote.LowestPrice}</span>
+            <span>量 {parseInt(twseQuote.TradeVolume || '0').toLocaleString()} 股</span>
+          </div>
+        )}
         <div className="price-date">
-          收盤價 · {latestPrice?.mdate || ''}
+          收盤價 · {priceDate}
         </div>
       </div>
 
