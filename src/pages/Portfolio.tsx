@@ -14,7 +14,14 @@ export default function Portfolio() {
   const isProfit = pl >= 0;
 
   const [aiSignals, setAiSignals] = useState<Record<string, { advice: string, color: string, icon: string }>>({});
-  const [enableCustomSignal, setEnableCustomSignal] = useState(false);
+  const [enableCustomSignal, setEnableCustomSignal] = useState(() => {
+    return localStorage.getItem('ppbears_custom_signal') === 'true';
+  });
+
+  const toggleCustomSignal = (val: boolean) => {
+    setEnableCustomSignal(val);
+    localStorage.setItem('ppbears_custom_signal', String(val));
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -174,7 +181,7 @@ export default function Portfolio() {
             <input 
               type="checkbox" 
               checked={enableCustomSignal} 
-              onChange={e => setEnableCustomSignal(e.target.checked)} 
+              onChange={e => toggleCustomSignal(e.target.checked)} 
               style={{ width: '16px', height: '16px', cursor: 'pointer' }}
             />
             顯示加碼與出場訊號
@@ -205,7 +212,7 @@ export default function Portfolio() {
                   onClick={() => navigate(`/stock/${h.stockCode}`)}
                 >
                   <div className="holding-left">
-                    {hasAiFeature && aiSignals[h.stockCode] ? (
+                    {aiSignals[h.stockCode] ? (
                       <div className="holding-emoji" style={{ display: 'flex', flexDirection: 'column', padding: '4px', background: '#f5f5f5', borderRadius: 8, textAlign: 'center' }}>
                         <span style={{ fontSize: '18px' }}>{aiSignals[h.stockCode].icon}</span>
                         <span style={{ fontSize: '10px', fontWeight: 800, color: aiSignals[h.stockCode].color }}>{aiSignals[h.stockCode].advice}</span>
