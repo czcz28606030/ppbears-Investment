@@ -305,17 +305,17 @@ ul, ol { list-style: none; }
 }
 
 .card-profit {
-  background: linear-gradient(135deg, var(--profit) 0%, #ff7b7f 100%);
-  color: white;
-  border: none;
-  box-shadow: var(--shadow-coral);
+  background: white;
+  color: var(--text-primary);
+  border: 3px solid var(--profit);
+  box-shadow: 0 4px 12px var(--profit-bg);
 }
 
 .card-loss {
-  background: linear-gradient(135deg, var(--loss-color) 0%, #A8DC4A 100%);
-  color: white;
-  border: none;
-  box-shadow: var(--shadow-green);
+  background: white;
+  color: var(--text-primary);
+  border: 3px solid var(--loss-color);
+  box-shadow: 0 4px 12px var(--loss-bg);
 }
 
 /* ============================================
