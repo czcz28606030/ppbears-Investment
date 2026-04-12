@@ -14,7 +14,7 @@ export default function AdminDashboard() {
   const navigate = useNavigate();
   const { user, allUsers, loadAllUsers, adminSetUserTier, adminDeleteUser, adminSetUserBalance,
     adminSetFeatureOverride, adminRemoveFeatureOverride, loadFeatureOverridesForUser,
-    systemSettings, adminUpdateSetting } = useStore();
+    systemSettings, adminUpdateSetting, adminSetUserRelation } = useStore();
 
   const [search, setSearch] = useState('');
   const [balanceModal, setBalanceModal] = useState<{ userId: string; name: string; current: number } | null>(null);
@@ -29,6 +29,8 @@ export default function AdminDashboard() {
   const [tradesModal, setTradesModal] = useState<{ userId: string; name: string } | null>(null);
   const [userTrades, setUserTrades] = useState<Trade[]>([]);
   const [tradesLoading, setTradesLoading] = useState(false);
+
+  const [relationModal, setRelationModal] = useState<{ userId: string; name: string; role: 'parent' | 'child'; parentId: string | null } | null>(null);
 
   useEffect(() => {
     if (user?.isAdmin) loadAllUsers();
@@ -322,6 +324,9 @@ export default function AdminDashboard() {
                 setBalanceInput(String(u.availableBalance));
               }}>💰 調餘額</button>
               <button className="admin-btn admin-btn-feature" onClick={() => handleViewTrades(u)}>📄 交易紀錄</button>
+              <button className="admin-btn admin-btn-feature" onClick={() => {
+                 setRelationModal({ userId: u.id, name: u.displayName, role: u.role, parentId: u.parentId || null });
+              }}>🔗 變更歸屬</button>
               <button className="admin-btn admin-btn-feature" onClick={() => toggleFeaturePanel(u.id)}>🔧 功能開關</button>
               {u.id !== user.id && (
                 <button className="admin-btn admin-btn-delete" onClick={() => handleDelete(u)}>🗑️ 刪除</button>
@@ -393,6 +398,72 @@ export default function AdminDashboard() {
             )}
             <div className="admin-modal-btns" style={{ marginTop: 24 }}>
               <button className="btn-confirm" onClick={() => setTradesModal(null)} style={{ width: '100%' }}>關閉頁面</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 帳號歸屬設定彈窗 */}
+      {relationModal && (
+        <div className="admin-modal-overlay" onClick={() => setRelationModal(null)}>
+          <div className="admin-modal" onClick={e => e.stopPropagation()}>
+            <h3 style={{ marginBottom: 16 }}>🔗 變更 {relationModal.name} 的帳號歸屬</h3>
+            
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ marginBottom: 8, fontWeight: 600 }}>選擇帳號模式：</div>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, cursor: 'pointer' }}>
+                <input 
+                  type="radio" 
+                  name="role" 
+                  checked={relationModal.role === 'parent'} 
+                  onChange={() => setRelationModal({ ...relationModal, role: 'parent', parentId: null })}
+                />
+                🚹 獨立主帳號
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                <input 
+                  type="radio" 
+                  name="role" 
+                  checked={relationModal.role === 'child'} 
+                  onChange={() => setRelationModal({ ...relationModal, role: 'child' })}
+                />
+                👶 附屬副帳號
+              </label>
+            </div>
+
+            {relationModal.role === 'child' && (
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ marginBottom: 8, fontWeight: 600 }}>請選擇所屬主帳號：</div>
+                <select 
+                  style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
+                  value={relationModal.parentId || ''}
+                  onChange={(e) => setRelationModal({ ...relationModal, parentId: e.target.value })}
+                >
+                  <option value="" disabled>-- 點此選擇主帳號 --</option>
+                  {allUsers
+                    .filter(u => (!u.parentId && u.role === 'parent') && u.id !== relationModal.userId)
+                    .map(u => (
+                      <option key={u.id} value={u.id}>{u.displayName} ({u.email})</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <div className="admin-modal-btns">
+              <button className="btn-cancel" onClick={() => setRelationModal(null)}>取消</button>
+              <button className="btn-confirm" onClick={async () => {
+                 if (relationModal.role === 'child' && !relationModal.parentId) {
+                   alert('請選擇主帳號！');
+                   return;
+                 }
+                 const targetParentId = relationModal.role === 'parent' ? null : relationModal.parentId;
+                 const { error } = await adminSetUserRelation(relationModal.userId, relationModal.role, targetParentId);
+                 if (error) {
+                   alert('更新失敗: ' + error);
+                 } else {
+                   setRelationModal(null);
+                 }
+              }}>確認儲存</button>
             </div>
           </div>
         </div>

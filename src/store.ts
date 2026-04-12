@@ -76,6 +76,7 @@ interface InvestmentStore {
   adminSetUserTier: (userId: string, tier: 'free' | 'premium', expiresAt?: string) => Promise<{ error: string | null }>;
   adminDeleteUser: (userId: string) => Promise<{ error: string | null }>;
   adminSetUserBalance: (userId: string, amount: number) => Promise<{ error: string | null }>;
+  adminSetUserRelation: (userId: string, role: 'parent' | 'child', parentId: string | null) => Promise<{ error: string | null }>;
   adminSetFeatureOverride: (userId: string, featureKey: string, enabled: boolean) => Promise<{ error: string | null }>;
   adminRemoveFeatureOverride: (userId: string, featureKey: string) => Promise<{ error: string | null }>;
   loadFeatureOverridesForUser: (userId: string) => Promise<FeatureOverride[]>;
@@ -614,6 +615,16 @@ export const useStore = create<InvestmentStore>((set, get) => ({
     const { user } = get();
     if (!user?.isAdmin) return { error: '需要管理員權限' };
     const { error } = await supabase.from('users').update({ available_balance: amount }).eq('id', userId);
+    if (error) return { error: error.message };
+    await get().loadAllUsers();
+    return { error: null };
+  },
+
+  adminSetUserRelation: async (userId, role, parentId) => {
+    if (!supabase) return { error: '資料庫未連線' };
+    const { user } = get();
+    if (!user?.isAdmin) return { error: '需要管理員權限' };
+    const { error } = await supabase.from('users').update({ role, parent_id: parentId }).eq('id', userId);
     if (error) return { error: error.message };
     await get().loadAllUsers();
     return { error: null };
