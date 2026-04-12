@@ -19,8 +19,14 @@ export default function StockDetail() {
   const [tradeReason, setTradeReason] = useState('');
   const [tradeResult, setTradeResult] = useState<{ success: boolean; message: string } | null>(null);
   
-  const { user, holdings, executeBuy, executeSell } = useStore();
+  const { user, holdings, executeBuy, executeSell, getPortfolioSummary } = useStore();
   const holding = holdings.find(h => h.stockCode === code);
+  const summary = getPortfolioSummary();
+
+  // ─── Risk Warning State ───────────────────────────────
+  type RiskWarning = { title: string; message: string; tip: string; icon: string };
+  const [pendingWarnings, setPendingWarnings] = useState<RiskWarning[]>([]);
+  const [showWarningModal, setShowWarningModal] = useState(false);
 
   const stockEmoji = POPULAR_STOCKS.find(s => s.code === code)?.emoji || '📊';
 
@@ -86,7 +92,65 @@ export default function StockDetail() {
   async function handleTrade() {
     if (!code || !tradeMode || price <= 0) return;
     const qty = parseInt(quantity);
-    
+
+    // ─── Only check risk on BUY ──────────────────────────────────────
+    if (tradeMode === 'buy') {
+      const warnings: RiskWarning[] = [];
+      const totalAssets = summary.totalAssets;
+      const buyAmount = qty * price;
+
+      // Risk 1: 買入後單一該股超過總資金 15%
+      const existingValue = holding ? holding.totalShares * holding.currentPrice : 0;
+      const newPositionValue = existingValue + buyAmount;
+      if (totalAssets > 0 && newPositionValue / totalAssets > 0.15) {
+        const pct = (newPositionValue / totalAssets * 100).toFixed(0);
+        warnings.push({
+          icon: '👸',
+          title: '雞蛋不能放在同一個箐子裡！',
+          message: `買入後，「${stockData?.stkname || code}」將占你總資金的 ${pct}%，超過了建議的 15% 上限。`,
+          tip: '分散投資就像將雞蛋放入不同的箐子裡，僅一個筐子不小心打破，其他的蛋還是安全的。單一股票超過 15%，万一跨了就欲哭無淚！',
+        });
+      }
+
+      // Risk 2: 在號損時加碼
+      if (holding && price < holding.avgCost) {
+        const lossRate = ((holding.avgCost - price) / holding.avgCost * 100).toFixed(1);
+        warnings.push({
+          icon: '🚨',
+          title: '目前正在號損！越跌越買很危険！',
+          message: `你的成本是 NT$ ${formatPrice(holding.avgCost)}，目前價格是 NT$ ${formatPrice(price)}，已號損 ${lossRate}%。`,
+          tip: '越跌越買（扔平成本）是投資新手最常犯的錯誤。警告：如果镜子不轉，搁整只會讓你輸得更多！只允許在「走勢變強」時才加碼。',
+        });
+      }
+
+      // Risk 3: 一次買超過現有持股的 1/3
+      if (holding && holding.totalShares > 0) {
+        const oneThirdShares = holding.totalShares / 3;
+        if (qty > oneThirdShares) {
+          warnings.push({
+            icon: '⚠️',
+            title: '一次加碼太多了！',
+            message: `你已持有 ${holding.totalShares} 股，此次想再買 ${qty} 股，超過現持股的 1/3（1/${3} = ${Math.floor(oneThirdShares)} 股）。`,
+            tip: '穩健的加碼方式，是將資金分拆從小量進場。當走勢問題時，輸少了還有檢討空間；一次 All-in 的話，沒有第二次機會了！',
+          });
+        }
+      }
+
+      if (warnings.length > 0) {
+        setPendingWarnings(warnings);
+        setShowWarningModal(true);
+        return;
+      }
+    }
+
+    await doExecuteTrade();
+  }
+
+  async function doExecuteTrade() {
+    if (!code || !tradeMode || price <= 0) return;
+    setShowWarningModal(false);
+    const qty = parseInt(quantity);
+
     let result;
     if (tradeMode === 'buy') {
       const name = stockData?.stkname || twseQuote?.Name || code;
@@ -422,6 +486,51 @@ export default function StockDetail() {
                 </button>
               </>
             )}
+          </div>
+        </div>
+      )}
+      {/* 風險警示彈窗 */}
+      {showWarningModal && (
+        <div className="modal-overlay">
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxHeight: '85vh', overflowY: 'auto' }}>
+            <div className="modal-handle"></div>
+            <div style={{ textAlign: 'center', marginBottom: 8 }}>
+              <span style={{ fontSize: 40 }}>🐻‍❄️</span>
+            </div>
+            <h3 style={{ textAlign: 'center', color: '#cc0000', marginBottom: 4 }}>讓 PPBear 先警告你！</h3>
+            <p style={{ textAlign: 'center', fontSize: 13, color: '#888', marginBottom: 16 }}>
+              這次交易有 {pendingWarnings.length} 個地方需要注意，但你還是可以自己決定
+            </p>
+
+            {pendingWarnings.map((w, idx) => (
+              <div key={idx} style={{
+                background: '#fff8f8', border: '1.5px solid #ffcccc', borderRadius: 12,
+                padding: '14px 16px', marginBottom: 12
+              }}>
+                <div style={{ fontSize: 22, marginBottom: 6 }}>{w.icon} <span style={{ fontWeight: 800, fontSize: 15, color: '#cc0000' }}>{w.title}</span></div>
+                <p style={{ margin: '0 0 8px', fontSize: 14, color: '#333' }}>{w.message}</p>
+                <div style={{ background: '#fff3cd', borderRadius: 8, padding: '8px 12px', fontSize: 12.5, color: '#7a5800', lineHeight: 1.5 }}>
+                  💡 <strong>投資教室：</strong> {w.tip}
+                </div>
+              </div>
+            ))}
+
+            <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+              <button
+                className="btn"
+                style={{ flex: 1, background: '#f5f5f5', color: '#555', fontWeight: 700 }}
+                onClick={() => setShowWarningModal(false)}
+              >
+                再想想🤔
+              </button>
+              <button
+                className="btn btn-buy"
+                style={{ flex: 1, background: '#cc4444' }}
+                onClick={doExecuteTrade}
+              >
+                我瞭解風险，還是要買
+              </button>
+            </div>
           </div>
         </div>
       )}
