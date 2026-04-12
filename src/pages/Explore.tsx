@@ -77,8 +77,27 @@ export default function Explore() {
   ];
 
   const filtered = useMemo(() => {
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      // Search across all TWSE stocks
+      const globalMatches = Object.entries(twsePriceMap)
+        .filter(([code, data]) => code.includes(q) || data.name.toLowerCase().includes(q))
+        .slice(0, 30); // Limit to 30 results for performance
+        
+      return globalMatches.map(([code, twse]) => ({
+        coid: code,
+        stkname: twse.name,
+        close: twse.close,
+        advice: 'hold',
+        score: 60,
+        category: '搜尋結果',
+        ret_w: 'flat',
+        kidAdvice: '這是您搜尋的股票，可以看看要不要加入庫存喔！',
+      } as StockRecommendation));
+    }
+
+    // Default strategy view
     let list: StockRecommendation[] = [];
-    
     if (activeStrategy === 'ai') {
       list = recommendations;
     } else {
@@ -99,16 +118,6 @@ export default function Explore() {
         } as StockRecommendation;
       });
     }
-    
-    if (search.trim()) {
-      const q = search.trim().toLowerCase();
-      list = list.filter(r => 
-        r.coid.includes(q) || 
-        r.stkname.toLowerCase().includes(q) ||
-        (r.category && r.category.toLowerCase().includes(q))
-      );
-    }
-    
     return list;
   }, [recommendations, activeStrategy, search, twsePriceMap, MOCK_STRATEGIES]);
 
