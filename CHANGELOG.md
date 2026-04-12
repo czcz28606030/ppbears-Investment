@@ -30,4 +30,4 @@
   - 串接 IFalgo API 取得台股即時報價與歷史數據
   - 串接 IFalgo Simons API 取得每日推薦與法人成本
   - 建立 AI 投資建議邏輯，提供評分與買進、觀望、賣出建議
-  - 基於 LocalStorage 的本地資料庫，模擬買賣交易邏輯與損益計算
+  - 全面整合 **Supabase 雲端資料庫** (PostgreSQL)，安全且即時地記錄使用者帳號、買賣交易 (Trades)、庫存 (Holdings) 與資產變動。
