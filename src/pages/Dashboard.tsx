@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useStore, formatMoney } from '../store';
+import { useStore, formatMoney, formatPrice } from '../store';
 import { fetchTWSEAllStocks, fetchTWSEDividendYields, type TWSTEStockQuote, type TWSEDividendYield } from '../api';
 import AdBanner from '../components/AdBanner';
 import './Dashboard.css';
@@ -234,39 +234,46 @@ export default function Dashboard() {
 
               return (
                 <div key={h.stockCode} className="card" onClick={() => navigate(`/stock/${h.stockCode}`)} style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '16px', cursor: 'pointer' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px' }}>
-                     <div style={{ fontWeight: 800, fontSize: '18px', color: 'var(--text-primary)' }}>
-                        {h.stockName} <span style={{fontSize: '14px', color: 'var(--text-secondary)', fontWeight: 500}}>{h.stockCode}</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f5f5f5', paddingBottom: '12px' }}>
+                     <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <div style={{ fontWeight: 800, fontSize: '16px', color: 'var(--text-primary)' }}>
+                           {h.stockName}
+                        </div>
+                        <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', fontWeight: 500, marginTop: '2px' }}>
+                           {h.stockCode}
+                        </div>
                      </div>
-                     <div className={liveChangeAmt >= 0 ? 'text-profit' : 'text-loss'} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 800 }}>
-                        <span style={{ fontSize: '14px' }}>NT$ {formatMoney(currentPrice)}</span>
-                        <span style={{ fontSize: '14px', padding: '2px 6px', background: liveChangeAmt >= 0 ? 'var(--profit-bg)' : 'var(--loss-bg)', borderRadius: '6px' }}>
-                          {liveChangePct >= 0 ? '+' : ''}{liveChangePct.toFixed(1)}%
-                        </span>
+                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                        <div className={liveChangeAmt >= 0 ? 'text-profit' : 'text-loss'} style={{ fontWeight: 800, fontSize: '28px', lineHeight: '1' }}>
+                           {formatMoney(currentPrice)}
+                        </div>
+                        <div className={liveChangeAmt >= 0 ? 'text-profit' : 'text-loss'} style={{ display: 'inline-flex', alignItems: 'center', fontSize: '13px', padding: '2px 6px', background: liveChangeAmt >= 0 ? 'var(--profit-bg)' : 'var(--loss-bg)', borderRadius: '6px', marginTop: '6px', fontWeight: 600 }}>
+                          {liveChangeAmt >= 0 ? '▲' : '▼'} {formatPrice(Math.abs(liveChangeAmt))} ({liveChangePct >= 0 ? '+' : ''}{liveChangePct.toFixed(2)}%)
+                        </div>
                      </div>
                   </div>
                   
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '13px' }}>
-                     <div>
-                        <div style={{ color: 'var(--text-tertiary)', fontSize: '11px', marginBottom: '2px' }}>⚡ 今日損益</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', fontSize: '13px', paddingTop: '4px' }}>
+                     <div style={{ display: 'flex', flexDirection: 'column', background: '#fafafa', padding: '10px', borderRadius: '10px' }}>
+                        <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '4px', fontWeight: 600 }}>今日損益</div>
                         <div className={todayPnL >= 0 ? 'text-profit' : 'text-loss'} style={{ fontWeight: 700, fontSize: '15px' }}>
                            {todayPnL >= 0 ? '+' : ''}{formatMoney(todayPnL)}
                         </div>
                      </div>
-                     <div>
-                        <div style={{ color: 'var(--text-tertiary)', fontSize: '11px', marginBottom: '2px' }}>📊 累積損益 (報酬率)</div>
-                        <div className={isProfit ? 'text-profit' : 'text-loss'} style={{ fontWeight: 700, fontSize: '15px' }}>
-                           {isProfit ? '+' : ''}{formatMoney(totalPnL)} ({isProfit ? '+' : ''}{totalPnLPct.toFixed(1)}%)
+                     <div style={{ display: 'flex', flexDirection: 'column', background: '#fafafa', padding: '10px', borderRadius: '10px' }}>
+                        <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '4px', fontWeight: 600 }}>累積損益</div>
+                        <div className={isProfit ? 'text-profit' : 'text-loss'} style={{ fontWeight: 800, fontSize: '15px' }}>
+                           {isProfit ? '+' : ''}{formatMoney(totalPnL)} <span style={{fontSize: '12px', fontWeight: 500}}>({isProfit ? '+' : ''}{totalPnLPct.toFixed(1)}%)</span>
                         </div>
                      </div>
-                     <div>
-                        <div style={{ color: 'var(--text-tertiary)', fontSize: '11px', marginBottom: '2px' }}>💼 股數 / 均價總成本</div>
+                     <div style={{ display: 'flex', flexDirection: 'column', background: '#fafafa', padding: '10px', borderRadius: '10px' }}>
+                        <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '4px', fontWeight: 600 }}>股數 / 總成本</div>
                         <div style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '14px' }}>
-                           {h.totalShares}股 / {formatMoney(totalCost)}
+                           {h.totalShares} 股 <span style={{fontSize: '12px', color: '#888', fontWeight: 500}}>/ NT${formatMoney(totalCost)}</span>
                         </div>
                      </div>
-                     <div>
-                        <div style={{ color: 'var(--text-tertiary)', fontSize: '11px', marginBottom: '2px' }}>💵 預估現金股利</div>
+                     <div style={{ display: 'flex', flexDirection: 'column', background: '#fafafa', padding: '10px', borderRadius: '10px' }}>
+                        <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '4px', fontWeight: 600 }}>預估現金股利</div>
                         <div style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '14px' }}>
                            {(() => {
                              const divInfo = liveDividends[h.stockCode];
@@ -278,11 +285,11 @@ export default function Dashboard() {
                              return 'NT$ 0 ';
                            })()}
                            {liveDividends[h.stockCode] ? (
-                              <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', fontWeight: 400 }}>
+                              <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', fontWeight: 500, display: 'block', marginTop: '2px' }}>
                                 (依殖利率 {liveDividends[h.stockCode].DividendYield || 0}%)
                               </span>
                            ) : (
-                              <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', fontWeight: 400 }}>(試算中)</span>
+                              <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', fontWeight: 500, display: 'block', marginTop: '2px' }}>(試算中)</span>
                            )}
                         </div>
                      </div>
