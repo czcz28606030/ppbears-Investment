@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore, formatMoney } from '../store';
-import { POPULAR_STOCKS } from '../api';
+import { POPULAR_STOCKS, fetchTWSEAllStocks } from '../api';
 import './Dashboard.css';
 
 export default function Dashboard() {
@@ -14,9 +14,37 @@ export default function Dashboard() {
   const [wReason, setWReason] = useState('');
   const [wError, setWError] = useState('');
   const [wLoading, setWLoading] = useState(false);
+  
+  const [livePnL, setLivePnL] = useState<{ todayPnL: number, todayPnLPct: number } | null>(null);
+
+  useEffect(() => {
+    async function fetchLive() {
+      if (holdings.length === 0) {
+        setLivePnL({ todayPnL: 0, todayPnLPct: 0 });
+        return;
+      }
+      const twse = await fetchTWSEAllStocks();
+      let todayPnL = 0;
+      let totalYesterdayValue = 0;
+      
+      holdings.forEach(h => {
+        const quote = twse.find(t => t.Code === h.stockCode);
+        if (quote && quote.Change) {
+           const changeAmount = parseFloat(quote.Change);
+           todayPnL += changeAmount * h.totalShares;
+           const currentPrice = parseFloat(quote.ClosingPrice);
+           let prevPrice = currentPrice - changeAmount;
+           if (prevPrice <= 0) prevPrice = currentPrice;
+           totalYesterdayValue += prevPrice * h.totalShares;
+        }
+      });
+      const todayPnLPct = totalYesterdayValue > 0 ? (todayPnL / totalYesterdayValue) * 100 : 0;
+      setLivePnL({ todayPnL, todayPnLPct });
+    }
+    fetchLive();
+  }, [holdings]);
 
   const profitClass = summary.totalProfitLoss >= 0 ? 'profit' : 'loss';
-  const profitEmoji = summary.totalProfitLoss >= 0 ? '📈' : '📉';
   const greetingEmoji = summary.totalProfitLoss >= 0 ? '😊' : '💪';
 
   // 根據時間問候
@@ -53,25 +81,37 @@ export default function Dashboard() {
       <div className={`card asset-card ${profitClass === 'profit' ? 'card-profit' : 'card-primary'}`}>
         <div className="asset-label">我的總資產 💰</div>
         <div className="asset-value">NT$ {formatMoney(summary.totalAssets)}</div>
-        <div className="asset-details">
+        
+        <div className="asset-details" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
           <div className="asset-detail">
-            <span className="asset-detail-label">可用現金</span>
+            <span className="asset-detail-label">💵 可用現金</span>
             <span className="asset-detail-value">NT$ {formatMoney(summary.cashBalance)}</span>
           </div>
           <div className="asset-detail">
-            <span className="asset-detail-label">投資市值</span>
+            <span className="asset-detail-label">📈 股票市值</span>
             <span className="asset-detail-value">NT$ {formatMoney(summary.totalMarketValue)}</span>
           </div>
-        </div>
-        {summary.totalCost > 0 && (
-          <div className="asset-profit">
-            <span>{profitEmoji} 目前{summary.totalProfitLoss >= 0 ? '賺' : '虧'}</span>
-            <span className="asset-profit-value">
-              NT$ {formatMoney(Math.abs(summary.totalProfitLoss))}
-              ({summary.profitLossPct >= 0 ? '+' : ''}{summary.profitLossPct.toFixed(1)}%)
+          <div className="asset-detail">
+            <span className="asset-detail-label">📊 累積損益</span>
+            <span className={`asset-detail-value ${summary.totalProfitLoss >= 0 ? 'text-profit' : 'text-loss'}`} style={{ color: summary.totalProfitLoss >= 0 ? '#fff' : '#ffe1e1' }}>
+              {summary.totalProfitLoss >= 0 ? '+' : ''}NT$ {formatMoney(summary.totalProfitLoss)}
+              <span style={{ fontSize: '0.8em', marginLeft: 4 }}>({summary.profitLossPct >= 0 ? '+' : ''}{summary.profitLossPct.toFixed(1)}%)</span>
             </span>
           </div>
-        )}
+          <div className="asset-detail">
+            <span className="asset-detail-label">⚡ 今日損益</span>
+            <span className={`asset-detail-value ${livePnL && livePnL.todayPnL >= 0 ? 'text-profit' : 'text-loss'}`} style={{ color: livePnL && livePnL.todayPnL >= 0 ? '#fff' : '#ffe1e1' }}>
+              {livePnL ? (
+                <>
+                  {livePnL.todayPnL >= 0 ? '+' : ''}NT$ {formatMoney(livePnL.todayPnL)}
+                  <span style={{ fontSize: '0.8em', marginLeft: 4 }}>({livePnL.todayPnLPct >= 0 ? '+' : ''}{livePnL.todayPnLPct.toFixed(1)}%)</span>
+                </>
+              ) : (
+                <span style={{ fontSize: '0.9em', opacity: 0.7 }}>計算中...</span>
+              )}
+            </span>
+          </div>
+        </div>
       </div>
 
       {/* 快速操作 */}
