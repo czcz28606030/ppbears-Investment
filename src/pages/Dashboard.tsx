@@ -284,30 +284,7 @@ export default function Dashboard() {
         </section>
       )}
 
-      {/* 最近交易 */}
-      {trades.length > 0 && (
-        <section>
-          <div className="section-header">
-            <h2 className="section-title">🕐 最近交易</h2>
-          </div>
-          <div className="trades-list">
-            {trades.map((t) => (
-              <div key={t.id} className="trade-item">
-                <div className={`trade-type-badge ${t.tradeType === 'buy' ? 'badge-buy' : 'badge-sell'}`}>
-                  {t.tradeType === 'buy' ? '買' : '賣'}
-                </div>
-                <div className="trade-info">
-                  <div className="trade-name">{t.stockName}</div>
-                  <div className="trade-detail">{t.quantity}股 × NT${t.price}</div>
-                </div>
-                <div className="trade-amount">
-                  NT$ {formatMoney(t.totalAmount)}
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
+
 
       {/* 空狀態 */}
       {holdings.length === 0 && trades.length === 0 && (

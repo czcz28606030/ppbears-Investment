@@ -173,6 +173,19 @@ export default function StockDetail() {
         <div className="price-date">
           收盤價 · {priceDate}
         </div>
+        <div style={{ marginTop: 16 }}>
+          <button 
+            className="btn" 
+            style={{ 
+              background: 'transparent', border: '1px solid #7B2CBF', color: '#7B2CBF', 
+              padding: '6px 16px', borderRadius: '20px', fontSize: '14px', fontWeight: 800,
+              display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer'
+            }}
+            onClick={() => window.open(`https://tw.stock.yahoo.com/quote/${code}.TW/technical-analysis`, '_blank')}
+          >
+            📈 查看 Yahoo 最新技術線圖
+          </button>
+        </div>
       </div>
 
       {/* 用小朋友聽得懂的話介紹 */}

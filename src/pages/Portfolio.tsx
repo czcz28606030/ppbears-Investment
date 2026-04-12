@@ -1,13 +1,11 @@
-import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore, formatMoney, formatPrice } from '../store';
-import type { Holding, Trade } from '../types';
+import type { Holding } from '../types';
 import './Portfolio.css';
 
 export default function Portfolio() {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'holdings' | 'trades'>('holdings');
-  const { holdings, trades, getPortfolioSummary, user } = useStore();
+  const { holdings, getPortfolioSummary, user } = useStore();
   const summary = getPortfolioSummary();
 
   const pl = summary.totalProfitLoss;
@@ -68,25 +66,12 @@ export default function Portfolio() {
         </div>
       )}
 
-      {/* 標籤切換 */}
-      <div className="tabs">
-        <button
-          className={`tab ${activeTab === 'holdings' ? 'active' : ''}`}
-          onClick={() => setActiveTab('holdings')}
-        >
-          📊 持股 ({holdings.length})
-        </button>
-        <button
-          className={`tab ${activeTab === 'trades' ? 'active' : ''}`}
-          onClick={() => setActiveTab('trades')}
-        >
-          🕐 紀錄 ({trades.length})
-        </button>
+      <div className="section-header" style={{ marginTop: '24px', marginBottom: '16px' }}>
+        <h2 className="section-title">📊 持股清單 ({holdings.length})</h2>
       </div>
 
       {/* 持股列表 */}
-      {activeTab === 'holdings' && (
-        <div className="holdings-list">
+      <div className="holdings-list">
           {holdings.length === 0 ? (
             <div className="empty-state">
               <div className="empty-state-icon">📭</div>
@@ -132,43 +117,6 @@ export default function Portfolio() {
             })
           )}
         </div>
-      )}
-
-      {/* 交易紀錄 */}
-      {activeTab === 'trades' && (
-        <div className="trades-history">
-          {trades.length === 0 ? (
-            <div className="empty-state">
-              <div className="empty-state-icon">📝</div>
-              <div className="empty-state-title">還沒有交易紀錄</div>
-              <div className="empty-state-desc">買或賣股票後，紀錄就會出現在這裡！</div>
-            </div>
-          ) : (
-            trades.map((t: Trade) => {
-              const date = new Date(t.timestamp);
-              return (
-                <div key={t.id} className="trade-history-item">
-                  <div className={`trade-type-indicator ${t.tradeType === 'buy' ? 'buy' : 'sell'}`}>
-                    {t.tradeType === 'buy' ? '買' : '賣'}
-                  </div>
-                  <div className="trade-history-info">
-                    <div className="trade-history-name">{t.stockName}</div>
-                    <div className="trade-history-detail">
-                      {t.quantity}股 × NT${formatPrice(t.price)}
-                    </div>
-                    <div className="trade-history-date">
-                      {date.toLocaleDateString('zh-TW')} {date.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' })}
-                    </div>
-                  </div>
-                  <div className={`trade-history-amount ${t.tradeType === 'buy' ? 'text-loss' : 'text-profit'}`}>
-                    {t.tradeType === 'buy' ? '-' : '+'}NT$ {formatMoney(t.totalAmount)}
-                  </div>
-                </div>
-              );
-            })
-          )}
-        </div>
-      )}
     </div>
   );
 }

@@ -90,11 +90,11 @@ function AppContent() {
             </NavLink>
             <NavLink to="/explore" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
               <span className="nav-icon-wrap"><span className="nav-icon">🔍</span></span>
-              <span className="nav-label">探索</span>
+              <span className="nav-label">找股票</span>
             </NavLink>
             <NavLink to="/portfolio" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
               <span className="nav-icon-wrap"><span className="nav-icon">💼</span></span>
-              <span className="nav-label">庫存</span>
+              <span className="nav-label">看庫存</span>
             </NavLink>
 
             <NavLink to="/withdrawal-approval" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
@@ -111,7 +111,7 @@ function AppContent() {
                   }}>{pendingCount}</span>
                 )}
               </span>
-              <span className="nav-label">出金</span>
+              <span className="nav-label">申請出金</span>
             </NavLink>
 
             <NavLink to="/learn" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
