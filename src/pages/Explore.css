@@ -7,9 +7,13 @@
 /* Strategy Grid */
 .strategy-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: var(--space-md);
   margin-bottom: var(--space-md);
+}
+
+.strategy-card-ai {
+  grid-column: 1 / -1;
 }
 
 .strategy-card {
@@ -146,4 +150,16 @@
 .rec-trend {
   font-size: var(--font-size-sm);
   font-weight: 700;
+}
+
+@media (max-width: 900px) {
+  .strategy-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 500px) {
+  .strategy-grid {
+    grid-template-columns: 1fr;
+  }
 }
