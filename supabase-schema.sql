@@ -39,6 +39,7 @@ CREATE TABLE public.trades (
   price numeric NOT NULL,
   total_amount numeric NOT NULL,
   reason text,
+  profit numeric,
   timestamp bigint NOT NULL,
   created_at timestamptz DEFAULT now() NOT NULL
 );

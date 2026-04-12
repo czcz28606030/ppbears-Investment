@@ -67,6 +67,11 @@ export default function TradeHistory() {
                 <div className="trade-item-price-block">
                   <div className="trade-item-total">NT$ {formatMoney(t.totalAmount)}</div>
                   <div className="trade-item-detail">{t.quantity} 股 × NT$ {t.price}</div>
+                  {t.profit !== undefined && (
+                    <div style={{ marginTop: 6, fontWeight: 800, fontSize: 13 }} className={t.profit >= 0 ? 'text-profit' : 'text-loss'}>
+                      {t.profit >= 0 ? `賺 NT$ ${formatMoney(t.profit)} 📈` : `虧 NT$ ${formatMoney(Math.abs(t.profit))} 📉`}
+                    </div>
+                  )}
                 </div>
               </div>
 

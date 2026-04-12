@@ -226,7 +226,9 @@ export const useStore = create<InvestmentStore>((set, get) => ({
           id: t.id, stockCode: t.stock_code, stockName: t.stock_name,
           tradeType: t.trade_type as 'buy' | 'sell',
           quantity: Number(t.quantity), price: Number(t.price),
-          totalAmount: Number(t.total_amount), reason: t.reason as string | undefined, timestamp: Number(t.timestamp),
+          totalAmount: Number(t.total_amount), reason: t.reason as string | undefined, 
+          profit: t.profit != null ? Number(t.profit) : undefined,
+          timestamp: Number(t.timestamp),
         }));
         set({ trades });
       })(),
@@ -426,10 +428,13 @@ export const useStore = create<InvestmentStore>((set, get) => ({
     if (quantity <= 0) return { success: false, message: '至少要賣 1 股喔！' };
 
     const totalReceived = quantity * price;
+    const profit = (price - holding.avgCost) * quantity;
+    
     await supabase.from('users').update({ available_balance: user.availableBalance + totalReceived }).eq('id', user.id);
     await supabase.from('trades').insert([{
       user_id: user.id, stock_code: stockCode, stock_name: holding.stockName,
-      trade_type: 'sell', quantity, price, total_amount: totalReceived, reason: reason || null, timestamp: Date.now(),
+      trade_type: 'sell', quantity, price, total_amount: totalReceived, 
+      reason: reason || null, profit: profit, timestamp: Date.now(),
     }]);
 
     const remaining = holding.totalShares - quantity;
@@ -442,7 +447,6 @@ export const useStore = create<InvestmentStore>((set, get) => ({
     }
 
     await get().loadUserData(user.id);
-    const profit = (price - holding.avgCost) * quantity;
     const emoji = profit >= 0 ? '📈' : '📉';
     return {
       success: true,
