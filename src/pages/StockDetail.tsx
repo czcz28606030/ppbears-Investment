@@ -114,6 +114,10 @@ export default function StockDetail() {
     setTradeResult(result);
     if (result.success) {
       setQuantity('');
+      setTimeout(() => {
+        setTradeMode(null);
+        setTradeResult(null);
+      }, 1500);
     }
   }
 
