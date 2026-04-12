@@ -44,9 +44,9 @@ export default function WithdrawalApproval() {
               <div key={req.id} className="request-card pending">
                 <div className="request-header">
                   {isParent && (
-                    <span className="request-avatar" style={{ padding: (req.childAvatar?.startsWith('data:') || req.childAvatar?.startsWith('http')) ? 0 : undefined, overflow: 'hidden' }}>
+                    <span className="request-avatar" style={{ padding: (req.childAvatar?.startsWith('data:') || req.childAvatar?.startsWith('http')) ? 0 : undefined, overflow: 'hidden', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
                       {(req.childAvatar?.startsWith('data:') || req.childAvatar?.startsWith('http'))
-                        ? <img src={req.childAvatar} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ? <img src={req.childAvatar} alt="avatar" style={{ width: '40px', height: '40px', objectFit: 'cover' }} />
                         : (req.childAvatar || '🐻')}
                     </span>
                   )}
@@ -93,9 +93,9 @@ export default function WithdrawalApproval() {
               <div key={req.id} className={`request-card ${req.status}`}>
                 <div className="request-header">
                   {isParent && (
-                    <span className="request-avatar" style={{ padding: (req.childAvatar?.startsWith('data:') || req.childAvatar?.startsWith('http')) ? 0 : undefined, overflow: 'hidden' }}>
+                    <span className="request-avatar" style={{ padding: (req.childAvatar?.startsWith('data:') || req.childAvatar?.startsWith('http')) ? 0 : undefined, overflow: 'hidden', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
                       {(req.childAvatar?.startsWith('data:') || req.childAvatar?.startsWith('http'))
-                        ? <img src={req.childAvatar} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ? <img src={req.childAvatar} alt="avatar" style={{ width: '40px', height: '40px', objectFit: 'cover' }} />
                         : (req.childAvatar || '🐻')}
                     </span>
                   )}

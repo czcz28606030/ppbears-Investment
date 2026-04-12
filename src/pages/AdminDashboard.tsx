@@ -16,6 +16,8 @@ export default function AdminDashboard() {
     adminSetFeatureOverride, adminRemoveFeatureOverride, loadFeatureOverridesForUser,
     systemSettings, adminUpdateSetting, adminSetUserRelation } = useStore();
 
+  const [allHoldings, setAllHoldings] = useState<any[]>([]);
+
   const [search, setSearch] = useState('');
   const [balanceModal, setBalanceModal] = useState<{ userId: string; name: string; current: number } | null>(null);
   const [balanceInput, setBalanceInput] = useState('');
@@ -33,8 +35,25 @@ export default function AdminDashboard() {
   const [relationModal, setRelationModal] = useState<{ userId: string; name: string; role: 'parent' | 'child'; parentId: string | null } | null>(null);
 
   useEffect(() => {
-    if (user?.isAdmin) loadAllUsers();
+    if (user?.isAdmin) {
+      loadAllUsers();
+      if (supabase) {
+        supabase.from('holdings').select('*').then(({ data }) => {
+          setAllHoldings(data || []);
+        });
+      }
+    }
   }, [user]);
+
+  const calculateUnrealizedPnL = (userId: string) => {
+    const userHoldings = allHoldings.filter(h => h.user_id === userId);
+    let pnl = 0;
+    userHoldings.forEach(h => {
+      const currentPrice = Number(h.current_price);
+      pnl += (currentPrice - Number(h.avg_cost)) * Number(h.total_shares);
+    });
+    return pnl;
+  };
 
   if (!user?.isAdmin) {
     return (
@@ -294,7 +313,12 @@ export default function AdminDashboard() {
                   )}
                 </div>
                 <div className="admin-user-email">{u.email}</div>
-                <div className="admin-user-balance">💰 NT$ {formatMoney(u.availableBalance)}</div>
+                <div className="admin-user-balance">
+                  💰 NT$ {formatMoney(u.availableBalance)}
+                  <span style={{ marginLeft: 8, fontSize: 13, color: calculateUnrealizedPnL(u.id) >= 0 ? 'var(--profit-color)' : 'var(--loss-color)' }}>
+                    (未平倉: {calculateUnrealizedPnL(u.id) > 0 ? '+' : ''}{formatMoney(calculateUnrealizedPnL(u.id))})
+                  </span>
+                </div>
                 <div className="admin-user-badges">
                   <span className={`admin-badge ${u.role === 'parent' ? 'badge-parent' : 'badge-child'}`}>
                     {u.role === 'parent' ? '👨‍👩‍👧主帳號' : '👶副帳號'}
@@ -371,15 +395,20 @@ export default function AdminDashboard() {
                  {userTrades.map(trade => (
                    <div key={trade.id} style={{ display: 'flex', justifyContent: 'space-between', padding: 12, background: '#f9f9f9', borderRadius: 8 }}>
                      <div>
-                       <div style={{ fontWeight: 800, marginBottom: 4 }}>
-                         <span style={{ color: trade.tradeType === 'buy' ? 'var(--loss-color)' : 'var(--profit-color)', marginRight: 8 }}>
-                           {trade.tradeType === 'buy' ? '買入' : '賣出'}
-                         </span>
-                         {trade.stockName} ({trade.stockCode})
-                       </div>
-                       <div style={{ fontSize: 12, color: '#666' }}>
-                         數量: {trade.quantity} 股 | 價格: NT$ {formatPrice(trade.price)}
-                       </div>
+                        <div style={{ fontWeight: 800, marginBottom: 4 }}>
+                          <span style={{ color: trade.tradeType === 'buy' ? 'var(--loss-color)' : trade.tradeType === 'sell' ? 'var(--profit-color)' : trade.tradeType === 'deposit' ? '#1976D2' : '#E65100', marginRight: 8 }}>
+                            {trade.tradeType === 'buy' && '買入'}
+                            {trade.tradeType === 'sell' && '賣出'}
+                            {trade.tradeType === 'deposit' && '入金'}
+                            {trade.tradeType === 'withdraw' && '出金'}
+                          </span>
+                          {trade.stockName} <span style={{ opacity: 0.5, fontSize: 12 }}>({trade.stockCode})</span>
+                        </div>
+                        {(trade.tradeType === 'buy' || trade.tradeType === 'sell') && (
+                          <div style={{ fontSize: 12, color: '#666' }}>
+                            數量: {trade.quantity} 股 | 價格: NT$ {formatPrice(trade.price)}
+                          </div>
+                        )}
                        <div style={{ fontSize: 11, color: '#888', marginTop: 4 }}>
                          {new Date(trade.timestamp).toLocaleString('zh-TW')}
                        </div>

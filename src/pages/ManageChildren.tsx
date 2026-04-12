@@ -174,9 +174,9 @@ export default function ManageChildren() {
           return (
           <div key={child.id} className="child-card" style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '20px' }}>
             <div className="child-card-header" style={{ marginBottom: 0, paddingBottom: 0, borderBottom: 'none' }}>
-              <span className="child-avatar" style={{ padding: (child.avatar?.startsWith('data:') || child.avatar?.startsWith('http')) ? 0 : undefined, overflow: 'hidden' }}>
+              <span className="child-avatar" style={{ padding: (child.avatar?.startsWith('data:') || child.avatar?.startsWith('http')) ? 0 : undefined, overflow: 'hidden', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
                 {(child.avatar?.startsWith('data:') || child.avatar?.startsWith('http')) 
-                  ? <img src={child.avatar} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> 
+                  ? <img src={child.avatar} alt="avatar" style={{ width: '48px', height: '48px', objectFit: 'cover' }} /> 
                   : (child.avatar || '🐻')}
               </span>
               <div className="child-info">

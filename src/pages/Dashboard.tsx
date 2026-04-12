@@ -91,7 +91,6 @@ export default function Dashboard() {
             <div className="greeting-sub">今天也要好好投資唷！</div>
           </div>
         </div>
-        <img src="/ppbear.png" alt="PPBear" className="greeting-bear animate-float" />
       </div>
 
       {/* 總資產卡片 */}
