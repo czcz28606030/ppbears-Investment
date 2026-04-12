@@ -243,12 +243,13 @@ export default function Dashboard() {
                            {h.stockCode}
                         </div>
                      </div>
-                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-                        <div className={liveChangeAmt >= 0 ? 'text-profit' : 'text-loss'} style={{ fontWeight: 800, fontSize: '28px', lineHeight: '1' }}>
-                           {formatMoney(currentPrice)}
-                        </div>
-                        <div className={liveChangeAmt >= 0 ? 'text-profit' : 'text-loss'} style={{ display: 'inline-flex', alignItems: 'center', fontSize: '13px', padding: '2px 6px', background: liveChangeAmt >= 0 ? 'var(--profit-bg)' : 'var(--loss-bg)', borderRadius: '6px', marginTop: '6px', fontWeight: 600 }}>
+                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div className={liveChangeAmt >= 0 ? 'text-profit' : 'text-loss'} style={{ display: 'inline-flex', alignItems: 'center', fontSize: '13px', padding: '2px 6px', background: liveChangeAmt >= 0 ? 'var(--profit-bg)' : 'var(--loss-bg)', borderRadius: '6px', fontWeight: 600 }}>
                           {liveChangeAmt >= 0 ? '▲' : '▼'} {formatPrice(Math.abs(liveChangeAmt))} ({liveChangePct >= 0 ? '+' : ''}{liveChangePct.toFixed(2)}%)
+                        </div>
+                        <div className={liveChangeAmt >= 0 ? 'text-profit' : 'text-loss'} style={{ display: 'flex', alignItems: 'baseline', gap: '2px' }}>
+                           <span style={{ fontSize: '14px', fontWeight: 700 }}>NT</span>
+                           <span style={{ fontWeight: 800, fontSize: '38px', lineHeight: '1', letterSpacing: '-0.5px' }}>{formatMoney(currentPrice)}</span>
                         </div>
                      </div>
                   </div>
