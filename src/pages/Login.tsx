@@ -9,7 +9,7 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const { login } = useStore();
+  const { login, loading: storeLoading } = useStore();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -86,9 +86,9 @@ export default function Login() {
           <button
             type="submit"
             className="auth-submit-btn"
-            disabled={!email || !password || isLoading}
+            disabled={!email || !password || isLoading || storeLoading}
           >
-            {isLoading ? '登入中...' : '登入 🚀'}
+            {(isLoading || storeLoading) ? '登入中...' : '登入 🚀'}
           </button>
         </form>
 

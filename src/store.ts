@@ -211,29 +211,32 @@ export const useStore = create<InvestmentStore>((set, get) => ({
     const currentUser = rowToUser(userData);
     set({ user: currentUser });
 
-    const { data: hData } = await supabase.from('holdings').select('*').eq('user_id', userId);
-    const holdings: Holding[] = (hData || []).map(h => ({
-      stockCode: h.stock_code, stockName: h.stock_name,
-      totalShares: Number(h.total_shares), avgCost: Number(h.avg_cost),
-      currentPrice: Number(h.current_price), industry: h.industry,
-    }));
+    // 取得基本資料後，平行查詢其餘資料以加速登入
+    await Promise.all([
+      (async () => {
+        const { data: hData } = await supabase.from('holdings').select('*').eq('user_id', userId);
+        const holdings: Holding[] = (hData || []).map(h => ({
+          stockCode: h.stock_code, stockName: h.stock_name,
+          totalShares: Number(h.total_shares), avgCost: Number(h.avg_cost),
+          currentPrice: Number(h.current_price), industry: h.industry,
+        }));
+        set({ holdings });
+      })(),
+      (async () => {
+        const { data: tData } = await supabase.from('trades').select('*').eq('user_id', userId).order('timestamp', { ascending: false });
+        const trades: Trade[] = (tData || []).map(t => ({
+          id: t.id, stockCode: t.stock_code, stockName: t.stock_name,
+          tradeType: t.trade_type as 'buy' | 'sell',
+          quantity: Number(t.quantity), price: Number(t.price),
+          totalAmount: Number(t.total_amount), timestamp: Number(t.timestamp),
+        }));
+        set({ trades });
+      })(),
+      currentUser.role === 'parent' ? get().loadChildren() : Promise.resolve(),
+      get().loadWithdrawalRequests()
+    ]);
 
-    const { data: tData } = await supabase.from('trades').select('*').eq('user_id', userId).order('timestamp', { ascending: false });
-    const trades: Trade[] = (tData || []).map(t => ({
-      id: t.id, stockCode: t.stock_code, stockName: t.stock_name,
-      tradeType: t.trade_type as 'buy' | 'sell',
-      quantity: Number(t.quantity), price: Number(t.price),
-      totalAmount: Number(t.total_amount), timestamp: Number(t.timestamp),
-    }));
-
-    set({ holdings, trades, loading: false });
-
-    if (currentUser.role === 'parent') {
-      await get().loadChildren();
-      await get().loadWithdrawalRequests();
-    } else {
-      await get().loadWithdrawalRequests();
-    }
+    set({ loading: false });
   },
 
   // ─── Parent Actions ────────────────────────
