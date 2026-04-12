@@ -1,17 +1,10 @@
 // PPBears Investment - API 服務層
 import type { StockData, SimonsItem, StockQuote, StockRecommendation, AIAdvice } from './types';
 
-const IFALGO_BASE = 'https://api.ifalgo.com.tw/frontapi';
-
-// CORS proxy (for development) - in production, use your own backend proxy
-const PROXY = 'https://corsproxy.io/?url=';
+const IFALGO_BASE = '/api/ifalgo';
 
 // TWSE OpenAPI Base
-const TWSE_BASE = 'https://openapi.twse.com.tw/v1';
-
-function proxyUrl(url: string): string {
-  return PROXY + encodeURIComponent(url);
-}
+const TWSE_BASE = '/api/twse';
 
 // TWSE 即時行情資料 (毎交易日更新)
 export interface TWSTEStockQuote {
@@ -47,16 +40,7 @@ export async function fetchTWSEAllStocks(): Promise<TWSTEStockQuote[]> {
     return data;
   } catch (err) {
     console.error('fetchTWSEAllStocks error:', err);
-    // 嘗試透過 proxy
-    try {
-      const url = `${TWSE_BASE}/exchangeReport/STOCK_DAY_ALL`;
-      const res = await fetch(proxyUrl(url));
-      const data: TWSTEStockQuote[] = await res.json();
-      twseCache = data;
-      return data;
-    } catch {
-      return [];
-    }
+    return [];
   }
 }
 
@@ -96,7 +80,7 @@ function makeKidFriendly(status: string, industry: string): string {
 export async function fetchStockData(coid: string): Promise<StockData | null> {
   try {
     const url = `${IFALGO_BASE}/stock?coid=${coid}`;
-    const res = await fetch(proxyUrl(url));
+    const res = await fetch(url);
     const json = await res.json();
     if (json.data?.stock?.position) {
       return json.data.stock.position;
@@ -113,7 +97,7 @@ export async function fetchSimonsData(date?: string): Promise<SimonsItem[]> {
   try {
     const d = date || new Date().toISOString().split('T')[0];
     const url = `${IFALGO_BASE}/common/getSimonsData?searchDate=${d}`;
-    const res = await fetch(proxyUrl(url));
+    const res = await fetch(url);
     const json = await res.json();
     return json.data?.dataItems || [];
   } catch (err) {

@@ -1,6 +1,14 @@
 {
   "rewrites": [
     {
+      "source": "/api/ifalgo/:path*",
+      "destination": "https://api.ifalgo.com.tw/frontapi/:path*"
+    },
+    {
+      "source": "/api/twse/:path*",
+      "destination": "https://openapi.twse.com.tw/v1/:path*"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
