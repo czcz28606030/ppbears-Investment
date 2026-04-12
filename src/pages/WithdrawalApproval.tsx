@@ -4,7 +4,8 @@ import './WithdrawalApproval.css';
 
 export default function WithdrawalApproval() {
   const navigate = useNavigate();
-  const { withdrawalRequests, approveWithdrawal, rejectWithdrawal } = useStore();
+  const { withdrawalRequests, approveWithdrawal, rejectWithdrawal, user } = useStore();
+  const isParent = user?.role === 'parent';
 
   const pending = withdrawalRequests.filter(r => r.status === 'pending');
   const reviewed = withdrawalRequests.filter(r => r.status !== 'pending');
@@ -23,8 +24,8 @@ export default function WithdrawalApproval() {
     <div className="approval-page">
       <div className="page-header">
         <button className="page-header-back" onClick={() => navigate('/')}>←</button>
-        <h1 className="page-title">💸 出金審核</h1>
-        {pending.length > 0 && (
+        <h1 className="page-title">{isParent ? '💸 出金審核' : '💸 出金紀錄'}</h1>
+        {isParent && pending.length > 0 && (
           <span className="pending-badge">{pending.length}</span>
         )}
       </div>
@@ -34,7 +35,7 @@ export default function WithdrawalApproval() {
         <h2 className="section-title">⏳ 待審核 ({pending.length})</h2>
         {pending.length === 0 ? (
           <div className="empty-state">
-            <div className="empty-state-icon">✅</div>
+            <div className="empty-state-icon">{isParent ? '✅' : '🐻'}</div>
             <div className="empty-state-title">目前沒有待審核的申請</div>
           </div>
         ) : (
@@ -42,9 +43,9 @@ export default function WithdrawalApproval() {
             {pending.map(req => (
               <div key={req.id} className="request-card pending">
                 <div className="request-header">
-                  <span className="request-avatar">{req.childAvatar || '🐻'}</span>
+                  {isParent && <span className="request-avatar">{req.childAvatar || '🐻'}</span>}
                   <div className="request-info">
-                    <div className="request-name">{req.childName || '未知副帳號'}</div>
+                    {isParent && <div className="request-name">{req.childName || '未知副帳號'}</div>}
                     <div className="request-date">
                       {new Date(req.createdAt).toLocaleDateString('zh-TW')} {' '}
                       {new Date(req.createdAt).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' })}
@@ -57,14 +58,20 @@ export default function WithdrawalApproval() {
                 {req.reason && (
                   <div className="request-reason">💬 {req.reason}</div>
                 )}
-                <div className="request-actions">
-                  <button className="btn-reject" onClick={() => handleReject(req.id)}>
-                    ❌ 拒絕
-                  </button>
-                  <button className="btn-approve" onClick={() => handleApprove(req.id)}>
-                    ✅ 同意出金
-                  </button>
-                </div>
+                {isParent ? (
+                  <div className="request-actions">
+                    <button className="btn-reject" onClick={() => handleReject(req.id)}>
+                      ❌ 拒絕
+                    </button>
+                    <button className="btn-approve" onClick={() => handleApprove(req.id)}>
+                      ✅ 同意出金
+                    </button>
+                  </div>
+                ) : (
+                  <div className="request-actions" style={{ justifyContent: 'flex-start', color: '#ffb95e', fontWeight: 'bold', fontSize: 14 }}>
+                    ⏳ 等待大人審核中...
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -79,9 +86,9 @@ export default function WithdrawalApproval() {
             {reviewed.map(req => (
               <div key={req.id} className={`request-card ${req.status}`}>
                 <div className="request-header">
-                  <span className="request-avatar">{req.childAvatar || '🐻'}</span>
+                  {isParent && <span className="request-avatar">{req.childAvatar || '🐻'}</span>}
                   <div className="request-info">
-                    <div className="request-name">{req.childName || '未知副帳號'}</div>
+                    {isParent && <div className="request-name">{req.childName || '未知副帳號'}</div>}
                     <div className="request-date">
                       {new Date(req.createdAt).toLocaleDateString('zh-TW')}
                     </div>

@@ -95,24 +95,22 @@ function AppContent() {
               <span className="nav-label">庫存</span>
             </NavLink>
 
-            {user.role === 'parent' && (
-              <NavLink to="/withdrawal-approval" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-                <span className="nav-icon-wrap" style={{ position: 'relative' }}>
-                  <span className="nav-icon">💸</span>
-                  {pendingCount > 0 && (
-                    <span style={{
-                      position: 'absolute', top: 2, right: 2,
-                      background: '#FF595E', color: '#fff',
-                      borderRadius: 10, fontSize: 9, fontWeight: 900,
-                      minWidth: 15, height: 15, display: 'flex',
-                      alignItems: 'center', justifyContent: 'center', padding: '0 3px',
-                      border: '2px solid white',
-                    }}>{pendingCount}</span>
-                  )}
-                </span>
-                <span className="nav-label">出金</span>
-              </NavLink>
-            )}
+            <NavLink to="/withdrawal-approval" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+              <span className="nav-icon-wrap" style={{ position: 'relative' }}>
+                <span className="nav-icon">💸</span>
+                {user.role === 'parent' && pendingCount > 0 && (
+                  <span style={{
+                    position: 'absolute', top: 2, right: 2,
+                    background: '#FF595E', color: '#fff',
+                    borderRadius: 10, fontSize: 9, fontWeight: 900,
+                    minWidth: 15, height: 15, display: 'flex',
+                    alignItems: 'center', justifyContent: 'center', padding: '0 3px',
+                    border: '2px solid white',
+                  }}>{pendingCount}</span>
+                )}
+              </span>
+              <span className="nav-label">出金</span>
+            </NavLink>
 
             <NavLink to="/learn" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
               <span className="nav-icon-wrap"><span className="nav-icon">📚</span></span>
