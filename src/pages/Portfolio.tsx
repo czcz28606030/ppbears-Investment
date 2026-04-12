@@ -177,15 +177,23 @@ export default function Portfolio() {
       <div className="section-header" style={{ marginTop: '24px', marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h2 className="section-title" style={{ margin: 0 }}>📊 持股清單 ({holdings.length})</h2>
         {!hasAiFeature && (
-          <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13.5px', color: '#555', cursor: 'pointer', fontWeight: 600, background: '#f5f5f5', padding: '6px 12px', borderRadius: '8px' }}>
-            <input 
-              type="checkbox" 
-              checked={enableCustomSignal} 
-              onChange={e => toggleCustomSignal(e.target.checked)} 
-              style={{ width: '16px', height: '16px', cursor: 'pointer' }}
-            />
-            顯示加碼與出場訊號
-          </label>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13.5px', color: '#555', cursor: 'pointer', fontWeight: 600, background: '#f5f5f5', padding: '6px 12px', borderRadius: '8px' }}>
+              <input 
+                type="checkbox" 
+                checked={enableCustomSignal} 
+                onChange={e => toggleCustomSignal(e.target.checked)} 
+                style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+              />
+              顯示加碼與出場訊號
+            </label>
+            {enableCustomSignal && (
+              <div style={{ fontSize: '11px', color: '#888', background: '#f5f5f5', padding: '6px 10px', borderRadius: '6px', lineHeight: '1.4' }}>
+                <span style={{ color: '#FF2424', fontWeight: 600 }}>加碼：</span>站上季線 + 收盤創 20 日新高<br/>
+                <span style={{ color: 'var(--loss-color)', fontWeight: 600 }}>出場：</span>跌破季線連續 2 天
+              </div>
+            )}
+          </div>
         )}
       </div>
 
