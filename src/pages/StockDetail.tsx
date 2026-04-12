@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { fetchStockData, fetchSimonsData, toRecommendation, POPULAR_STOCKS, fetchTWSEStockPrice, makeKidFriendly } from '../api';
+import { fetchStockData, fetchSimonsData, toRecommendation, POPULAR_STOCKS, fetchTWSEStockPrice, getOrGenerateKidFriendlyDesc } from '../api';
 import type { TWSTEStockQuote } from '../api';
 import { useStore, formatPrice, formatMoney } from '../store';
 import type { StockData, StockPrice, StockRecommendation } from '../types';
@@ -14,6 +14,8 @@ export default function StockDetail() {
   const [latestPrice, setLatestPrice] = useState<StockPrice | null>(null);
   const [twseQuote, setTwseQuote] = useState<TWSTEStockQuote | null>(null);
   const [loading, setLoading] = useState(true);
+  const [descLoading, setDescLoading] = useState(true);
+  const [kidDesc, setKidDesc] = useState('');
   const [tradeMode, setTradeMode] = useState<'buy' | 'sell' | null>(null);
   const [quantity, setQuantity] = useState('');
   const [tradeReason, setTradeReason] = useState('');
@@ -77,12 +79,22 @@ export default function StockDetail() {
     setLoading(false);
   }
 
-  function getKidDescription(): string {
-    const rawName = stockData?.stkname || twseQuote?.Name || code || '';
-    const status = stockData?.status || '';
-    const industry = stockData?.subindustry || '';
-    return makeKidFriendly(code || '', rawName, status, industry);
-  }
+  // 非同步載入公司介紹
+  useEffect(() => {
+    async function loadDesc() {
+      if (!code) return;
+      setDescLoading(true);
+      const rawName = stockData?.stkname || twseQuote?.Name || POPULAR_STOCKS.find(s => s.code === code)?.name || code || '';
+      const status = stockData?.status || '';
+      const industry = stockData?.subindustry || '';
+      const desc = await getOrGenerateKidFriendlyDesc(code, rawName, status, industry);
+      setKidDesc(desc);
+      setDescLoading(false);
+    }
+    if (!loading) {
+      loadDesc();
+    }
+  }, [code, loading, stockData, twseQuote]);
 
   // 價格優先展示：TWSE 即時收盤價 > ifalgo 歷史 K 線
   const price = twseQuote?.ClosingPrice
@@ -258,7 +270,14 @@ export default function StockDetail() {
           <img src="/ppbear.png" alt="PPBear" className="kid-desc-bear" />
           <span className="kid-desc-title">PPBear 介紹</span>
         </div>
-        <p className="kid-desc-text">{getKidDescription()}</p>
+        {descLoading ? (
+          <p style={{ color: '#888', fontStyle: 'italic', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span className="spinner" style={{ width: 14, height: 14, border: '2px solid #ccc', borderTopColor: '#FFA000', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></span>
+            PPBear 正在認識這間公司中...
+          </p>
+        ) : (
+          <p className="kid-desc-text">{kidDesc}</p>
+        )}
       </div>
 
       {/* AI 建議 */}

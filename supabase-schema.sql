@@ -226,3 +226,22 @@ CREATE POLICY "Users can view own feature overrides"
 -- 升級 (加入入金出金支援): 
 -- ALTER TABLE public.trades DROP CONSTRAINT IF EXISTS trades_trade_type_check;
 -- ALTER TABLE public.trades ADD CONSTRAINT trades_trade_type_check CHECK (trade_type IN ('buy', 'sell', 'deposit', 'withdraw'));
+
+-- ==========================================================
+-- 升級 v2.2 (AI 公司介紹快取表)
+-- ==========================================================
+CREATE TABLE public.stock_profiles (
+  stock_code text PRIMARY KEY,
+  kid_description text NOT NULL,
+  created_at timestamptz DEFAULT now()
+);
+
+ALTER TABLE public.stock_profiles ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow authenticated access to view stock profiles"
+  ON public.stock_profiles FOR SELECT
+  USING (auth.role() = 'authenticated');
+
+CREATE POLICY "Allow authenticated users to insert stock profiles"
+  ON public.stock_profiles FOR INSERT
+  WITH CHECK (auth.role() = 'authenticated');

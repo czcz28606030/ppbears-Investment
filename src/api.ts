@@ -1,5 +1,5 @@
-// PPBears Investment - API 服務層
 import type { StockData, SimonsItem, StockQuote, StockRecommendation, AIAdvice } from './types';
+import { supabase } from './supabase';
 
 const IFALGO_BASE = '/api/ifalgo';
 
@@ -122,6 +122,77 @@ export function makeKidFriendly(code: string, name: string, status: string, indu
   }
   return '一間認真做事、努力賺錢，也為社會貢獻的好公司 🏢✨';
 }
+
+// 動態取得或生成兒童版股票介紹
+export async function getOrGenerateKidFriendlyDesc(code: string, name: string, status: string, industry: string): Promise<string> {
+  const fallbackDesc = makeKidFriendly(code, name, status, industry);
+
+  if (!supabase) return fallbackDesc;
+  
+  try {
+    // 1. 嘗試從快取資料庫讀取
+    const { data: cached } = await supabase
+      .from('stock_profiles')
+      .select('kid_description')
+      .eq('stock_code', code)
+      .maybeSingle();
+
+    if (cached && cached.kid_description) {
+      return cached.kid_description;
+    }
+
+    // 2. 如果沒有，嘗試呼叫 OpenAI gpt-4o-mini
+    const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
+    if (!apiKey) {
+      return fallbackDesc; // 如果沒有 API Key，就回退原本的寫法
+    }
+
+    const payload = {
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: '你現在是一隻名叫 PPBear 的穿西裝可愛小熊。你在扮演「投資兒童夏令營」的解說員。請用極度活潑、國小四年級生都能聽懂的語氣，並且加上適合的 Emoji，用 50 個中文字以內，介紹這間公司主要在做什麼。結尾要以 PPBear 的口吻鼓勵小朋友。'
+        },
+        {
+          role: 'user',
+          content: `公司名稱：${name} (${code})。所屬產業與狀態：${industry} ${status}。請向小朋友介紹這家公司！`
+        }
+      ],
+      temperature: 0.7,
+      max_tokens: 150
+    };
+
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      console.error('OpenAI API Error:', await response.text());
+      return fallbackDesc;
+    }
+
+    const result = await response.json();
+    const newDesc = result.choices[0].message.content.trim();
+
+    // 3. 把生成的結果存入 Supabase，以後就不必再花錢請求了
+    await supabase.from('stock_profiles').insert({
+      stock_code: code,
+      kid_description: newDesc
+    });
+
+    return newDesc;
+  } catch (error) {
+    console.error('getOrGenerateKidFriendlyDesc error:', error);
+    return fallbackDesc;
+  }
+}
+
 
 // 取得個股資料
 export async function fetchStockData(coid: string): Promise<StockData | null> {
