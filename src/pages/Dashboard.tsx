@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore, formatMoney } from '../store';
-import { POPULAR_STOCKS, fetchTWSEAllStocks } from '../api';
+import { POPULAR_STOCKS, fetchTWSEAllStocks, type TWSTEStockQuote } from '../api';
 import './Dashboard.css';
 
 export default function Dashboard() {
@@ -16,30 +16,37 @@ export default function Dashboard() {
   const [wLoading, setWLoading] = useState(false);
   
   const [livePnL, setLivePnL] = useState<{ todayPnL: number, todayPnLPct: number } | null>(null);
+  const [liveQuotes, setLiveQuotes] = useState<Record<string, TWSTEStockQuote>>({});
 
   useEffect(() => {
     async function fetchLive() {
       if (holdings.length === 0) {
         setLivePnL({ todayPnL: 0, todayPnLPct: 0 });
+        setLiveQuotes({});
         return;
       }
       const twse = await fetchTWSEAllStocks();
+      const quotesMap: Record<string, TWSTEStockQuote> = {};
       let todayPnL = 0;
       let totalYesterdayValue = 0;
       
       holdings.forEach(h => {
         const quote = twse.find(t => t.Code === h.stockCode);
-        if (quote && quote.Change) {
-           const changeAmount = parseFloat(quote.Change);
-           todayPnL += changeAmount * h.totalShares;
-           const currentPrice = parseFloat(quote.ClosingPrice);
-           let prevPrice = currentPrice - changeAmount;
-           if (prevPrice <= 0) prevPrice = currentPrice;
-           totalYesterdayValue += prevPrice * h.totalShares;
+        if (quote) {
+           quotesMap[h.stockCode] = quote;
+           if (quote.Change) {
+             const changeAmount = parseFloat(quote.Change);
+             todayPnL += changeAmount * h.totalShares;
+             const currentPrice = parseFloat(quote.ClosingPrice);
+             let prevPrice = currentPrice - changeAmount;
+             if (prevPrice <= 0) prevPrice = currentPrice;
+             totalYesterdayValue += prevPrice * h.totalShares;
+           }
         }
       });
       const todayPnLPct = totalYesterdayValue > 0 ? (todayPnL / totalYesterdayValue) * 100 : 0;
       setLivePnL({ todayPnL, todayPnLPct });
+      setLiveQuotes(quotesMap);
     }
     fetchLive();
   }, [holdings]);
@@ -191,31 +198,60 @@ export default function Dashboard() {
             <h2 className="section-title">📊 我的持股</h2>
             <span className="section-action" onClick={() => navigate('/portfolio')}>查看全部</span>
           </div>
-          <div className="holdings-preview">
+          <div className="holdings-preview" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             {holdings.slice(0, 3).map((h) => {
-              const pl = (h.currentPrice - h.avgCost) * h.totalShares;
-              const plPct = ((h.currentPrice - h.avgCost) / h.avgCost * 100);
-              const isProfit = pl >= 0;
+              const quote = liveQuotes[h.stockCode];
+              
+              const currentPrice = quote ? parseFloat(quote.ClosingPrice) : h.currentPrice;
+              const liveChangeAmt = quote && quote.Change ? parseFloat(quote.Change) : 0;
+              const prevPrice = currentPrice - liveChangeAmt;
+              const liveChangePct = prevPrice > 0 ? (liveChangeAmt / prevPrice) * 100 : 0;
+              
+              const todayPnL = liveChangeAmt * h.totalShares;
+              const totalCost = h.avgCost * h.totalShares;
+              const totalPnL = (currentPrice - h.avgCost) * h.totalShares;
+              const totalPnLPct = h.avgCost > 0 ? ((currentPrice - h.avgCost) / h.avgCost * 100) : 0;
+              const isProfit = totalPnL >= 0;
+
               return (
-                <div
-                  key={h.stockCode}
-                  className="stock-card"
-                  onClick={() => navigate(`/stock/${h.stockCode}`)}
-                >
-                  <div className="stock-icon" style={{ background: isProfit ? 'var(--profit-bg)' : 'var(--loss-bg)' }}>
-                    {isProfit ? '📈' : '📉'}
+                <div key={h.stockCode} className="card" onClick={() => navigate(`/stock/${h.stockCode}`)} style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '16px', cursor: 'pointer' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px' }}>
+                     <div style={{ fontWeight: 800, fontSize: '18px', color: 'var(--text-primary)' }}>
+                        {h.stockName} <span style={{fontSize: '14px', color: 'var(--text-secondary)', fontWeight: 500}}>{h.stockCode}</span>
+                     </div>
+                     <div className={liveChangeAmt >= 0 ? 'text-profit' : 'text-loss'} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 800 }}>
+                        <span style={{ fontSize: '14px' }}>NT$ {formatMoney(currentPrice)}</span>
+                        <span style={{ fontSize: '14px', padding: '2px 6px', background: liveChangeAmt >= 0 ? 'var(--profit-bg)' : 'var(--loss-bg)', borderRadius: '6px' }}>
+                          {liveChangePct >= 0 ? '+' : ''}{liveChangePct.toFixed(1)}%
+                        </span>
+                     </div>
                   </div>
-                  <div className="stock-info">
-                    <div className="stock-name">{h.stockName}</div>
-                    <div className="stock-code">{h.stockCode} · {h.totalShares}股</div>
-                  </div>
-                  <div className="stock-price-info">
-                    <div className={`stock-price ${isProfit ? 'text-profit' : 'text-loss'}`}>
-                      {isProfit ? '+' : ''}{formatMoney(pl)}
-                    </div>
-                    <div className={`stock-change ${isProfit ? 'text-profit' : 'text-loss'}`}>
-                      {isProfit ? '+' : ''}{plPct.toFixed(1)}%
-                    </div>
+                  
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '13px' }}>
+                     <div>
+                        <div style={{ color: 'var(--text-tertiary)', fontSize: '11px', marginBottom: '2px' }}>⚡ 今日損益</div>
+                        <div className={todayPnL >= 0 ? 'text-profit' : 'text-loss'} style={{ fontWeight: 700, fontSize: '15px' }}>
+                           {todayPnL >= 0 ? '+' : ''}{formatMoney(todayPnL)}
+                        </div>
+                     </div>
+                     <div>
+                        <div style={{ color: 'var(--text-tertiary)', fontSize: '11px', marginBottom: '2px' }}>📊 累積損益 (報酬率)</div>
+                        <div className={isProfit ? 'text-profit' : 'text-loss'} style={{ fontWeight: 700, fontSize: '15px' }}>
+                           {isProfit ? '+' : ''}{formatMoney(totalPnL)} ({isProfit ? '+' : ''}{totalPnLPct.toFixed(1)}%)
+                        </div>
+                     </div>
+                     <div>
+                        <div style={{ color: 'var(--text-tertiary)', fontSize: '11px', marginBottom: '2px' }}>💼 股數 / 均價總成本</div>
+                        <div style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '14px' }}>
+                           {h.totalShares}股 / {formatMoney(totalCost)}
+                        </div>
+                     </div>
+                     <div>
+                        <div style={{ color: 'var(--text-tertiary)', fontSize: '11px', marginBottom: '2px' }}>💵 預估現金股利</div>
+                        <div style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '14px' }}>
+                           NT$ 0 <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', fontWeight: 400 }}>(試算中)</span>
+                        </div>
+                     </div>
                   </div>
                 </div>
               );
