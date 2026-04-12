@@ -13,6 +13,7 @@ import Register from './pages/Register';
 import ManageChildren from './pages/ManageChildren';
 import WithdrawalApproval from './pages/WithdrawalApproval';
 import ProfileSettings from './pages/ProfileSettings';
+import AdminDashboard from './pages/AdminDashboard';
 import ForgotPassword from './pages/ForgotPassword';
 import UpdatePassword from './pages/UpdatePassword';
 
@@ -75,6 +76,9 @@ function AppContent() {
 
           {/* Profile Settings */}
           <Route path="/settings" element={<ProfileSettings />} />
+
+          {/* Admin */}
+          <Route path="/admin" element={<AdminDashboard />} />
 
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

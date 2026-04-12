@@ -2,6 +2,25 @@
 
 所有關於 PPBears Investment 的版本變更都會記錄在此檔案中。我們遵循 [語意化版本控制](https://semver.org/lang/zh-TW/) 的規範。
 
+## [1.4.0] - 2026-04-12
+
+### 新增與優化 (Added & Changed)
+- **帳號分級系統 (Tier System)**:
+  - 全新三級權限架構：管理員 (Admin)、免費用戶 (Free)、付費會員 (Premium)。
+  - 資料庫新增 `tier`、`is_admin`、`subscription_expires_at` 欄位與 `feature_overrides` 功能開關表。
+  - 家庭方案繼承：主帳號升級 Premium 後，底下所有副帳號自動享有付費功能。
+- **管理員後台 (`/admin`)**:
+  - 系統總覽（總用戶數、Free/Premium 分布）。
+  - 用戶管理列表：搜尋、升級/降級、調整餘額、刪除帳號。
+  - 功能開關面板：可逐一控制每個帳號的「AI 聰明選股」與「庫存 AI 建議」權限。
+  - Premium 升級彈窗：支援 30/90/365 天或永久訂閱。
+- **付費牆 (Paywall)**:
+  - Free 用戶限制：副帳號 ≤ 2 個、持股 ≤ 5 檔、每日交易 ≤ 10 次。
+  - 廣告橫幅 (AdBanner)：Free 用戶在首頁與探索頁看到升級提示。
+  - AI 聰明選股卡片：Free 用戶顯示🔒鎖定覆蓋。
+- **訂閱制基礎建設**:
+  - 預埋 `subscription_expires_at` 到期日概念，為未來 Google Play 上架做準備。
+
 ## [1.3.0] - 2026-04-12
 
 ### 新增與優化 (Added & Changed)

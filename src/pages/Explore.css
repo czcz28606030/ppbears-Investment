@@ -37,6 +37,11 @@
   border-color: var(--primary);
 }
 
+.strategy-card.locked {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
 .strategy-icon {
   font-size: 28px;
   margin-bottom: 8px;

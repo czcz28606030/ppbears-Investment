@@ -20,10 +20,25 @@ CREATE TABLE public.users (
   display_name text NOT NULL,
   avatar text NOT NULL DEFAULT '🐻',
   role text NOT NULL CHECK (role IN ('parent', 'child')),
+  tier text NOT NULL DEFAULT 'free' CHECK (tier IN ('free', 'premium')),
+  is_admin boolean NOT NULL DEFAULT false,
+  subscription_expires_at timestamptz,
   parent_id uuid REFERENCES public.users(id) ON DELETE CASCADE,  -- null = 主帳號
   available_balance numeric NOT NULL DEFAULT 0,   -- 目前可用現金（無上限）
   initial_balance numeric NOT NULL DEFAULT 0,     -- 主帳號初始給予的金額（僅參考用）
   created_at timestamptz DEFAULT now() NOT NULL
+);
+
+-- ==========================================================
+-- 1b. 功能開關表（管理員可逐一控制用戶的進階功能）
+-- ==========================================================
+CREATE TABLE public.feature_overrides (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  feature_key text NOT NULL,
+  enabled boolean NOT NULL DEFAULT false,
+  updated_at timestamptz DEFAULT now(),
+  UNIQUE(user_id, feature_key)
 );
 
 -- ==========================================================

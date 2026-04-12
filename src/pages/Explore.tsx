@@ -2,14 +2,18 @@ import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fetchSimonsData, toRecommendation, POPULAR_STOCKS, fetchTWSEAllStocks } from '../api';
 import type { StockRecommendation } from '../types';
+import { useStore } from '../store';
+import AdBanner from '../components/AdBanner';
 import './Explore.css';
 
 export default function Explore() {
   const navigate = useNavigate();
+  const { hasFeature } = useStore();
+  const hasAiFeature = hasFeature('ai_stock_picking');
   const [recommendations, setRecommendations] = useState<StockRecommendation[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [activeStrategy, setActiveStrategy] = useState('ai');
+  const [activeStrategy, setActiveStrategy] = useState(hasAiFeature ? 'ai' : 'A');
   const [error, setError] = useState('');
   const [twsePriceMap, setTwsePriceMap] = useState<Record<string, { close: string; change: string; name: string }>>({});
 
@@ -148,17 +152,29 @@ export default function Explore() {
             {STRATEGY_CARDS.map(card => (
               <div
                 key={card.id}
-                className={`strategy-card ${card.className} ${activeStrategy === card.id ? 'active' : ''}`}
-                onClick={() => setActiveStrategy(card.id)}
+                className={`strategy-card ${card.className} ${activeStrategy === card.id ? 'active' : ''} ${card.id === 'ai' && !hasAiFeature ? 'locked' : ''}`}
+                onClick={() => {
+                  if (card.id === 'ai' && !hasAiFeature) return;
+                  setActiveStrategy(card.id);
+                }}
               >
                 <div className="strategy-icon">{card.icon}</div>
                 <div className="strategy-title">{card.title}</div>
                 <div className="strategy-desc">
                   {card.desc.split('\n').map((line, i) => <div key={i}>{line}</div>)}
                 </div>
+                {card.id === 'ai' && !hasAiFeature && (
+                  <div style={{
+                    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+                    background: 'rgba(0,0,0,0.35)', borderRadius: 16,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: '#fff', fontWeight: 800, fontSize: 14, gap: 4,
+                  }}>🔒 Premium</div>
+                )}
               </div>
             ))}
           </div>
+          <AdBanner />
         </section>
       )}
 

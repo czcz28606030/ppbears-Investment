@@ -76,6 +76,9 @@ export interface UserAccount {
   displayName: string;
   avatar: string;
   role: AccountRole;
+  tier: 'free' | 'premium';
+  isAdmin: boolean;
+  subscriptionExpiresAt?: string;
   availableBalance: number;  // 目前可用現金（無上限）
   initialBalance: number;    // 主帳號初始給予（參考用）
   parentId?: string;
@@ -83,6 +86,12 @@ export interface UserAccount {
 
 export interface ChildAccount extends UserAccount {
   role: 'child';
+}
+
+export interface FeatureOverride {
+  userId: string;
+  featureKey: string;
+  enabled: boolean;
 }
 
 export interface WithdrawalRequest {

@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { supabase } from './supabase';
 import type { Session } from '@supabase/supabase-js';
-import type { UserAccount, Trade, Holding, WithdrawalRequest } from './types';
+import type { UserAccount, Trade, Holding, WithdrawalRequest, FeatureOverride } from './types';
 
 // ==========================================
 // 輔助函式
@@ -34,6 +34,8 @@ interface InvestmentStore {
   holdings: Holding[];
   trades: Trade[];
   withdrawalRequests: WithdrawalRequest[];
+  featureOverrides: FeatureOverride[];
+  allUsers: UserAccount[];
   loading: boolean;
   authLoading: boolean;
 
@@ -68,6 +70,20 @@ interface InvestmentStore {
   updateProfile: (displayName: string, avatarUrl: string) => Promise<{ error: string | null }>;
   uploadAvatar: (file: File) => Promise<{ url: string | null; error: string | null }>;
 
+  // Admin Actions
+  loadAllUsers: () => Promise<void>;
+  adminSetUserTier: (userId: string, tier: 'free' | 'premium', expiresAt?: string) => Promise<{ error: string | null }>;
+  adminDeleteUser: (userId: string) => Promise<{ error: string | null }>;
+  adminSetUserBalance: (userId: string, amount: number) => Promise<{ error: string | null }>;
+  adminSetFeatureOverride: (userId: string, featureKey: string, enabled: boolean) => Promise<{ error: string | null }>;
+  adminRemoveFeatureOverride: (userId: string, featureKey: string) => Promise<{ error: string | null }>;
+  loadFeatureOverridesForUser: (userId: string) => Promise<FeatureOverride[]>;
+
+  // Tier & Feature Helpers
+  isPremiumUser: (targetUser?: UserAccount) => boolean;
+  hasFeature: (featureKey: string) => boolean;
+  getTodayTradeCount: () => number;
+
   // Getters
   getPortfolioSummary: () => PortfolioSummary;
 }
@@ -80,6 +96,9 @@ function rowToUser(row: Record<string, unknown>): UserAccount {
     displayName: row.display_name as string,
     avatar: row.avatar as string,
     role: row.role as 'parent' | 'child',
+    tier: (row.tier as 'free' | 'premium') || 'free',
+    isAdmin: Boolean(row.is_admin),
+    subscriptionExpiresAt: (row.subscription_expires_at as string) || undefined,
     availableBalance: Number(row.available_balance),
     initialBalance: Number(row.initial_balance),
     parentId: (row.parent_id as string) || undefined,
@@ -96,6 +115,8 @@ export const useStore = create<InvestmentStore>((set, get) => ({
   holdings: [],
   trades: [],
   withdrawalRequests: [],
+  featureOverrides: [],
+  allUsers: [],
   loading: false,
   authLoading: true,
   isRecoveryMode: false,
@@ -195,7 +216,7 @@ export const useStore = create<InvestmentStore>((set, get) => ({
   logout: async () => {
     if (!supabase) return;
     await supabase.auth.signOut();
-    set({ user: null, session: null, children: [], holdings: [], trades: [], withdrawalRequests: [] });
+    set({ user: null, session: null, children: [], holdings: [], trades: [], withdrawalRequests: [], featureOverrides: [], allUsers: [] });
   },
 
   // ─── Data Loading ──────────────────────────
@@ -233,7 +254,14 @@ export const useStore = create<InvestmentStore>((set, get) => ({
         set({ trades });
       })(),
       currentUser.role === 'parent' ? get().loadChildren() : Promise.resolve(),
-      get().loadWithdrawalRequests()
+      get().loadWithdrawalRequests(),
+      (async () => {
+        const { data: foData } = await supabase.from('feature_overrides').select('*').eq('user_id', userId);
+        const featureOverrides: FeatureOverride[] = (foData || []).map(f => ({
+          userId: f.user_id, featureKey: f.feature_key, enabled: Boolean(f.enabled),
+        }));
+        set({ featureOverrides });
+      })()
     ]);
 
     set({ loading: false });
@@ -395,6 +423,22 @@ export const useStore = create<InvestmentStore>((set, get) => ({
     if (totalCost > user.availableBalance) return { success: false, message: '餘額不足！需要更多零用錢才能買喔 💰' };
     if (quantity <= 0) return { success: false, message: '至少要買 1 股喔！' };
 
+    // ─ Paywall: 持股上限檢查 (免費用戶 ≤ 5 檔) ─
+    if (!get().isPremiumUser()) {
+      const uniqueStocks = new Set(holdings.map(h => h.stockCode));
+      if (!uniqueStocks.has(stockCode) && uniqueStocks.size >= 5) {
+        return { success: false, message: '🔒 免費帳號最多只能持有 5 檔股票喔！\n升級 Premium 可解鎖無限持股 💎' };
+      }
+    }
+
+    // ─ Paywall: 每日交易次數檢查 (免費用戶 ≤ 10 次/日) ─
+    if (!get().isPremiumUser()) {
+      const todayCount = get().getTodayTradeCount();
+      if (todayCount >= 10) {
+        return { success: false, message: '🔒 免費帳號每日最多交易 10 次！\n升級 Premium 可解鎖無限交易 💎' };
+      }
+    }
+
     await supabase.from('users').update({ available_balance: user.availableBalance - totalCost }).eq('id', user.id);
     await supabase.from('trades').insert([{
       user_id: user.id, stock_code: stockCode, stock_name: stockName,
@@ -426,6 +470,14 @@ export const useStore = create<InvestmentStore>((set, get) => ({
     if (!holding) return { success: false, message: '你沒有持有這檔股票喔！' };
     if (quantity > holding.totalShares) return { success: false, message: `你只有 ${holding.totalShares} 股，不能賣超過喔！` };
     if (quantity <= 0) return { success: false, message: '至少要賣 1 股喔！' };
+
+    // ─ Paywall: 每日交易次數檢查 (免費用戶 ≤ 10 次/日) ─
+    if (!get().isPremiumUser()) {
+      const todayCount = get().getTodayTradeCount();
+      if (todayCount >= 10) {
+        return { success: false, message: '🔒 免費帳號每日最多交易 10 次！\n升級 Premium 可解鎖無限交易 💎' };
+      }
+    }
 
     const totalReceived = quantity * price;
     const profit = (price - holding.avgCost) * quantity;
@@ -503,6 +555,128 @@ export const useStore = create<InvestmentStore>((set, get) => ({
       };
       reader.readAsDataURL(file);
     });
+  },
+
+  // ─── Admin Actions ─────────────────────────
+  loadAllUsers: async () => {
+    if (!supabase) return;
+    const { user } = get();
+    if (!user?.isAdmin) return;
+    const { data } = await supabase.from('users').select('*').order('created_at', { ascending: false });
+    set({ allUsers: (data || []).map(rowToUser) });
+  },
+
+  adminSetUserTier: async (userId, tier, expiresAt) => {
+    if (!supabase) return { error: '資料庫未連線' };
+    const { user } = get();
+    if (!user?.isAdmin) return { error: '需要管理員權限' };
+    const updateData: Record<string, unknown> = { tier };
+    if (expiresAt) updateData.subscription_expires_at = expiresAt;
+    else if (tier === 'free') updateData.subscription_expires_at = null;
+    const { error } = await supabase.from('users').update(updateData).eq('id', userId);
+    if (error) return { error: error.message };
+    await get().loadAllUsers();
+    return { error: null };
+  },
+
+  adminDeleteUser: async (userId) => {
+    if (!supabase) return { error: '資料庫未連線' };
+    const { user } = get();
+    if (!user?.isAdmin) return { error: '需要管理員權限' };
+    if (userId === user.id) return { error: '不能刪除自己的帳號' };
+    // Delete from public.users (cascades to trades, holdings, etc.)
+    const { error } = await supabase.from('users').delete().eq('id', userId);
+    if (error) return { error: error.message };
+    await get().loadAllUsers();
+    return { error: null };
+  },
+
+  adminSetUserBalance: async (userId, amount) => {
+    if (!supabase) return { error: '資料庫未連線' };
+    const { user } = get();
+    if (!user?.isAdmin) return { error: '需要管理員權限' };
+    const { error } = await supabase.from('users').update({ available_balance: amount }).eq('id', userId);
+    if (error) return { error: error.message };
+    await get().loadAllUsers();
+    return { error: null };
+  },
+
+  adminSetFeatureOverride: async (userId, featureKey, enabled) => {
+    if (!supabase) return { error: '資料庫未連線' };
+    const { user } = get();
+    if (!user?.isAdmin) return { error: '需要管理員權限' };
+    const { error } = await supabase.from('feature_overrides').upsert({
+      user_id: userId, feature_key: featureKey, enabled, updated_at: new Date().toISOString(),
+    }, { onConflict: 'user_id,feature_key' });
+    if (error) return { error: error.message };
+    return { error: null };
+  },
+
+  adminRemoveFeatureOverride: async (userId, featureKey) => {
+    if (!supabase) return { error: '資料庫未連線' };
+    const { user } = get();
+    if (!user?.isAdmin) return { error: '需要管理員權限' };
+    const { error } = await supabase.from('feature_overrides').delete()
+      .eq('user_id', userId).eq('feature_key', featureKey);
+    if (error) return { error: error.message };
+    return { error: null };
+  },
+
+  loadFeatureOverridesForUser: async (userId) => {
+    if (!supabase) return [];
+    const { data } = await supabase.from('feature_overrides').select('*').eq('user_id', userId);
+    return (data || []).map(f => ({
+      userId: f.user_id, featureKey: f.feature_key, enabled: Boolean(f.enabled),
+    }));
+  },
+
+  // ─── Tier & Feature Helpers ────────────────
+  isPremiumUser: (targetUser) => {
+    const { user, allUsers } = get();
+    const u = targetUser || user;
+    if (!u) return false;
+    if (u.isAdmin) return true;
+
+    // 先檢查訂閱到期日
+    if (u.tier === 'premium') {
+      if (u.subscriptionExpiresAt) {
+        return new Date(u.subscriptionExpiresAt) > new Date();
+      }
+      return true; // 沒設到期日 = 永久 Premium (管理員手動升級)
+    }
+
+    // 家庭方案繼承：如果是 child，查看 parent 的 tier
+    if (u.role === 'child' && u.parentId) {
+      const parent = allUsers.find(au => au.id === u.parentId);
+      if (parent?.tier === 'premium') {
+        if (parent.subscriptionExpiresAt) {
+          return new Date(parent.subscriptionExpiresAt) > new Date();
+        }
+        return true;
+      }
+    }
+
+    return false;
+  },
+
+  hasFeature: (featureKey) => {
+    const { user, featureOverrides } = get();
+    if (!user) return false;
+    if (user.isAdmin) return true;
+
+    // 1. 先查 override
+    const override = featureOverrides.find(f => f.featureKey === featureKey);
+    if (override) return override.enabled;
+
+    // 2. 按 tier 預設
+    return get().isPremiumUser();
+  },
+
+  getTodayTradeCount: () => {
+    const { trades } = get();
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    return trades.filter(t => t.timestamp >= todayStart.getTime()).length;
   },
 
   getPortfolioSummary: () => {

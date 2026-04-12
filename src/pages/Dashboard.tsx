@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore, formatMoney } from '../store';
 import { fetchTWSEAllStocks, fetchTWSEDividendYields, type TWSTEStockQuote, type TWSEDividendYield } from '../api';
+import AdBanner from '../components/AdBanner';
 import './Dashboard.css';
 
 export default function Dashboard() {
@@ -155,7 +156,16 @@ export default function Dashboard() {
           <span className="qa-icon">🕒</span>
           <span className="qa-label">交易紀錄</span>
         </button>
+        {user?.isAdmin && (
+          <button className="quick-action-btn" onClick={() => navigate('/admin')}>
+            <span className="qa-icon">🔧</span>
+            <span className="qa-label">管理後台</span>
+          </button>
+        )}
       </div>
+
+      {/* 廣告橫幅（僅 Free 用戶可見） */}
+      <AdBanner />
 
       {/* 副帳號出金申請彈窗 */}
       {showWithdrawal && (
@@ -302,7 +312,7 @@ export default function Dashboard() {
 
       {/* 頁尾版本號 */}
       <div style={{ textAlign: 'center', margin: '32px 0 16px', color: 'var(--text-tertiary)', fontSize: 13, fontWeight: 500 }}>
-        PPBears Investment v1.3.0
+        PPBears Investment v1.4.0
       </div>
     </div>
   );
