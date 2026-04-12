@@ -18,6 +18,8 @@ export default function ManageChildren() {
   const [initialBalance, setInitialBalance] = useState('');
   const [createError, setCreateError] = useState('');
   const [isCreating, setIsCreating] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [registeredChildEmail, setRegisteredChildEmail] = useState('');
 
   // 設定餘額面板
   const [editingChildId, setEditingChildId] = useState<string | null>(null);
@@ -34,10 +36,20 @@ export default function ManageChildren() {
     const result = await createChildAccount(email, password, displayName, avatar, Number(initialBalance) || 0);
     setIsCreating(false);
     if (result.error) {
-      setCreateError(result.error.includes('already') ? '此 Email 已經被使用了' : result.error);
+      if (result.error.includes('already')) {
+        setCreateError('此 Email 已經被使用了');
+      } else if (result.error.includes('rate limit')) {
+        setCreateError('發送驗證信太頻繁啦！請稍後 1 小時再試（平台保護機制）');
+      } else {
+        setCreateError(result.error);
+      }
     } else {
       setShowCreate(false);
+      setRegisteredChildEmail(email);
       setEmail(''); setPassword(''); setDisplayName(''); setInitialBalance('');
+      if (result.needsConfirmation) {
+        setShowSuccessModal(true);
+      }
     }
   };
 
@@ -179,6 +191,44 @@ export default function ManageChildren() {
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* ── Email Confirmation Modal ── */}
+      {showSuccessModal && (
+        <div className="modal-overlay" style={{ alignItems: 'center' }}>
+          <div className="modal-content" style={{ borderRadius: '28px', maxWidth: '400px', margin: '0 20px', padding: '32px 24px' }}>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: 64, marginBottom: 16 }} className="animate-bounce">👦</div>
+              <h2 style={{ fontSize: 22, fontWeight: 900, color: '#2B2118', marginBottom: 8 }}>副帳號建立成功！</h2>
+              <p style={{ fontSize: 14, fontWeight: 700, color: '#7A6A55', marginBottom: 20 }}>
+                請提醒孩子去信箱收取驗證信
+              </p>
+              
+              <div style={{
+                background: 'rgba(56, 189, 248, 0.1)',
+                border: '1.5px dashed rgba(56, 189, 248, 0.4)',
+                borderRadius: 16,
+                padding: '12px',
+                marginBottom: 24,
+                wordBreak: 'break-all'
+              }}>
+                <span style={{ fontWeight: 800, color: '#0284c7' }}>{registeredChildEmail}</span>
+              </div>
+
+              <p style={{ fontSize: 13, fontWeight: 600, color: '#BFB09A', marginBottom: 24, lineHeight: 1.6 }}>
+                💡 驗證開通後，孩子就可以用這組<br/>信箱與密碼登入小熊投資家了！
+              </p>
+
+              <button 
+                onClick={() => setShowSuccessModal(false)}
+                className="btn btn-block btn-primary"
+                style={{ padding: '16px', fontSize: 16 }}
+              >
+                我知道了 ✅
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -51,10 +51,10 @@ interface InvestmentStore {
   // Data
   loadUserData: (userId: string) => Promise<void>;
 
-  // Parent Actions
-  createChildAccount: (email: string, password: string, displayName: string, avatar: string, initialBalance: number) => Promise<{ error: string | null }>;
-  setChildBalance: (childId: string, amount: number, mode: 'set' | 'add') => Promise<{ error: string | null }>;
+  // Children Management
   loadChildren: () => Promise<void>;
+  createChildAccount: (email: string, password: string, displayName: string, avatar: string, initialBalance: number) => Promise<{ error: string | null; needsConfirmation?: boolean }>;
+  setChildBalance: (childId: string, amount: number, mode: 'set' | 'add') => Promise<{ error: string | null }>;
   loadWithdrawalRequests: () => Promise<void>;
   approveWithdrawal: (requestId: string) => Promise<{ error: string | null }>;
   rejectWithdrawal: (requestId: string) => Promise<{ error: string | null }>;
@@ -294,7 +294,11 @@ export const useStore = create<InvestmentStore>((set, get) => ({
       if (insertError) return { error: insertError.message };
 
       await get().loadChildren();
-      return { error: null };
+      
+      if (!data.session) {
+        return { error: null, needsConfirmation: true };
+      }
+      return { error: null, needsConfirmation: false };
     } catch (e) { return { error: String(e) }; }
   },
 
