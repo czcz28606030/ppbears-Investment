@@ -324,8 +324,8 @@ export default function Dashboard() {
       )}
 
       {/* 頁尾版本號 */}
-      <div className="dashboard-footer" style={{ textAlign: 'center', padding: '20px', color: 'var(--color-text-tertiary, #aaa)', fontSize: '0.85rem' }}>
-        PPBears Investment v1.2.0
+      <div style={{ textAlign: 'center', margin: '32px 0 16px', color: 'var(--text-tertiary)', fontSize: 13, fontWeight: 500 }}>
+        PPBears Investment v1.3.0
       </div>
     </div>
   );
