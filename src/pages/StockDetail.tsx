@@ -70,10 +70,6 @@ export default function StockDetail() {
     setLoading(false);
   }
 
-
-
-  }
-
   function getKidDescription(): string {
     if (!stockData) return '';
     const status = stockData.status || '';
