@@ -25,12 +25,12 @@
   --action-soft:  rgba(255, 89, 94, 0.12);
 
   /* ── Semantic ── */
-  --profit:     #8AC926;
-  --profit-bg:  rgba(138, 201, 38, 0.12);
-  --loss-color: #FF595E;
-  --loss-bg:    rgba(255, 89, 94, 0.10);
-  --buy-color:  #8AC926;
-  --sell-color: #FF595E;
+  --profit:     #FF595E;
+  --profit-bg:  rgba(255, 89, 94, 0.12);
+  --loss-color: #8AC926;
+  --loss-bg:    rgba(138, 201, 38, 0.10);
+  --buy-color:  #FF595E;
+  --sell-color: #8AC926;
   --info-color: #1982C4;
   --info-bg:    rgba(25, 130, 196, 0.10);
 

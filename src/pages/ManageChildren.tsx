@@ -1,6 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore, formatMoney } from '../store';
+import { supabase } from '../supabase';
+import { fetchTWSEAllStocks, type TWSTEStockQuote } from '../api';
+import type { Holding } from '../types';
 import './ManageChildren.css';
 import './Login.css'; // Import for password-wrapper and toggle styles
 
@@ -9,6 +12,48 @@ const AVATARS = ['🐻', '🐼', '🐨', '🦁', '🦊', '🐯', '🐸', '🦄']
 export default function ManageChildren() {
   const navigate = useNavigate();
   const { children, createChildAccount, setChildBalance } = useStore();
+
+  // 子帳號資產資料
+  const [childrenHoldings, setChildrenHoldings] = useState<Record<string, Holding[]>>({});
+  const [liveQuotes, setLiveQuotes] = useState<Record<string, TWSTEStockQuote>>({});
+
+  useEffect(() => {
+    async function loadDetailedData() {
+      if (children.length === 0) return;
+      
+      const twse = await fetchTWSEAllStocks();
+      const quotesMap: Record<string, TWSTEStockQuote> = {};
+      twse.forEach(t => quotesMap[t.Code] = t);
+      setLiveQuotes(quotesMap);
+
+      const childIds = children.map(c => c.id);
+      if (!supabase) return;
+      
+      const { data } = await supabase
+        .from('holdings')
+        .select('*')
+        .in('user_id', childIds);
+      
+      const holdingsMap: Record<string, Holding[]> = {};
+      childIds.forEach(id => holdingsMap[id] = []);
+      
+      (data || []).forEach(h => {
+        holdingsMap[h.user_id].push({
+          stockCode: h.stock_code,
+          stockName: h.stock_name,
+          totalShares: Number(h.total_shares),
+          avgCost: Number(h.avg_cost),
+          currentPrice: Number(h.current_price),
+          industry: h.industry,
+        });
+      });
+      setChildrenHoldings(holdingsMap);
+    }
+    
+    if (children.length > 0) {
+      loadDetailedData();
+    }
+  }, [children]);
 
   // 建立副帳號表單
   const [showCreate, setShowCreate] = useState(false);
@@ -91,22 +136,87 @@ export default function ManageChildren() {
           </div>
         )}
 
-        {children.map(child => (
-          <div key={child.id} className="child-card">
-            <div className="child-card-header">
+        {children.map(child => {
+          const cHoldings = childrenHoldings[child.id] || [];
+          let totalMarketValue = 0;
+          let totalCost = 0;
+          let todayPnL = 0;
+          
+          cHoldings.forEach(h => {
+             const quote = liveQuotes[h.stockCode];
+             const currentPrice = quote ? parseFloat(quote.ClosingPrice) : h.currentPrice;
+             const liveChangeAmt = quote && quote.Change ? parseFloat(quote.Change) : 0;
+             
+             totalMarketValue += currentPrice * h.totalShares;
+             totalCost += h.avgCost * h.totalShares;
+             todayPnL += liveChangeAmt * h.totalShares;
+          });
+          
+          const totalAssets = child.availableBalance + totalMarketValue;
+          const totalPnL = totalMarketValue - totalCost;
+          const totalPnLPct = totalCost > 0 ? (totalPnL / totalCost) * 100 : 0;
+
+          return (
+          <div key={child.id} className="child-card" style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '20px' }}>
+            <div className="child-card-header" style={{ marginBottom: 0, paddingBottom: 0, borderBottom: 'none' }}>
               <span className="child-avatar">{child.avatar}</span>
               <div className="child-info">
                 <div className="child-name">{child.displayName}</div>
                 <div className="child-email">{child.email}</div>
               </div>
               <div className="child-balance-display">
-                <div className="child-balance-label">可用餘額</div>
-                <div className="child-balance-value">NT$ {formatMoney(child.availableBalance)}</div>
+                <div className="child-balance-label">總資金 (總資產)</div>
+                <div className="child-balance-value" style={{ color: 'var(--primary-dark)', fontSize: '18px' }}>NT$ {formatMoney(totalAssets)}</div>
               </div>
             </div>
 
+            {/* 子帳號資產總覽 */}
+            <div style={{ background: 'var(--bg-page)', borderRadius: '12px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>可用餘額 (現金)</span>
+                <span style={{ fontWeight: 700, fontSize: '14px' }}>NT$ {formatMoney(child.availableBalance)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>股票總市值</span>
+                <span style={{ fontWeight: 700, fontSize: '14px' }}>NT$ {formatMoney(totalMarketValue)}</span>
+              </div>
+              {(totalMarketValue > 0) && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(0,0,0,0.05)', paddingTop: '12px', marginTop: '4px' }}>
+                  <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>累積獲利</span>
+                  <span className={totalPnL >= 0 ? 'text-profit' : 'text-loss'} style={{ fontWeight: 800, fontSize: '14px' }}>
+                    {totalPnL >= 0 ? '+' : ''}{formatMoney(totalPnL)} ({totalPnL >= 0 ? '+' : ''}{totalPnLPct.toFixed(1)}%)
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* 子帳號具體持股 */}
+            {cHoldings.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div style={{ fontSize: '13px', fontWeight: 800, color: 'var(--text-secondary)', marginBottom: '4px' }}>持有股票明細 ({cHoldings.length})</div>
+                {cHoldings.map(h => {
+                  const quote = liveQuotes[h.stockCode];
+                  const currentPrice = quote ? parseFloat(quote.ClosingPrice) : h.currentPrice;
+                  const pl = (currentPrice - h.avgCost) * h.totalShares;
+                  const plPct = h.avgCost > 0 ? (pl / (h.avgCost * h.totalShares)) * 100 : 0;
+                  return (
+                    <div key={h.stockCode} style={{ background: '#fff', border: '1px solid var(--border-card)', borderRadius: '8px', padding: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <span style={{ fontWeight: 800, fontSize: '14px' }}>{h.stockName} <span style={{ color: '#aaa', fontWeight: 500, fontSize: '12px' }}>{h.stockCode}</span></span>
+                        <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>{h.totalShares} 股 · 總成本 NT${formatMoney(h.avgCost * h.totalShares)}</span>
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+                        <span className={pl >= 0 ? 'text-profit' : 'text-loss'} style={{ fontWeight: 800, fontSize: '14px' }}>{pl >= 0 ? '+' : ''}{formatMoney(pl)}</span>
+                        <span className={pl >= 0 ? 'text-profit' : 'text-loss'} style={{ fontSize: '12px', padding: '2px 6px', background: pl >= 0 ? 'var(--profit-bg)' : 'var(--loss-bg)', borderRadius: '4px' }}>{pl >= 0 ? '+' : ''}{plPct.toFixed(1)}%</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
             {editingChildId === child.id ? (
-              <div className="balance-editor">
+              <div className="balance-editor" style={{ marginTop: '8px' }}>
                 <div className="balance-mode-toggle">
                   <button
                     className={`mode-btn ${balanceMode === 'add' ? 'active' : ''}`}
@@ -121,7 +231,7 @@ export default function ManageChildren() {
                 </div>
                 <input
                   type="number" className="balance-input"
-                  placeholder={balanceMode === 'add' ? '追加的金額（元）' : '新的餘額（元）'}
+                  placeholder={balanceMode === 'add' ? '追加的現金（元）' : '新的現金餘額（元）'}
                   value={balanceAmount}
                   onChange={(e) => setBalanceAmount(e.target.value)}
                   min="1"
@@ -135,12 +245,12 @@ export default function ManageChildren() {
                 </div>
               </div>
             ) : (
-              <button className="set-balance-btn" onClick={() => { setEditingChildId(child.id); setBalanceError(''); setBalanceAmount(''); }}>
-                💰 調整零用錢
+              <button className="set-balance-btn" onClick={() => { setEditingChildId(child.id); setBalanceError(''); setBalanceAmount(''); }} style={{ marginTop: '4px' }}>
+                💰 調整現金餘額
               </button>
             )}
           </div>
-        ))}
+        )})}
       </div>
 
       {/* 建立副帳號按鈕 */}
