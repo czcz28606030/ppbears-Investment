@@ -7,9 +7,7 @@ import type { UserAccount, Trade, Holding, WithdrawalRequest } from './types';
 // 輔助函式
 // ==========================================
 export function formatMoney(amount: number): string {
-  if (Math.abs(amount) >= 10000) {
-    return (amount / 10000).toFixed(1) + '萬';
-  }
+  // 移除「萬」的概數格式，一律顯示精確數字，避免計算上產生混淆（例如 79423 顯示為 7.9萬）
   return amount.toLocaleString('zh-TW', { maximumFractionDigits: 0 });
 }
 
