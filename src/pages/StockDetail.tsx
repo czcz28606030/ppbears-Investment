@@ -15,6 +15,7 @@ export default function StockDetail() {
   const [twseQuote, setTwseQuote] = useState<TWSTEStockQuote | null>(null);
   const [loading, setLoading] = useState(true);
   const [descLoading, setDescLoading] = useState(true);
+  const [isStreaming, setIsStreaming] = useState(false);
   const [kidDesc, setKidDesc] = useState('');
   const [tradeMode, setTradeMode] = useState<'buy' | 'sell' | null>(null);
   const [quantity, setQuantity] = useState('');
@@ -84,11 +85,23 @@ export default function StockDetail() {
     async function loadDesc() {
       if (!code) return;
       setDescLoading(true);
+      setIsStreaming(true);
       const rawName = stockData?.stkname || twseQuote?.Name || POPULAR_STOCKS.find(s => s.code === code)?.name || code || '';
       const status = stockData?.status || '';
       const industry = stockData?.subindustry || '';
-      const desc = await getOrGenerateKidFriendlyDesc(code, rawName, status, industry);
+      const desc = await getOrGenerateKidFriendlyDesc(
+        code, 
+        rawName, 
+        status, 
+        industry,
+        (chunk) => {
+          setKidDesc(chunk);
+          // 只要有字進來，我們就不顯示這是在 spinner 的裝載階段了
+          setDescLoading(false); 
+        }
+      );
       setKidDesc(desc);
+      setIsStreaming(false);
       setDescLoading(false);
     }
     if (!loading) {
@@ -273,10 +286,13 @@ export default function StockDetail() {
         {descLoading ? (
           <p style={{ color: '#888', fontStyle: 'italic', display: 'flex', alignItems: 'center', gap: 6 }}>
             <span className="spinner" style={{ width: 14, height: 14, border: '2px solid #ccc', borderTopColor: '#FFA000', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></span>
-            PPBear 正在認識這間公司中...
+             PPBear 正在翻閱財經百科全書...
           </p>
         ) : (
-          <p className="kid-desc-text">{kidDesc}</p>
+          <p className="kid-desc-text">
+            {kidDesc}
+            {isStreaming && <span style={{ display: 'inline-block', width: '8px', height: '16px', background: '#FFA000', marginLeft: '4px', animation: 'blink 1s step-end infinite', verticalAlign: 'middle' }}></span>}
+          </p>
         )}
       </div>
 

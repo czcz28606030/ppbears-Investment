@@ -124,7 +124,13 @@ export function makeKidFriendly(code: string, name: string, status: string, indu
 }
 
 // 動態取得或生成兒童版股票介紹
-export async function getOrGenerateKidFriendlyDesc(code: string, name: string, status: string, industry: string): Promise<string> {
+export async function getOrGenerateKidFriendlyDesc(
+  code: string, 
+  name: string, 
+  status: string, 
+  industry: string,
+  onChunk?: (text: string) => void
+): Promise<string> {
   const fallbackDesc = makeKidFriendly(code, name, status, industry);
 
   if (!supabase) return fallbackDesc;
@@ -138,6 +144,7 @@ export async function getOrGenerateKidFriendlyDesc(code: string, name: string, s
       .maybeSingle();
 
     if (cached && cached.kid_description) {
+      if (onChunk) onChunk(cached.kid_description);
       return cached.kid_description;
     }
 
@@ -160,7 +167,8 @@ export async function getOrGenerateKidFriendlyDesc(code: string, name: string, s
         }
       ],
       temperature: 0.7,
-      max_tokens: 150
+      max_tokens: 150,
+      stream: true
     };
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -177,16 +185,55 @@ export async function getOrGenerateKidFriendlyDesc(code: string, name: string, s
       return fallbackDesc;
     }
 
-    const result = await response.json();
-    const newDesc = result.choices[0].message.content.trim();
+    const reader = response.body?.getReader();
+    const decoder = new TextDecoder('utf-8');
+    let fullText = '';
+    let buffer = '';
+
+    if (reader) {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        
+        buffer += decoder.decode(value, { stream: true });
+        const parts = buffer.split('\n\n');
+        buffer = parts.pop() || ''; // 將最後一段不完整的留到下一次
+        
+        for (const part of parts) {
+          const line = part.replace(/^data: /, '').trim();
+          if (line === '[DONE]' || !line) continue;
+          
+          try {
+            const parsed = JSON.parse(line);
+            if (parsed.choices?.[0]?.delta?.content) {
+              fullText += parsed.choices[0].delta.content;
+              if (onChunk) onChunk(fullText);
+            }
+          } catch (e) {
+            // 忽略無法解析的片段
+          }
+        }
+      }
+    }
+    
+    // 結束時如果還有東西可以收尾 (通常不會)
+    if (buffer.trim() && buffer.trim() !== 'data: [DONE]') {
+      try {
+        const parsed = JSON.parse(buffer.replace(/^data: /, '').trim());
+        if (parsed.choices?.[0]?.delta?.content) fullText += parsed.choices[0].delta.content;
+      } catch(e) {}
+    }
+
+    // 防禦性檢查，如果生成失敗
+    if (!fullText) return fallbackDesc;
 
     // 3. 把生成的結果存入 Supabase，以後就不必再花錢請求了
     await supabase.from('stock_profiles').insert({
       stock_code: code,
-      kid_description: newDesc
+      kid_description: fullText
     });
 
-    return newDesc;
+    return fullText;
   } catch (error) {
     console.error('getOrGenerateKidFriendlyDesc error:', error);
     return fallbackDesc;
