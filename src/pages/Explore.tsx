@@ -164,9 +164,17 @@ export default function Explore() {
 
       {/* 篩選結果列表 */}
       <section>
-        <div className="filtered-result-header">
+        <div className="filtered-result-header" style={{ marginBottom: 4 }}>
           {activeStrategy === 'ai' ? '🤖 AI 每日推薦結果' : `🎯 「${STRATEGY_CARDS.find(c => c.id === activeStrategy)?.title}」策略篩選結果`}
           {activeStrategy === 'ai' && <span className="section-action" onClick={loadData} style={{ marginLeft: 'auto', fontWeight: 600 }}>重新整理</span>}
+        </div>
+        <div style={{ fontSize: '13px', color: 'var(--text-tertiary)', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 600 }}>
+          <span>ℹ️ 資料來源與時間：</span>
+          {activeStrategy === 'ai' ? (
+             <span style={{ color: 'var(--primary)' }}>Simons 量化模型（{recommendations[0]?.mdate ? recommendations[0].mdate.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3') : '最新同步'}）</span>
+          ) : (
+             <span style={{ color: 'var(--primary)' }}>台灣證券交易所 TWSE（今日收盤即時資料）</span>
+          )}
         </div>
 
         {loading && activeStrategy === 'ai' && (
