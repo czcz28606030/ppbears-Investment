@@ -9,6 +9,10 @@
       "destination": "https://openapi.twse.com.tw/v1/:path*"
     },
     {
+      "source": "/api/openai/:path*",
+      "destination": "https://api.openai.com/:path*"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

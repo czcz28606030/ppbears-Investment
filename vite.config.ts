@@ -21,6 +21,11 @@ export default defineConfig({
         target: 'https://openapi.twse.com.tw/v1',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/twse/, '')
+      },
+      '/api/openai': {
+        target: 'https://api.openai.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/openai/, '')
       }
     }
   }
