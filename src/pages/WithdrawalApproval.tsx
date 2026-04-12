@@ -43,7 +43,13 @@ export default function WithdrawalApproval() {
             {pending.map(req => (
               <div key={req.id} className="request-card pending">
                 <div className="request-header">
-                  {isParent && <span className="request-avatar">{req.childAvatar || '🐻'}</span>}
+                  {isParent && (
+                    <span className="request-avatar" style={{ padding: (req.childAvatar?.startsWith('data:') || req.childAvatar?.startsWith('http')) ? 0 : undefined, overflow: 'hidden' }}>
+                      {(req.childAvatar?.startsWith('data:') || req.childAvatar?.startsWith('http'))
+                        ? <img src={req.childAvatar} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        : (req.childAvatar || '🐻')}
+                    </span>
+                  )}
                   <div className="request-info">
                     {isParent && <div className="request-name">{req.childName || '未知副帳號'}</div>}
                     <div className="request-date">
@@ -86,7 +92,13 @@ export default function WithdrawalApproval() {
             {reviewed.map(req => (
               <div key={req.id} className={`request-card ${req.status}`}>
                 <div className="request-header">
-                  {isParent && <span className="request-avatar">{req.childAvatar || '🐻'}</span>}
+                  {isParent && (
+                    <span className="request-avatar" style={{ padding: (req.childAvatar?.startsWith('data:') || req.childAvatar?.startsWith('http')) ? 0 : undefined, overflow: 'hidden' }}>
+                      {(req.childAvatar?.startsWith('data:') || req.childAvatar?.startsWith('http'))
+                        ? <img src={req.childAvatar} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        : (req.childAvatar || '🐻')}
+                    </span>
+                  )}
                   <div className="request-info">
                     {isParent && <div className="request-name">{req.childName || '未知副帳號'}</div>}
                     <div className="request-date">

@@ -362,20 +362,35 @@ export const useStore = create<InvestmentStore>((set, get) => ({
     const { user } = get();
     if (!user || user.role !== 'parent') return { error: '權限不足' };
 
+    let diff = 0;
+    let oldBal = 0;
     if (mode === 'set') {
+      const { data: child } = await supabase.from('users').select('available_balance').eq('id', childId).single();
+      if (!child) return { error: '找不到此副帳號' };
+      oldBal = Number(child.available_balance);
+      diff = amount - oldBal;
       // 直接設定餘額
       const { error } = await supabase.from('users').update({
         available_balance: amount,
       }).eq('id', childId);
       if (error) return { error: error.message };
     } else {
-      // 追加餘額
+      diff = amount;
       const { data: child } = await supabase.from('users').select('available_balance').eq('id', childId).single();
       if (!child) return { error: '找不到此副帳號' };
       const { error } = await supabase.from('users').update({
         available_balance: Number(child.available_balance) + amount,
       }).eq('id', childId);
       if (error) return { error: error.message };
+    }
+
+    if (diff !== 0) {
+       await supabase.from('trades').insert([{
+         user_id: childId, stock_code: 'CASH', stock_name: diff > 0 ? '入金' : '扣款',
+         trade_type: diff > 0 ? 'deposit' : 'withdraw', quantity: 1, price: Math.abs(diff),
+         total_amount: Math.abs(diff), reason: mode === 'set' ? '家長調整餘額' : '家長加碼撥款', 
+         timestamp: Date.now()
+       }]);
     }
 
     await get().loadChildren();
@@ -404,6 +419,13 @@ export const useStore = create<InvestmentStore>((set, get) => ({
       status: 'approved',
       reviewed_at: new Date().toISOString(),
     }).eq('id', requestId);
+
+    await supabase.from('trades').insert([{
+      user_id: req.childId, stock_code: 'WD', stock_name: '提款出金',
+      trade_type: 'withdraw', quantity: 1, price: req.amount,
+      total_amount: req.amount, reason: '家長已核准提款',
+      timestamp: Date.now()
+    }]);
 
     await get().loadWithdrawalRequests();
     await get().loadChildren();

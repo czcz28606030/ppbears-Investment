@@ -68,7 +68,7 @@ CREATE TABLE public.trades (
   user_id uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
   stock_code text NOT NULL,
   stock_name text NOT NULL,
-  trade_type text NOT NULL CHECK (trade_type IN ('buy', 'sell')),
+  trade_type text NOT NULL CHECK (trade_type IN ('buy', 'sell', 'deposit', 'withdraw')),
   quantity numeric NOT NULL,
   price numeric NOT NULL,
   total_amount numeric NOT NULL,
@@ -222,3 +222,7 @@ CREATE POLICY "Users can view own feature overrides"
 -- ALTER TABLE public.users ADD COLUMN broker_fee_rate numeric DEFAULT 0.001425;
 -- ALTER TABLE public.users ADD COLUMN broker_min_fee numeric DEFAULT 20;
 -- ALTER TABLE public.users ADD COLUMN broker_tax_rate numeric DEFAULT 0.003;
+--
+-- 升級 (加入入金出金支援): 
+-- ALTER TABLE public.trades DROP CONSTRAINT IF EXISTS trades_trade_type_check;
+-- ALTER TABLE public.trades ADD CONSTRAINT trades_trade_type_check CHECK (trade_type IN ('buy', 'sell', 'deposit', 'withdraw'));

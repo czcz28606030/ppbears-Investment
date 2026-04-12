@@ -57,7 +57,10 @@ export default function TradeHistory() {
               <div className="trade-item-header">
                 <div className="trade-item-info">
                   <div className={`trade-type-badge ${t.tradeType}`}>
-                    {t.tradeType === 'buy' ? '買入' : '賣出'}
+                    {t.tradeType === 'buy' && '買入'}
+                    {t.tradeType === 'sell' && '賣出'}
+                    {t.tradeType === 'deposit' && '入金'}
+                    {t.tradeType === 'withdraw' && '出金'}
                   </div>
                   <div className="trade-item-stock">
                     <span className="trade-item-stock-name">{t.stockName} <span style={{ opacity: 0.5, fontSize: '13px' }}>{t.stockCode}</span></span>
@@ -65,9 +68,13 @@ export default function TradeHistory() {
                   </div>
                 </div>
                 <div className="trade-item-price-block">
-                  <div className="trade-item-total">NT$ {formatMoney(t.totalAmount)}</div>
-                  <div className="trade-item-detail">{t.quantity} 股 × NT$ {t.price}</div>
-                  {t.profit !== undefined && (
+                  <div className={`trade-item-total ${t.tradeType === 'deposit' ? 'text-profit' : t.tradeType === 'withdraw' ? 'text-loss' : ''}`}>
+                    {t.tradeType === 'deposit' ? '+ ' : t.tradeType === 'withdraw' ? '- ' : ''}NT$ {formatMoney(t.totalAmount)}
+                  </div>
+                  {(t.tradeType === 'buy' || t.tradeType === 'sell') && (
+                    <div className="trade-item-detail">{t.quantity} 股 × NT$ {t.price}</div>
+                  )}
+                  {t.profit !== undefined && t.profit !== null && (
                     <div style={{ marginTop: 6, fontWeight: 800, fontSize: 13 }} className={t.profit >= 0 ? 'text-profit' : 'text-loss'}>
                       {t.profit >= 0 ? `賺 NT$ ${formatMoney(t.profit)} 📈` : `虧 NT$ ${formatMoney(Math.abs(t.profit))} 📉`}
                     </div>
@@ -82,11 +89,13 @@ export default function TradeHistory() {
                 </div>
               )}
 
-              <div className="trade-action-bar">
-                <button className="btn-yahoo-chart" onClick={() => openYahooChart(t.stockCode)}>
-                  📈 查看當時技術線圖
-                </button>
-              </div>
+              {(t.tradeType === 'buy' || t.tradeType === 'sell') && (
+                <div className="trade-action-bar">
+                  <button className="btn-yahoo-chart" onClick={() => openYahooChart(t.stockCode)}>
+                    📈 查看當時技術線圖
+                  </button>
+                </div>
+              )}
             </div>
           ))}
         </div>

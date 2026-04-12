@@ -43,7 +43,7 @@ export interface SimonsItem {
   fcr_today: string;
 }
 
-export type TradeType = 'buy' | 'sell';
+export type TradeType = 'buy' | 'sell' | 'deposit' | 'withdraw';
 export type AccountRole = 'parent' | 'child';
 export type AIAdvice = 'buy' | 'hold' | 'sell';
 export type WithdrawalStatus = 'pending' | 'approved' | 'rejected';
