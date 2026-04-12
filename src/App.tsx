@@ -20,7 +20,7 @@ import './App.css';
 const AUTH_ROUTES = ['/login', '/register', '/forgot-password'];
 
 function AppContent() {
-  const { user, authLoading, initAuth, withdrawalRequests } = useStore();
+  const { user, authLoading, initAuth, withdrawalRequests, isRecoveryMode } = useStore();
   const location = useLocation();
 
   useEffect(() => {
@@ -40,8 +40,13 @@ function AppContent() {
   const isAuthRoute = AUTH_ROUTES.includes(location.pathname);
   const pendingCount = withdrawalRequests.filter(r => r.status === 'pending').length;
 
+  // 密碼恢復模式優先導向
+  if (isRecoveryMode && location.pathname !== '/update-password') {
+    return <Navigate to="/update-password" replace />;
+  }
+
   // 未登入 → 導向 login
-  if (!user && !isAuthRoute) return <Navigate to="/login" replace />;
+  if (!user && !isAuthRoute && location.pathname !== '/update-password') return <Navigate to="/login" replace />;
   // 已登入 → 不要再去 login/register
   if (user && isAuthRoute) return <Navigate to="/" replace />;
 
@@ -74,7 +79,7 @@ function AppContent() {
       </main>
 
       {/* 底部導覽列（只在登入後顯示） */}
-      {user && !isAuthRoute && (
+      {user && !isAuthRoute && location.pathname !== '/update-password' && (
         <nav className="bottom-nav">
           <div className="bottom-nav-inner">
             <NavLink to="/" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} end>
