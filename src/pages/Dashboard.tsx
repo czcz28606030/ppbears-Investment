@@ -276,22 +276,28 @@ export default function Dashboard() {
                      <div style={{ display: 'flex', flexDirection: 'column', background: '#fafafa', padding: '10px', borderRadius: '10px' }}>
                         <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '4px', fontWeight: 600 }}>預估現金股利</div>
                         <div style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '14px' }}>
-                           {(() => {
-                             const divInfo = liveDividends[h.stockCode];
-                             const divYield = divInfo && divInfo.DividendYield ? parseFloat(divInfo.DividendYield) / 100 : 0;
-                             if (divYield > 0) {
-                               const estDiv = currentPrice * h.totalShares * divYield;
-                               return `NT$ ${formatMoney(estDiv)} `;
-                             }
-                             return 'NT$ 0 ';
-                           })()}
-                           {liveDividends[h.stockCode] ? (
-                              <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', fontWeight: 500, display: 'block', marginTop: '2px' }}>
-                                (依殖利率 {liveDividends[h.stockCode].DividendYield || 0}%)
-                              </span>
-                           ) : (
-                              <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', fontWeight: 500, display: 'block', marginTop: '2px' }}>(試算中)</span>
-                           )}
+                            {(() => {
+                              const divInfo = liveDividends[h.stockCode];
+                              const divYield = divInfo && divInfo.DividendYield ? parseFloat(divInfo.DividendYield) / 100 : 0;
+                              if (divYield > 0) {
+                                const dps = currentPrice * divYield;
+                                const estDiv = dps * h.totalShares;
+                                return (
+                                  <>
+                                    <span>NT$ {formatMoney(estDiv)}</span>
+                                    <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', fontWeight: 500, display: 'block', marginTop: '2px' }}>
+                                      (預估約 {dps.toFixed(2)} 元 / 股)
+                                    </span>
+                                  </>
+                                );
+                              }
+                              return (
+                                <>
+                                  <span>NT$ 0</span>
+                                  <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', fontWeight: 500, display: 'block', marginTop: '2px' }}>(試算中)</span>
+                                </>
+                              );
+                            })()}
                         </div>
                      </div>
                   </div>
