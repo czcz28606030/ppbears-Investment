@@ -5,8 +5,8 @@ import type { UserAccount, FeatureOverride } from '../types';
 import './AdminDashboard.css';
 
 const FEATURE_KEYS = [
-  { key: 'ai_stock_picking', label: '🤖 AI 聰明選股', desc: '探索頁的 AI 推薦' },
-  { key: 'ai_portfolio_advice', label: '📊 庫存 AI 建議', desc: 'Simons 量化買賣建議' },
+  { key: 'ai_stock_picking', label: '🤖 AI 聰明選股', desc: '' },
+  { key: 'ai_portfolio_advice', label: '📊 庫存 AI 建議', desc: '' },
 ];
 
 export default function AdminDashboard() {
@@ -276,7 +276,7 @@ export default function AdminDashboard() {
                     <div key={feat.key} className="admin-feature-row">
                       <div>
                         <div className="admin-feature-label">{feat.label}</div>
-                        <div style={{ fontSize: 11, color: '#999' }}>{feat.desc}</div>
+                        {feat.desc && <div style={{ fontSize: 11, color: '#999' }}>{feat.desc}</div>}
                       </div>
                       <div
                         className={`toggle-switch ${enabled ? 'active' : ''}`}

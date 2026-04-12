@@ -249,9 +249,9 @@ export default function Explore() {
                     <span className="rec-stars">{getScoreStars(rec.score)}</span>
                   </div>
                   <div className="rec-badges">
-                    {getAdviceBadge(rec.advice)}
-                    <span className="badge badge-neutral">評分 {rec.score}分</span>
-                  </div>
+                     {hasAiFeature && getAdviceBadge(rec.advice)}
+                     <span className="badge badge-neutral">評分 {rec.score}分</span>
+                   </div>
                 </div>
                 <div className="rec-right">
                   <div className="stock-price">
