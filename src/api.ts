@@ -106,20 +106,27 @@ export async function getOrGenerateKidFriendlyDesc(
   
   try {
     // 1. 嘗試從快取資料庫讀取
-    const { data: cached } = await supabase
-      .from('stock_profiles')
-      .select('kid_description')
-      .eq('stock_code', code)
-      .maybeSingle();
+    if (supabase) {
+      try {
+        const { data: cached, error: cacheErr } = await supabase
+          .from('stock_profiles')
+          .select('kid_description')
+          .eq('stock_code', code)
+          .maybeSingle();
 
-    if (cached && cached.kid_description) {
-      if (onChunk) onChunk(cached.kid_description);
-      return cached.kid_description;
+        if (!cacheErr && cached && cached.kid_description) {
+          if (onChunk) onChunk(cached.kid_description);
+          return cached.kid_description;
+        }
+      } catch (cacheError) {
+        console.warn('Supabase cache read error (ignored):', cacheError);
+      }
     }
 
-    // 2. 如果沒有，嘗試呼叫 OpenAI gpt-4o-mini
+    // 2. 如果沒有或快取失敗，嘗試呼叫 OpenAI gpt-4o-mini
     const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
     if (!apiKey) {
+      console.warn('No OpenAI API key found, using fallback.');
       return fallbackDesc; // 如果沒有 API Key，就回退原本的寫法
     }
 
@@ -128,19 +135,19 @@ export async function getOrGenerateKidFriendlyDesc(
       messages: [
         {
           role: 'system',
-          content: `你是一隻叫 PPBear 的可愛小熊投資解說員。請介紹這間公司在做什麼。
+          content: `你是一隻叫 PPBear 的可愛小熊解說員。你的唯一任務是「重點介紹這間公司生產的產品與服務」。
 
 規則（非常重要）：
-1. 絕對不能用「嗨」「大家好」「小朋友們」「快來」「一起學習投資」「讓未來變得更美好」「PPBear 支持你」這類制式開場或結尾
-2. 直接從公司的核心業務開始說，不要廢話
-3. 一定要舉出生活中看得到的真實產品或情境當例子（例如：你用的 iPhone 裡的晶片、家裡的冷氣、超商的咖啡機...）
-4. 語氣要活潑、讓國小四年級生聽得懂，可以用 Emoji 輔助
-5. 全文介紹長度必須在 50 到 200 個中文字之間，不能更短也不能更長
-6. 不需要任何結語或鼓勵的句子，只要把公司介紹清楚`
+1. 絕對不能有任何客套話與廢話（禁止使用「嗨大家好」「小朋友們」「快來」「一起學習」「讓未來變得更美好」「PPBear 支持你」等開場或結尾）。
+2. 直接破題，重點完全放在「公司的產品與服務介紹」，直接告訴大家這間公司在做什麼。
+3. 必須使用白話文、用小朋友能輕鬆聽懂的方式說明。
+4. 一定要舉出生活中看得到的實體商品或情境當作例子（例如：手機裡的晶片、超商的飲料、平常用的網路...）。
+5. 全文字數必須嚴格控制在 50 到 200 字之間。
+6. 保持活潑生動但直接切入重點，可以適度使用 Emoji 輔助。`
         },
         {
           role: 'user',
-          content: `公司名稱：${name} (${code})。所屬產業：${industry}。公司概況：${status}。請介紹這家公司在做什麼，並舉出生活中能看到的產品例子。`
+          content: `公司名稱：${name} (${code})。所屬產業：${industry}。公司概況：${status}。請重申規則：直接介紹產品服務、舉生活例子、50到200字以內、拒絕任何客套話。`
         }
       ],
       temperature: 0.75,
@@ -205,10 +212,16 @@ export async function getOrGenerateKidFriendlyDesc(
     if (!fullText) return fallbackDesc;
 
     // 3. 把生成的結果存入 Supabase，以後就不必再花錢請求了
-    await supabase.from('stock_profiles').insert({
-      stock_code: code,
-      kid_description: fullText
-    });
+    if (supabase) {
+      try {
+        await supabase.from('stock_profiles').insert({
+          stock_code: code,
+          kid_description: fullText
+        });
+      } catch (insertErr) {
+        console.warn('Supabase cache insert error (ignored):', insertErr);
+      }
+    }
 
     return fullText;
   } catch (error) {

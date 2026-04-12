@@ -325,7 +325,7 @@ export default function Dashboard() {
 
       {/* 頁尾版本號 */}
       <div style={{ textAlign: 'center', margin: '32px 0 16px', color: 'var(--text-tertiary)', fontSize: 13, fontWeight: 500 }}>
-        PPBears Investment v1.4.0
+        PPBears Investment v{import.meta.env.VITE_APP_VERSION || '1.4.0'}
       </div>
     </div>
   );
