@@ -434,8 +434,10 @@ ul, ol { list-style: none; }
 }
 
 .badge-sell {
-  background: var(--loss-bg);
-  color: var(--coral);
+  background: #2e7d32;
+  color: #fff;
+  font-weight: 900;
+  box-shadow: 0 2px 8px rgba(46, 125, 50, 0.35);
 }
 
 .badge-hold {
