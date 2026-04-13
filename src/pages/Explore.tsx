@@ -15,7 +15,7 @@ export default function Explore() {
   const [search, setSearch] = useState('');
   const [activeStrategy, setActiveStrategy] = useState(hasAiFeature ? 'ai' : 'A');
   const [error, setError] = useState('');
-  const [twsePriceMap, setTwsePriceMap] = useState<Record<string, { close: string; change: string; name: string }>>({});
+  const [twsePriceMap, setTwsePriceMap] = useState<Record<string, { close: string; change: string; name: string; volume: number }>>({});
 
   async function loadData() {
     setLoading(true);
@@ -26,9 +26,14 @@ export default function Explore() {
       
       // 建立 TWSE 快速查詢 map
       if (twseAll.length > 0) {
-        const map: Record<string, { close: string; change: string; name: string }> = {};
+        const map: Record<string, { close: string; change: string; name: string; volume: number }> = {};
         for (const s of twseAll) {
-          if (s.ClosingPrice) map[s.Code] = { close: s.ClosingPrice, change: s.Change, name: s.Name || '' };
+          if (s.ClosingPrice) map[s.Code] = {
+            close: s.ClosingPrice,
+            change: s.Change,
+            name: s.Name || '',
+            volume: Math.floor(parseInt(s.TradeVolume || '0') / 1000), // 轉換為「張」
+          };
         }
         setTwsePriceMap(map);
       }
@@ -65,12 +70,12 @@ export default function Explore() {
 
 
   const STRATEGY_CARDS = [
-    { id: 'A', title: '穩穩大公司', icon: '🏢', desc: '股本 > 100億\n成交量 > 1,000張', className: 'strategy-card-a' },
-    { id: 'B', title: '最近變強公司', icon: '🚀', desc: '月營收連3月成長\n近4季ROE > 10%', className: 'strategy-card-b' },
-    { id: 'C', title: '市場有注意公司', icon: '👀', desc: '股價站上季線\n外資連3日買超', className: 'strategy-card-c' },
-    { id: 'D', title: '巴菲特風格公司', icon: '👴', desc: '股本 > 100億\n近4季ROE > 10%\n本益比 < 20倍', className: 'strategy-card-d' },
-    { id: 'E', title: '配息安心公司', icon: '💰', desc: '現金殖利率 > 5%\n股本 > 100億或長年配息', className: 'strategy-card-e' },
-    { id: 'F', title: '便宜好公司', icon: '🏷️', desc: '本益比 < 20倍\n股價淨值比 < 1\n近4季ROE > 10%', className: 'strategy-card-f' },
+    { id: 'A', title: '穩穩大公司', icon: '🏢', desc: '成交量 > 1,000張\nPSR 評分 ≥ 6', className: 'strategy-card-a' },
+    { id: 'B', title: '最近變強公司', icon: '🚀', desc: '週漲 + 月漲雙確認\n籌碼動能強勁', className: 'strategy-card-b' },
+    { id: 'C', title: '市場有注意公司', icon: '👀', desc: '法人籌碼強度 > 2.0\n外資 / 投信積極布局', className: 'strategy-card-c' },
+    { id: 'D', title: '價值潛力公司', icon: '👴', desc: 'PSR 高品質 ≥ 7\n股價低於外資持股成本', className: 'strategy-card-d' },
+    { id: 'E', title: '配息安心公司', icon: '💰', desc: '金融・電信・公用事業\n月趨勢穩定不下跌', className: 'strategy-card-e' },
+    { id: 'F', title: '便宜好公司', icon: '🏷️', desc: '低於外資 + 投信持股成本\n雙重折價潛在補漲', className: 'strategy-card-f' },
     { id: 'ai', title: 'AI 聰明選股', icon: '🤖', desc: '每日最新大數據\n電腦推薦標的', className: 'strategy-card-ai' }
   ];
 
@@ -94,53 +99,76 @@ export default function Explore() {
 
     if (activeStrategy === 'ai') return recommendations;
 
-    // 每日動態策略篩選（從 Simons 數據過濾，每天隨數據更新）
+    // 每日動態策略篩選（從 Simons + TWSE 數據過濾，每天隨數據更新）
     let list: StockRecommendation[] = [];
 
     switch (activeStrategy) {
-      case 'A': // 穩穩大公司：PSR 高、月趨勢不跌
-        list = recommendations.filter(r => r.psr >= 7 && r.ret_m !== 'drop');
+      case 'A': // 穩穩大公司：成交量 > 1,000 張 + PSR ≥ 6
+        list = recommendations.filter(r => {
+          const vol = twsePriceMap[r.coid]?.volume ?? 0;
+          return vol >= 1000 && r.psr >= 6;
+        });
+        // 不足時放寬成交量條件
+        if (list.length < 10)
+          list = recommendations.filter(r => (twsePriceMap[r.coid]?.volume ?? 0) >= 500 && r.psr >= 6);
         break;
 
-      case 'B': // 最近變強公司：週月雙漲，或強度夠高
+      case 'B': // 最近變強公司：週漲 + 月漲雙確認
         list = recommendations.filter(r => r.ret_w === 'rise' && r.ret_m === 'rise');
+        // 不足時加入強度高的
+        if (list.length < 10)
+          list = recommendations.filter(r => r.ret_w === 'rise' && parseFloat(r.strength || '0') >= 1.8);
+        break;
+
+      case 'C': // 市場有注意：法人籌碼強度 > 2.0
+        list = recommendations.filter(r => parseFloat(r.strength || '0') > 2.0);
         if (list.length < 10)
           list = recommendations.filter(r => parseFloat(r.strength || '0') >= 1.8);
         break;
 
-      case 'C': // 市場有注意公司：籌碼強度高
-        list = recommendations.filter(r => parseFloat(r.strength || '0') > 2.0);
-        if (list.length < 10)
-          list = recommendations.filter(r => parseFloat(r.strength || '0') >= 1.5);
-        break;
-
-      case 'D': // 巴菲特風格：高品質 + 低於外資成本
+      case 'D': // 價值潛力：PSR ≥ 7 + 股價低於外資持股成本
         list = recommendations.filter(r => {
           const close = parseFloat(r.close || '0');
           const wtcost = parseFloat(r.wtcost || '0');
-          return r.psr >= 6 && wtcost > 0 && close <= wtcost * 1.05;
+          return r.psr >= 7 && wtcost > 0 && close < wtcost;
         });
         if (list.length < 10)
-          list = recommendations.filter(r => r.psr >= 7 && r.ret_m !== 'drop');
+          list = recommendations.filter(r => {
+            const close = parseFloat(r.close || '0');
+            const wtcost = parseFloat(r.wtcost || '0');
+            return r.psr >= 6 && wtcost > 0 && close <= wtcost * 1.03;
+          });
         break;
 
-      case 'E': // 配息安心公司：金融、電信類 + PSR 穩定
+      case 'E': // 配息安心：金融・電信・公用事業 + 月趨勢不跌
         list = recommendations.filter(r =>
-          r.category?.includes('金融') ||
-          r.category?.includes('電信') ||
-          r.category?.includes('電力') ||
-          r.subindustry?.includes('金融') ||
-          (r.psr >= 8 && r.ret_m !== 'drop')
+          (r.category?.includes('金融') ||
+           r.category?.includes('電信') ||
+           r.category?.includes('電力') ||
+           r.category?.includes('公用') ||
+           r.subindustry?.includes('金融')) &&
+          r.ret_m !== 'drop'
         );
+        // 不足時放寬：只要 PSR ≥ 8 且不跌
+        if (list.length < 10)
+          list = recommendations.filter(r => r.psr >= 8 && r.ret_m !== 'drop' && r.ret_w !== 'drop');
         break;
 
-      case 'F': // 便宜好公司：收盤價低於外資或投信成本
+      case 'F': // 便宜好公司：低於外資 + 低於投信成本（雙重折價）
         list = recommendations.filter(r => {
           const close = parseFloat(r.close || '0');
           const wtcost = parseFloat(r.wtcost || '0');
           const fcost = parseFloat(r.fcost || '0');
-          return r.psr >= 5 && ((wtcost > 0 && close < wtcost) || (fcost > 0 && close < fcost));
+          return wtcost > 0 && fcost > 0 && close < wtcost && close < fcost;
         });
+        // 不足時放寬：任一低於即可
+        if (list.length < 10)
+          list = recommendations.filter(r => {
+            const close = parseFloat(r.close || '0');
+            const wtcost = parseFloat(r.wtcost || '0');
+            const fcost = parseFloat(r.fcost || '0');
+            return r.psr >= 5 && ((wtcost > 0 && close < wtcost) || (fcost > 0 && close < fcost));
+          });
         break;
     }
 
