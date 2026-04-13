@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore, formatMoney, formatPrice } from '../store';
-import { fetchStockData, fetchTWSEDividendYields, type TWSTEStockQuote, type TWSEDividendYield } from '../api';
+import { fetchStockData, fetchTWSEDividendYields, type TWSEDividendYield } from '../api';
 import AdBanner from '../components/AdBanner';
 import './Dashboard.css';
 
