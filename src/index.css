@@ -427,8 +427,10 @@ ul, ol { list-style: none; }
 }
 
 .badge-buy {
-  background: var(--profit-bg);
-  color: var(--green);
+  background: #e53935;
+  color: #fff;
+  font-weight: 900;
+  box-shadow: 0 2px 8px rgba(229, 57, 53, 0.35);
 }
 
 .badge-sell {

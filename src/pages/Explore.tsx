@@ -141,7 +141,7 @@ export default function Explore() {
 
   function getAdviceBadge(advice: string) {
     switch (advice) {
-      case 'buy': return <span className="badge badge-buy">🟢 建議買進</span>;
+      case 'buy': return <span className="badge badge-buy">🔥 建議買進</span>;
       case 'sell': return <span className="badge badge-sell">🔴 建議賣出</span>;
       default: return <span className="badge badge-hold">🟡 觀望中</span>;
     }
