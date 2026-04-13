@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { supabase } from './supabase';
 import type { Session } from '@supabase/supabase-js';
 import type { UserAccount, Trade, Holding, WithdrawalRequest, FeatureOverride, SystemSettings, LessonResult, RewardRule, RewardTriggerType, WalletTransaction, RewardShopItem, RedemptionRequest } from './types';
+import { fetchTWSEAllStocks } from './api';
 
 // ==========================================
 // 輔助函式
@@ -136,6 +137,9 @@ interface InvestmentStore {
   isPremiumUser: (targetUser?: UserAccount) => boolean;
   hasFeature: (featureKey: string) => boolean;
   getTodayTradeCount: () => number;
+
+  // Price Refresh
+  refreshHoldingPrices: () => Promise<void>;
 
   // Getters
   getPortfolioSummary: () => PortfolioSummary;
@@ -1076,6 +1080,42 @@ export const useStore = create<InvestmentStore>((set, get) => ({
     if (error) return { error: error.message };
     await get().loadWithdrawalRequests();
     return { error: null };
+  },
+
+  // ─── Price Refresh ──────────────────────────
+  refreshHoldingPrices: async () => {
+    const { user, holdings } = get();
+    if (!supabase || !user || holdings.length === 0) return;
+
+    // 1. 抓 TWSE 全市場收盤資料（同天有 in-memory 快取，只打一次 API）
+    const twseData = await fetchTWSEAllStocks();
+    if (twseData.length === 0) return;
+
+    // 2. 找出有新價格且與現有不同的持股
+    const updates: { stockCode: string; newPrice: number }[] = [];
+    const updatedHoldings = holdings.map(h => {
+      const quote = twseData.find(t => t.Code === h.stockCode);
+      const newPrice = quote ? parseFloat(quote.ClosingPrice) : NaN;
+      if (!isNaN(newPrice) && newPrice > 0 && newPrice !== h.currentPrice) {
+        updates.push({ stockCode: h.stockCode, newPrice });
+        return { ...h, currentPrice: newPrice };
+      }
+      return h;
+    });
+
+    // 3. 批次寫回 Supabase（只更新有變化的持股）
+    if (updates.length > 0) {
+      await Promise.all(
+        updates.map(u =>
+          supabase!.from('holdings')
+            .update({ current_price: u.newPrice, updated_at: new Date().toISOString() })
+            .eq('user_id', user.id)
+            .eq('stock_code', u.stockCode)
+        )
+      );
+      // 4. 同步更新 store，觸發所有頁面 re-render
+      set({ holdings: updatedHoldings });
+    }
   },
 
   // ─── Trading ───────────────────────────────

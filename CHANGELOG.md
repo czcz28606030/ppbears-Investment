@@ -2,7 +2,16 @@
 
 所有關於 PPBears Investment 的版本變更都會記錄在此檔案中。我們遵循 [語意化版本控制](https://semver.org/lang/zh-TW/) 的規範。
 
-## [1.6.0] - 2026-04-13
+## [1.6.1] - 2026-04-13
+
+### 修復 (Fixed)
+- **持股現價自動同步 (Price Auto-Refresh)**:
+  - 修復了股票現價只有在「下單時」才會更新的問題，導致庫存損益與統計數據長期停留在舊數據。
+  - 新增 `refreshHoldingPrices()` 方法：在使用者進入首頁 (Dashboard) 或庫存頁 (Portfolio) 時，自動從台灣證交所 (TWSE) API 抓取全部持股的最新收盤價，並批次更新 Supabase 資料庫與 Zustand store 狀態。
+  - 此後所有頁面的「現價」、「未平倉損益」、「總市值」均以 TWSE 最新收盤價為準，確保統計數據準確。
+  - TWSE API 呼叫具有 in-memory 快取（同一交易日只打一次 API），不影響效能。
+
+
 
 ### 新增與優化 (Added & Changed)
 - **投資學習與測驗模組 (Learning Module)**:

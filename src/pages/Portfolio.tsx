@@ -6,9 +6,15 @@ import './Portfolio.css';
 
 export default function Portfolio() {
   const navigate = useNavigate();
-  const { holdings, getPortfolioSummary, hasFeature } = useStore();
+  const { holdings, getPortfolioSummary, hasFeature, refreshHoldingPrices } = useStore();
   const hasAiFeature = hasFeature('ai_portfolio_advice');
   const summary = getPortfolioSummary();
+
+  // 進入庫存頁時，自動從 TWSE 刷新所有持股現價
+  useEffect(() => {
+    refreshHoldingPrices();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
 
   const pl = summary.totalProfitLoss;
   const isProfit = pl >= 0;

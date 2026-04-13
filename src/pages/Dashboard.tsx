@@ -7,7 +7,7 @@ import './Dashboard.css';
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { user, holdings, trades: allTrades, getPortfolioSummary, requestWithdrawal } = useStore();
+  const { user, holdings, trades: allTrades, getPortfolioSummary, requestWithdrawal, refreshHoldingPrices } = useStore();
   const trades = allTrades.slice(0, 5);
   const summary = getPortfolioSummary();
   const [showWithdrawal, setShowWithdrawal] = useState(false);
@@ -29,6 +29,10 @@ export default function Dashboard() {
         return;
       }
       
+      // 先同步最新收盤價到 Supabase 與 store（確保所有頁面數據一致）
+      await refreshHoldingPrices();
+
+      // 再抓 TWSE 資料計算今日漲跌顯示（快取已在上一步建立，不重複打 API）
       const [twse, twseDivs] = await Promise.all([
         fetchTWSEAllStocks(),
         fetchTWSEDividendYields()
@@ -59,7 +63,8 @@ export default function Dashboard() {
       setLiveQuotes(quotesMap);
     }
     fetchLive();
-  }, [holdings]);
+  }, [holdings.length]); // 依賴 holdings.length：首次載入 + 持股數量改變時觸發
+
 
   const profitClass = summary.totalProfitLoss >= 0 ? 'profit' : 'loss';
   const greetingEmoji = summary.totalProfitLoss >= 0 ? '😊' : '💪';
