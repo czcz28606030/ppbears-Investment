@@ -1,5 +1,4 @@
 import type { StockData, SimonsItem, StockQuote, StockRecommendation, AIAdvice } from './types';
-import { supabase } from './supabase';
 
 const IFALGO_BASE = '/api/ifalgo';
 
@@ -102,18 +101,27 @@ export async function getOrGenerateKidFriendlyDesc(
 ): Promise<string> {
   const fallbackDesc = makeKidFriendly(code, name, status, industry);
 
-  if (!supabase) return fallbackDesc;
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+  if (!supabaseUrl || !supabaseAnonKey) return fallbackDesc;
 
   try {
-    const { data, error } = await supabase.functions.invoke('get-kid-description', {
-      body: { code, name, status, industry },
+    const response = await fetch(`${supabaseUrl}/functions/v1/get-kid-description`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${supabaseAnonKey}`,
+        'apikey': supabaseAnonKey,
+      },
+      body: JSON.stringify({ code, name, status, industry }),
     });
 
-    if (error) {
-      console.error('Edge Function error:', error.message);
+    if (!response.ok) {
+      console.error('Edge Function HTTP error:', response.status);
       return fallbackDesc;
     }
 
+    const data = await response.json();
     const description: string = data?.description || '';
     if (!description) return fallbackDesc;
 
