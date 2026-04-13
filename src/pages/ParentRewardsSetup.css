@@ -1,0 +1,121 @@
+.parent-rewards-setup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+/* Toast */
+.prs-toast {
+  position: fixed;
+  bottom: 90px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--text-primary);
+  color: #fff;
+  font-size: var(--font-size-sm);
+  font-weight: 800;
+  padding: 10px 20px;
+  border-radius: var(--radius-full);
+  z-index: 999;
+  white-space: nowrap;
+  animation: slideUp 0.25s ease;
+}
+@keyframes slideUp {
+  from { opacity: 0; transform: translateX(-50%) translateY(12px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+/* 說明 */
+.prs-intro {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-md);
+}
+.prs-intro-emoji { font-size: 40px; flex-shrink: 0; }
+.prs-intro-title {
+  font-weight: 900;
+  font-size: var(--font-size-lg);
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+.prs-intro-desc {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  line-height: 1.7;
+}
+
+/* 現有規則 */
+.prs-section-title {
+  font-size: var(--font-size-base);
+  font-weight: 900;
+  color: var(--text-primary);
+}
+.prs-current { display: flex; flex-direction: column; gap: var(--space-sm); }
+.prs-rule-list { display: flex; flex-direction: column; gap: 6px; }
+.prs-rule-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 8px 12px;
+  background: var(--bg-tag);
+  border-radius: var(--radius-md);
+}
+.prs-rule-row.custom { background: rgba(108, 92, 231, 0.08); }
+.prs-rule-label { flex: 1; font-size: var(--font-size-sm); font-weight: 800; color: var(--text-primary); }
+.prs-rule-amount { font-size: var(--font-size-sm); font-weight: 900; color: var(--profit); }
+.prs-rule-del {
+  background: none;
+  border: none;
+  color: var(--text-light);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: var(--radius-sm);
+}
+.prs-rule-del:hover:not(:disabled) { background: var(--action-soft); color: var(--action); }
+
+/* 模板卡 */
+.prs-template { display: flex; flex-direction: column; gap: var(--space-md); }
+.prs-tpl-head { display: flex; align-items: flex-start; gap: var(--space-md); }
+.prs-tpl-emoji { font-size: 40px; }
+.prs-tpl-info { flex: 1; }
+.prs-tpl-name {
+  font-size: var(--font-size-lg);
+  font-weight: 900;
+  color: var(--text-primary);
+  margin-bottom: 2px;
+}
+.prs-tpl-desc { font-size: var(--font-size-sm); color: var(--text-secondary); }
+.prs-tpl-monthly {
+  font-size: var(--font-size-xs);
+  font-weight: 800;
+  color: var(--learn-coin);
+  margin-top: 4px;
+}
+.prs-tpl-amounts {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--bg-page);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+}
+.prs-tpl-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+.prs-tpl-amt { color: var(--profit); font-weight: 900; }
+.prs-apply-btn { width: 100%; }
+
+/* 提示 */
+.prs-hint {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  line-height: 1.6;
+}

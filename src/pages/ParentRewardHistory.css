@@ -1,0 +1,35 @@
+.prh-page { display: flex; flex-direction: column; gap: var(--space-lg); }
+
+.prh-empty {
+  display: flex; flex-direction: column; align-items: center;
+  gap: var(--space-sm); text-align: center;
+  color: var(--text-secondary); font-size: var(--font-size-sm);
+  padding: var(--space-xl) !important;
+}
+
+.prh-list { display: flex; flex-direction: column; padding: 0 !important; overflow: hidden; }
+
+.prh-row {
+  display: flex; align-items: flex-start; gap: var(--space-md);
+  padding: var(--space-md) var(--space-md);
+  border-bottom: 1px solid var(--border-card);
+}
+.prh-row:last-child { border-bottom: none; }
+
+.prh-emoji { font-size: 24px; flex-shrink: 0; margin-top: 2px; }
+
+.prh-info { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.prh-label { font-weight: 900; font-size: var(--font-size-sm); color: var(--text-primary); }
+.prh-child {
+  display: flex; align-items: center; gap: 4px;
+  font-size: var(--font-size-xs); color: var(--text-secondary); font-weight: 800;
+}
+.prh-desc { font-size: var(--font-size-xs); color: var(--text-secondary); }
+.prh-msg  { font-size: var(--font-size-xs); color: var(--text-secondary); font-style: italic; }
+.prh-date { font-size: var(--font-size-xs); color: var(--text-light); margin-top: 2px; }
+
+.prh-amount {
+  font-size: var(--font-size-base); font-weight: 900; flex-shrink: 0; margin-top: 2px;
+}
+.prh-amount.earn  { color: var(--profit); }
+.prh-amount.spend { color: var(--text-secondary); }

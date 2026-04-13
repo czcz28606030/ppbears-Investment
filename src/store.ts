@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { supabase } from './supabase';
 import type { Session } from '@supabase/supabase-js';
-import type { UserAccount, Trade, Holding, WithdrawalRequest, FeatureOverride, SystemSettings } from './types';
+import type { UserAccount, Trade, Holding, WithdrawalRequest, FeatureOverride, SystemSettings, LessonResult, RewardRule, RewardTriggerType, WalletTransaction, RewardShopItem, RedemptionRequest } from './types';
 
 // ==========================================
 // 輔助函式
@@ -27,6 +27,25 @@ export interface PortfolioSummary {
 // ==========================================
 // Store 型別定義
 // ==========================================
+export interface LearningProfile {
+  currentLevel: number;
+  currentStage: number;
+  totalXp: number;
+  streakDays: number;
+  longestStreak: number;
+  lastLearnDate: string | null;
+  totalLessonsCompleted: number;
+  totalQuestionsCorrect: number;
+  totalQuestionsAnswered: number;
+}
+
+export interface LearningWallet {
+  balance: number;
+  frozen: number;
+  totalEarned: number;
+  totalSpent: number;
+}
+
 interface InvestmentStore {
   session: Session | null;
   user: UserAccount | null;
@@ -39,6 +58,36 @@ interface InvestmentStore {
   allUsers: UserAccount[];
   loading: boolean;
   authLoading: boolean;
+
+  // Learning module (Slice 1–3)
+  learningProfile: LearningProfile | null;
+  learningWallet: LearningWallet | null;
+  learningWalletTxs: WalletTransaction[];
+  childrenTxLog: WalletTransaction[];
+  rewardRules: RewardRule[];
+  fetchLearningProfile: () => Promise<void>;
+  fetchLearningWallet: () => Promise<void>;
+  fetchWalletTransactions: () => Promise<void>;
+  fetchChildrenTransactions: () => Promise<void>;
+  completeLesson: (lessonId: string, result: LessonResult) => Promise<{ error: string | null; xpEarned: number; coinsEarned: number; levelUp: boolean; newStreak: number }>;
+  // Reward rules (parent actions)
+  fetchRewardRules: () => Promise<void>;
+  applyRewardTemplate: (template: 'light' | 'standard' | 'intensive') => Promise<{ error: string | null }>;
+  saveRewardRule: (rule: Omit<RewardRule, 'id' | 'parentId' | 'createdAt'>) => Promise<{ error: string | null }>;
+  deleteRewardRule: (ruleId: string) => Promise<{ error: string | null }>;
+  grantCoinsManually: (childId: string, amount: number, message: string) => Promise<{ error: string | null }>;
+  // Shop items
+  shopItems: RewardShopItem[];
+  fetchShopItems: () => Promise<void>;
+  saveShopItem: (item: Pick<RewardShopItem, 'name' | 'description' | 'icon' | 'itemType' | 'costCoins' | 'cashValue'>) => Promise<{ error: string | null }>;
+  deleteShopItem: (itemId: string) => Promise<{ error: string | null }>;
+  toggleShopItem: (itemId: string, isActive: boolean) => Promise<{ error: string | null }>;
+  // Redemptions
+  redemptions: RedemptionRequest[];
+  fetchRedemptions: () => Promise<void>;
+  requestRedemption: (shopItemId: string) => Promise<{ error: string | null }>;
+  approveRedemption: (requestId: string, note: string) => Promise<{ error: string | null }>;
+  rejectRedemption: (requestId: string, note: string) => Promise<{ error: string | null }>;
 
   // Auth
   initAuth: () => Promise<void>;
@@ -92,6 +141,37 @@ interface InvestmentStore {
   getPortfolioSummary: () => PortfolioSummary;
 }
 
+// ── Learning / Reward 常數 ─────────────────────────────────
+
+import type { RewardTriggerType as _RTT } from './types';
+
+export const TRIGGER_LABELS: Record<_RTT, string> = {
+  daily_complete: '每日完課',
+  streak_7:       '連續 7 天',
+  streak_30:      '連續 30 天',
+  level_up:       '升小等級',
+  stage_up:       '升大階段',
+  badge:          '獲得徽章',
+  pet_evolution:  '寵物進化',
+  perfect_score:  '完美答題',
+  custom:         '自訂',
+};
+
+export const REWARD_TEMPLATES = {
+  light: {
+    daily_complete: 3, streak_7: 10, streak_30: 50,
+    level_up: 5, stage_up: 30, badge: 8, perfect_score: 5,
+  },
+  standard: {
+    daily_complete: 5, streak_7: 20, streak_30: 100,
+    level_up: 10, stage_up: 50, badge: 15, perfect_score: 10,
+  },
+  intensive: {
+    daily_complete: 10, streak_7: 50, streak_30: 200,
+    level_up: 20, stage_up: 100, badge: 30, perfect_score: 20,
+  },
+} as const satisfies Record<string, Partial<Record<_RTT, number>>>;
+
 // DB Row → TypeScript
 function rowToUser(row: Record<string, unknown>): UserAccount {
   return {
@@ -112,6 +192,54 @@ function rowToUser(row: Record<string, unknown>): UserAccount {
   };
 }
 
+import type { RewardRule as _RR } from './types';
+
+function rowToRewardRule(row: Record<string, unknown>): _RR {
+  return {
+    id:           row.id as string,
+    parentId:     row.parent_id as string,
+    childId:      (row.child_id as string) || null,
+    triggerType:  row.trigger_type as _RTT,
+    triggerLabel: (row.trigger_label as string) || null,
+    amount:       Number(row.amount),
+    isActive:     Boolean(row.is_active),
+    createdAt:    row.created_at as string,
+  };
+}
+
+import type { RewardShopItem as _RSI, RedemptionRequest as _RDQ } from './types';
+
+function rowToShopItem(row: Record<string, unknown>): _RSI {
+  return {
+    id:          row.id as string,
+    parentId:    row.parent_id as string,
+    name:        row.name as string,
+    description: (row.description as string) || null,
+    icon:        (row.icon as string) || null,
+    itemType:    row.item_type as _RSI['itemType'],
+    costCoins:   Number(row.cost_coins),
+    cashValue:   row.cash_value != null ? Number(row.cash_value) : null,
+    isActive:    Boolean(row.is_active),
+    sortOrder:   Number(row.sort_order),
+    createdAt:   row.created_at as string,
+  };
+}
+
+function rowToRedemption(row: Record<string, unknown>): _RDQ {
+  return {
+    id:           row.id as string,
+    childId:      row.child_id as string,
+    parentId:     row.parent_id as string,
+    shopItemId:   row.shop_item_id as string,
+    itemName:     row.item_name as string,
+    costCoins:    Number(row.cost_coins),
+    status:       row.status as _RDQ['status'],
+    parentNote:   (row.parent_note as string) || null,
+    requestedAt:  row.requested_at as string,
+    resolvedAt:   (row.resolved_at as string) || null,
+  };
+}
+
 // ==========================================
 // Store 實作
 // ==========================================
@@ -128,6 +256,496 @@ export const useStore = create<InvestmentStore>((set, get) => ({
   loading: false,
   authLoading: true,
   isRecoveryMode: false,
+
+  // ─── Learning Module (Slice 1–3) ─────────
+  learningProfile: null,
+  learningWallet: null,
+  learningWalletTxs: [],
+  childrenTxLog: [],
+  rewardRules: [],
+  shopItems: [],
+  redemptions: [],
+
+  fetchLearningProfile: async () => {
+    if (!supabase) return;
+    const { user } = get();
+    if (!user) return;
+
+    const { data } = await supabase
+      .from('learning_profiles')
+      .select('*')
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (!data) {
+      const { data: created } = await supabase
+        .from('learning_profiles')
+        .insert([{ user_id: user.id }])
+        .select()
+        .single();
+      if (created) {
+        set({
+          learningProfile: {
+            currentLevel: Number(created.current_level),
+            currentStage: Number(created.current_stage),
+            totalXp: Number(created.total_xp),
+            streakDays: Number(created.streak_days),
+            longestStreak: Number(created.longest_streak),
+            lastLearnDate: (created.last_learn_date as string) || null,
+            totalLessonsCompleted: Number(created.total_lessons_completed),
+            totalQuestionsCorrect: Number(created.total_questions_correct),
+            totalQuestionsAnswered: Number(created.total_questions_answered),
+          },
+        });
+      }
+      return;
+    }
+
+    set({
+      learningProfile: {
+        currentLevel: Number(data.current_level),
+        currentStage: Number(data.current_stage),
+        totalXp: Number(data.total_xp),
+        streakDays: Number(data.streak_days),
+        longestStreak: Number(data.longest_streak),
+        lastLearnDate: (data.last_learn_date as string) || null,
+        totalLessonsCompleted: Number(data.total_lessons_completed),
+        totalQuestionsCorrect: Number(data.total_questions_correct),
+        totalQuestionsAnswered: Number(data.total_questions_answered),
+      },
+    });
+  },
+
+  fetchLearningWallet: async () => {
+    if (!supabase) return;
+    const { user } = get();
+    if (!user) return;
+
+    const { data } = await supabase
+      .from('learning_wallet')
+      .select('*')
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (!data) {
+      const { data: created } = await supabase
+        .from('learning_wallet')
+        .insert([{ user_id: user.id }])
+        .select()
+        .single();
+      if (created) {
+        set({
+          learningWallet: {
+            balance: Number(created.balance),
+            frozen: Number(created.frozen),
+            totalEarned: Number(created.total_earned),
+            totalSpent: Number(created.total_spent),
+          },
+        });
+      }
+      return;
+    }
+
+    set({
+      learningWallet: {
+        balance: Number(data.balance),
+        frozen: Number(data.frozen),
+        totalEarned: Number(data.total_earned),
+        totalSpent: Number(data.total_spent),
+      },
+    });
+  },
+
+  completeLesson: async (lessonId, result) => {
+    if (!supabase) return { error: '資料庫未連線', xpEarned: 0, coinsEarned: 0, levelUp: false, newStreak: 0 };
+    const { user, learningProfile } = get();
+    if (!user || !learningProfile) return { error: '請先登入', xpEarned: 0, coinsEarned: 0, levelUp: false, newStreak: 0 };
+
+    const today = new Date().toISOString().split('T')[0];
+    const isFirstTodayLesson = learningProfile.lastLearnDate !== today;
+
+    // XP：答題得分 + 首次每日 +20
+    let xpEarned = result.xpFromQuestions;
+    if (isFirstTodayLesson) xpEarned += 20;
+
+    // 等級
+    const newTotalXp = learningProfile.totalXp + xpEarned;
+    const newLevel = Math.min(50, Math.floor(newTotalXp / 100) + 1);
+    const newStage = Math.min(10, Math.floor((newLevel - 1) / 5) + 1);
+    const levelUp = newLevel > learningProfile.currentLevel;
+    const stageUp = newStage > learningProfile.currentStage;
+
+    // 連續天數
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString().split('T')[0];
+    let newStreak = learningProfile.streakDays;
+    if (isFirstTodayLesson) {
+      newStreak = learningProfile.lastLearnDate === yesterdayStr
+        ? learningProfile.streakDays + 1
+        : 1;
+    }
+    const newLongestStreak = Math.max(learningProfile.longestStreak, newStreak);
+
+    // 寫入 lesson_progress
+    await supabase.from('lesson_progress').insert([{
+      user_id: user.id,
+      lesson_id: lessonId,
+      score: result.score,
+      xp_earned: xpEarned,
+      time_spent_seconds: result.timeSpentSeconds,
+      questions_correct: result.questionsCorrect,
+      questions_total: result.questionsTotal,
+    }]);
+
+    // 更新 learning_profiles
+    const { error } = await supabase.from('learning_profiles').update({
+      total_xp: newTotalXp,
+      current_level: newLevel,
+      current_stage: newStage,
+      streak_days: newStreak,
+      longest_streak: newLongestStreak,
+      last_learn_date: today,
+      total_lessons_completed: learningProfile.totalLessonsCompleted + 1,
+      total_questions_correct: learningProfile.totalQuestionsCorrect + result.questionsCorrect,
+      total_questions_answered: learningProfile.totalQuestionsAnswered + result.questionsTotal,
+      updated_at: new Date().toISOString(),
+    }).eq('user_id', user.id);
+
+    if (error) return { error: error.message, xpEarned, coinsEarned: 0, levelUp, newStreak };
+
+    set({
+      learningProfile: {
+        ...learningProfile,
+        totalXp: newTotalXp,
+        currentLevel: newLevel,
+        currentStage: newStage,
+        streakDays: newStreak,
+        longestStreak: newLongestStreak,
+        lastLearnDate: today,
+        totalLessonsCompleted: learningProfile.totalLessonsCompleted + 1,
+        totalQuestionsCorrect: learningProfile.totalQuestionsCorrect + result.questionsCorrect,
+        totalQuestionsAnswered: learningProfile.totalQuestionsAnswered + result.questionsTotal,
+      },
+    });
+
+    // ── 自動發幣：查詢父母的發幣規則 ─────────────
+    let coinsEarned = 0;
+    if (user.parentId) {
+      const { data: rules } = await supabase
+        .from('reward_rules')
+        .select('*')
+        .eq('parent_id', user.parentId)
+        .eq('is_active', true)
+        .or(`child_id.is.null,child_id.eq.${user.id}`);
+
+      if (rules && rules.length > 0) {
+        // 判斷哪些觸發條件成立
+        const triggeredTypes: RewardTriggerType[] = [];
+        if (isFirstTodayLesson) triggeredTypes.push('daily_complete');
+        if (levelUp) triggeredTypes.push('level_up');
+        if (stageUp) triggeredTypes.push('stage_up');
+        if (result.score === 100) triggeredTypes.push('perfect_score');
+        if (newStreak === 7) triggeredTypes.push('streak_7');
+        if (newStreak === 30) triggeredTypes.push('streak_30');
+
+        for (const rule of rules) {
+          if (triggeredTypes.includes(rule.trigger_type as RewardTriggerType)) {
+            const { error: rpcErr } = await supabase.rpc('grant_learning_coins', {
+              p_user_id: user.id,
+              p_amount: rule.amount,
+              p_tx_type: 'earn',
+              p_source: rule.id,
+              p_description: TRIGGER_LABELS[rule.trigger_type as RewardTriggerType] ?? rule.trigger_label ?? rule.trigger_type,
+            });
+            if (!rpcErr) coinsEarned += rule.amount;
+          }
+        }
+
+        // 重新拉最新錢包餘額
+        if (coinsEarned > 0) await get().fetchLearningWallet();
+      }
+    }
+
+    return { error: null, xpEarned, coinsEarned, levelUp, newStreak };
+  },
+
+  // ─── Reward Rules ─────────────────────────
+  fetchRewardRules: async () => {
+    if (!supabase) return;
+    const { user } = get();
+    if (!user || user.role !== 'parent') return;
+    const { data } = await supabase
+      .from('reward_rules')
+      .select('*')
+      .eq('parent_id', user.id)
+      .order('created_at', { ascending: true });
+    set({
+      rewardRules: (data || []).map(rowToRewardRule),
+    });
+  },
+
+  applyRewardTemplate: async (template) => {
+    if (!supabase) return { error: '資料庫未連線' };
+    const { user } = get();
+    if (!user || user.role !== 'parent') return { error: '權限不足' };
+    const amounts = REWARD_TEMPLATES[template];
+    // 刪除現有非 custom 規則
+    await supabase
+      .from('reward_rules')
+      .delete()
+      .eq('parent_id', user.id)
+      .neq('trigger_type', 'custom');
+    // 批次新增
+    const rows = (Object.entries(amounts) as [RewardTriggerType, number][]).map(([triggerType, amount]) => ({
+      parent_id: user.id,
+      trigger_type: triggerType,
+      amount,
+      is_active: true,
+    }));
+    const { error } = await supabase.from('reward_rules').insert(rows);
+    if (error) return { error: error.message };
+    await get().fetchRewardRules();
+    return { error: null };
+  },
+
+  saveRewardRule: async (rule) => {
+    if (!supabase) return { error: '資料庫未連線' };
+    const { user } = get();
+    if (!user || user.role !== 'parent') return { error: '權限不足' };
+    const { error } = await supabase.from('reward_rules').insert([{
+      parent_id: user.id,
+      child_id: rule.childId ?? null,
+      trigger_type: rule.triggerType,
+      trigger_label: rule.triggerLabel ?? null,
+      amount: rule.amount,
+      is_active: rule.isActive,
+    }]);
+    if (error) return { error: error.message };
+    await get().fetchRewardRules();
+    return { error: null };
+  },
+
+  deleteRewardRule: async (ruleId) => {
+    if (!supabase) return { error: '資料庫未連線' };
+    const { error } = await supabase
+      .from('reward_rules')
+      .delete()
+      .eq('id', ruleId);
+    if (error) return { error: error.message };
+    set(s => ({ rewardRules: s.rewardRules.filter(r => r.id !== ruleId) }));
+    return { error: null };
+  },
+
+  grantCoinsManually: async (childId, amount, message) => {
+    if (!supabase) return { error: '資料庫未連線' };
+    const { user } = get();
+    if (!user || user.role !== 'parent') return { error: '權限不足' };
+    const { error } = await supabase.rpc('grant_learning_coins', {
+      p_user_id: childId,
+      p_amount: amount,
+      p_tx_type: 'parent_grant',
+      p_source: user.id,
+      p_description: '父母手動發放',
+      p_parent_message: message,
+    });
+    if (error) return { error: error.message };
+    return { error: null };
+  },
+
+  fetchWalletTransactions: async () => {
+    if (!supabase) return;
+    const { user } = get();
+    if (!user) return;
+    const { data } = await supabase
+      .from('wallet_transactions')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(50);
+    set({
+      learningWalletTxs: (data || []).map(r => ({
+        id: r.id as string,
+        userId: r.user_id as string,
+        amount: Number(r.amount),
+        txType: r.tx_type as WalletTransaction['txType'],
+        source: (r.source as string) || null,
+        description: (r.description as string) || null,
+        parentMessage: (r.parent_message as string) || null,
+        createdAt: r.created_at as string,
+      })),
+    });
+  },
+
+  fetchChildrenTransactions: async () => {
+    if (!supabase) return;
+    const { user, children } = get();
+    if (!user || user.role !== 'parent') return;
+    const childIds = children.map(c => c.id);
+    if (childIds.length === 0) return;
+    const { data } = await supabase
+      .from('wallet_transactions')
+      .select('*')
+      .in('user_id', childIds)
+      .order('created_at', { ascending: false })
+      .limit(200);
+    set({
+      childrenTxLog: (data || []).map(r => ({
+        id: r.id as string,
+        userId: r.user_id as string,
+        amount: Number(r.amount),
+        txType: r.tx_type as WalletTransaction['txType'],
+        source: (r.source as string) || null,
+        description: (r.description as string) || null,
+        parentMessage: (r.parent_message as string) || null,
+        createdAt: r.created_at as string,
+      })),
+    });
+  },
+
+  // ─── Shop Items ───────────────────────────
+  fetchShopItems: async () => {
+    if (!supabase) return;
+    const { user } = get();
+    if (!user) return;
+    // parent fetches own items; child fetches parent's items
+    const parentId = user.role === 'parent' ? user.id : user.parentId;
+    if (!parentId) return;
+    const { data } = await supabase
+      .from('reward_shop_items')
+      .select('*')
+      .eq('parent_id', parentId)
+      .order('sort_order', { ascending: true })
+      .order('created_at', { ascending: true });
+    set({ shopItems: (data || []).map(rowToShopItem) });
+  },
+
+  saveShopItem: async (item) => {
+    if (!supabase) return { error: '資料庫未連線' };
+    const { user } = get();
+    if (!user || user.role !== 'parent') return { error: '權限不足' };
+    const { shopItems } = get();
+    const { error } = await supabase.from('reward_shop_items').insert([{
+      parent_id:   user.id,
+      name:        item.name,
+      description: item.description ?? null,
+      icon:        item.icon ?? null,
+      item_type:   item.itemType,
+      cost_coins:  item.costCoins,
+      cash_value:  item.cashValue ?? null,
+      is_active:   true,
+      sort_order:  shopItems.length,
+    }]);
+    if (error) return { error: error.message };
+    await get().fetchShopItems();
+    return { error: null };
+  },
+
+  deleteShopItem: async (itemId) => {
+    if (!supabase) return { error: '資料庫未連線' };
+    const { error } = await supabase
+      .from('reward_shop_items').delete().eq('id', itemId);
+    if (error) return { error: error.message };
+    set(s => ({ shopItems: s.shopItems.filter(i => i.id !== itemId) }));
+    return { error: null };
+  },
+
+  toggleShopItem: async (itemId, isActive) => {
+    if (!supabase) return { error: '資料庫未連線' };
+    const { error } = await supabase
+      .from('reward_shop_items')
+      .update({ is_active: isActive })
+      .eq('id', itemId);
+    if (error) return { error: error.message };
+    set(s => ({
+      shopItems: s.shopItems.map(i => i.id === itemId ? { ...i, isActive } : i),
+    }));
+    return { error: null };
+  },
+
+  // ─── Redemptions ──────────────────────────
+  fetchRedemptions: async () => {
+    if (!supabase) return;
+    const { user } = get();
+    if (!user) return;
+    const col = user.role === 'parent' ? 'parent_id' : 'child_id';
+    const { data } = await supabase
+      .from('redemption_requests')
+      .select('*')
+      .eq(col, user.id)
+      .order('requested_at', { ascending: false })
+      .limit(100);
+    set({ redemptions: (data || []).map(rowToRedemption) });
+  },
+
+  requestRedemption: async (shopItemId) => {
+    if (!supabase) return { error: '資料庫未連線' };
+    const { user, shopItems } = get();
+    if (!user || user.role !== 'child') return { error: '請用副帳號操作' };
+    if (!user.parentId) return { error: '找不到主帳號' };
+
+    const item = shopItems.find(i => i.id === shopItemId);
+    if (!item) return { error: '找不到商品' };
+
+    // 凍結幣
+    const { error: freezeErr } = await supabase.rpc('freeze_coins', {
+      p_user_id:    user.id,
+      p_amount:     item.costCoins,
+      p_source:     shopItemId,
+      p_description: `申請兌換：${item.name}`,
+    });
+    if (freezeErr) return { error: freezeErr.message };
+
+    // 建立申請
+    const { error } = await supabase.from('redemption_requests').insert([{
+      child_id:     user.id,
+      parent_id:    user.parentId,
+      shop_item_id: shopItemId,
+      item_name:    item.name,
+      cost_coins:   item.costCoins,
+      status:       'pending',
+    }]);
+    if (error) return { error: error.message };
+
+    // 更新本地錢包顯示
+    await get().fetchLearningWallet();
+    await get().fetchRedemptions();
+    return { error: null };
+  },
+
+  approveRedemption: async (requestId, note) => {
+    if (!supabase) return { error: '資料庫未連線' };
+    const { error } = await supabase.rpc('approve_redemption', {
+      p_request_id: requestId,
+      p_parent_note: note || null,
+    });
+    if (error) return { error: error.message };
+    set(s => ({
+      redemptions: s.redemptions.map(r =>
+        r.id === requestId
+          ? { ...r, status: 'approved' as const, parentNote: note || null, resolvedAt: new Date().toISOString() }
+          : r
+      ),
+    }));
+    return { error: null };
+  },
+
+  rejectRedemption: async (requestId, note) => {
+    if (!supabase) return { error: '資料庫未連線' };
+    const { error } = await supabase.rpc('reject_redemption', {
+      p_request_id: requestId,
+      p_parent_note: note || null,
+    });
+    if (error) return { error: error.message };
+    set(s => ({
+      redemptions: s.redemptions.map(r =>
+        r.id === requestId
+          ? { ...r, status: 'rejected' as const, parentNote: note || null, resolvedAt: new Date().toISOString() }
+          : r
+      ),
+    }));
+    return { error: null };
+  },
 
   // ─── Auth ─────────────────────────────────
   initAuth: async () => {
@@ -224,7 +842,7 @@ export const useStore = create<InvestmentStore>((set, get) => ({
   logout: async () => {
     if (!supabase) return;
     await supabase.auth.signOut();
-    set({ user: null, session: null, children: [], holdings: [], trades: [], withdrawalRequests: [], featureOverrides: [], allUsers: [] });
+    set({ user: null, session: null, children: [], holdings: [], trades: [], withdrawalRequests: [], featureOverrides: [], allUsers: [], learningProfile: null, learningWallet: null, learningWalletTxs: [], childrenTxLog: [], rewardRules: [], shopItems: [], redemptions: [] });
   },
 
   // ─── Data Loading ──────────────────────────

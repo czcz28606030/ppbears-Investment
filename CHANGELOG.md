@@ -2,6 +2,18 @@
 
 所有關於 PPBears Investment 的版本變更都會記錄在此檔案中。我們遵循 [語意化版本控制](https://semver.org/lang/zh-TW/) 的規範。
 
+## [1.6.0] - 2026-04-13
+
+### 新增與優化 (Added & Changed)
+- **投資學習與測驗模組 (Learning Module)**:
+  - 實作完整的投資小學堂架構，包含首頁導覽 (`LearnHome`)、文章閱讀 (`LearnArticles`) 與課程檢視 (`LessonView`)。
+  - 新增 Supabase 學習相關資料表 (`supabase-learning-schema.sql`)。
+- **任務與獎勵系統 (Rewards & Shop System)**:
+  - 針對父母與孩童雙端打造獨立的任務與獎勵經濟系統。
+  - 孩童端：新增願望清單檢視 (`ChildRequestsView`)、商店 (`ShopView`) 與錢包功能 (`WalletView`)。
+  - 父母端：實作從建立任務、審核發放獎勵到願望清單商店管理的完整後台 (`ParentRewardDashboard`、`ParentRewardsSetup`、`ParentRewardHistory` 等子頁面)。
+  - 新增 Supabase 獎勵相關資料表 (`supabase-rewards-schema.sql`)。
+
 ## [1.5.2] - 2026-04-12
 
 ### 新增與優化 (Added & Changed)

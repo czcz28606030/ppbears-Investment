@@ -145,3 +145,109 @@ export interface SystemSettings {
   free_max_holdings: number;
   free_max_daily_trades: number;
 }
+
+// ── Learning Module ──────────────────────────────────────
+
+export type QuestionType = 'choice' | 'true_false_speed' | 'matching' | 'sorting' | 'scenario' | 'fill_blank';
+
+export interface LessonQuestion {
+  question_type: QuestionType;
+  question_text: string;
+  options?: string[];           // choice 題用
+  correct_answer: number | boolean | string;
+  explanation: string;
+}
+
+export interface LessonCard {
+  type: string;
+  title: string;
+  body: string;
+  image_key?: string;
+}
+
+export interface LessonData {
+  lesson_id: string;
+  stage: number;
+  level: number;
+  domain: 'basic' | 'technical' | 'chips' | 'psychology';
+  title: string;
+  summary: string;
+  cards: LessonCard[];
+  preset_questions: LessonQuestion[];
+  ai_prompt_context: {
+    topic: string;
+    age_hint: string;
+    vocabulary_level: string;
+    metaphor_suggestions: string[];
+  };
+}
+
+export interface LessonResult {
+  questionsCorrect: number;
+  questionsTotal: number;
+  xpFromQuestions: number;
+  timeSpentSeconds: number;
+  score: number;
+}
+
+// ── Rewards Module ────────────────────────────────────────
+
+export type RewardTriggerType =
+  | 'daily_complete' | 'streak_7' | 'streak_30'
+  | 'level_up' | 'stage_up' | 'badge' | 'pet_evolution'
+  | 'perfect_score' | 'custom';
+
+export interface RewardRule {
+  id: string;
+  parentId: string;
+  childId: string | null;    // null = 適用所有副帳號
+  triggerType: RewardTriggerType;
+  triggerLabel: string | null;
+  amount: number;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export type ShopItemType = 'cash' | 'product' | 'experience' | 'invest_bonus';
+
+export interface RewardShopItem {
+  id: string;
+  parentId: string;
+  name: string;
+  description: string | null;
+  icon: string | null;
+  itemType: ShopItemType;
+  costCoins: number;
+  cashValue: number | null;
+  isActive: boolean;
+  sortOrder: number;
+  createdAt: string;
+}
+
+export type RedemptionStatus = 'pending' | 'approved' | 'rejected' | 'cancelled';
+
+export interface RedemptionRequest {
+  id: string;
+  childId: string;
+  parentId: string;
+  shopItemId: string;
+  itemName: string;
+  costCoins: number;
+  status: RedemptionStatus;
+  parentNote: string | null;
+  requestedAt: string;
+  resolvedAt: string | null;
+}
+
+export type WalletTxType = 'earn' | 'redeem' | 'parent_grant' | 'refund' | 'freeze' | 'unfreeze';
+
+export interface WalletTransaction {
+  id: string;
+  userId: string;
+  amount: number;
+  txType: WalletTxType;
+  source: string | null;
+  description: string | null;
+  parentMessage: string | null;
+  createdAt: string;
+}

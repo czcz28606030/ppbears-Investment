@@ -134,6 +134,25 @@ export default function ManageChildren() {
         <h1 className="page-title">👨‍👩‍👧 管理副帳號</h1>
       </div>
 
+      {/* 學習獎勵管理入口 */}
+      <div
+        onClick={() => navigate('/parent/rewards')}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 16,
+          background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)',
+          padding: '16px 20px', cursor: 'pointer', marginBottom: 4,
+          border: '2px solid rgba(240,147,43,0.2)',
+          boxShadow: 'var(--shadow-sm)',
+        }}
+      >
+        <span style={{ fontSize: 36 }}>🎁</span>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontWeight: 900, fontSize: 'var(--font-size-base)', color: 'var(--text-primary)' }}>學習獎勵管理</div>
+          <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', marginTop: 2 }}>設定發幣規則，孩子學習自動領學習幣</div>
+        </div>
+        <span style={{ color: 'var(--text-light)', fontSize: 18 }}>▶</span>
+      </div>
+
       {/* 副帳號清單 */}
       <div className="children-list">
         {children.length === 0 && !showCreate && (

@@ -6,7 +6,18 @@ import Dashboard from './pages/Dashboard';
 import Explore from './pages/Explore';
 import Portfolio from './pages/Portfolio';
 import StockDetail from './pages/StockDetail';
-import Learn from './pages/Learn';
+import LearnHome from './pages/LearnHome';
+import LearnArticles from './pages/LearnArticles';
+import LessonView from './pages/LessonView';
+import WalletView from './pages/WalletView';
+import ParentRewardsSetup from './pages/ParentRewardsSetup';
+import ParentRewardDashboard from './pages/ParentRewardDashboard';
+import ParentRewardShopManager from './pages/ParentRewardShopManager';
+import ParentRewardReview from './pages/ParentRewardReview';
+import ParentRewardGrant from './pages/ParentRewardGrant';
+import ShopView from './pages/ShopView';
+import ChildRequestsView from './pages/ChildRequestsView';
+import ParentRewardHistory from './pages/ParentRewardHistory';
 import TradeHistory from './pages/TradeHistory';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -67,11 +78,22 @@ function AppContent() {
           <Route path="/explore" element={<Explore />} />
           <Route path="/portfolio" element={<Portfolio />} />
           <Route path="/stock/:code" element={<StockDetail />} />
-          <Route path="/learn" element={<Learn />} />
+          <Route path="/learn" element={<LearnHome />} />
+          <Route path="/learn/articles" element={<LearnArticles />} />
+          <Route path="/learn/lesson/:lessonId" element={<LessonView />} />
+          <Route path="/learn/wallet" element={<WalletView />} />
           <Route path="/history" element={<TradeHistory />} />
 
           {/* Parent-only Routes */}
           <Route path="/manage-children" element={<ManageChildren />} />
+          <Route path="/parent/rewards" element={<ParentRewardDashboard />} />
+          <Route path="/parent/rewards/rules" element={<ParentRewardsSetup />} />
+          <Route path="/parent/rewards/shop" element={<ParentRewardShopManager />} />
+          <Route path="/parent/rewards/review" element={<ParentRewardReview />} />
+          <Route path="/parent/rewards/grant" element={<ParentRewardGrant />} />
+          <Route path="/learn/shop" element={<ShopView />} />
+          <Route path="/learn/requests" element={<ChildRequestsView />} />
+          <Route path="/parent/rewards/history" element={<ParentRewardHistory />} />
           <Route path="/withdrawal-approval" element={<WithdrawalApproval />} />
 
           {/* Profile Settings */}

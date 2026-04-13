@@ -1,0 +1,334 @@
+.lesson-view {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  min-height: calc(100vh - 80px);
+}
+
+/* 進度列 */
+.lesson-progress-bar-wrap {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+.lesson-back {
+  background: none;
+  border: none;
+  font-size: 20px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+}
+.lesson-back:hover { background: var(--bg-tag); }
+.lesson-progress-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+}
+.lesson-progress-dot {
+  flex: 1;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: rgba(108, 92, 231, 0.15);
+  transition: background 0.3s;
+}
+.lesson-progress-dot.active {
+  background: var(--learn-xp);
+}
+.lesson-quiz-label {
+  font-size: var(--font-size-sm);
+  font-weight: 800;
+  color: var(--text-secondary);
+  flex: 1;
+  text-align: center;
+}
+.lesson-combo {
+  font-size: var(--font-size-sm);
+  font-weight: 900;
+  color: var(--learn-streak);
+  background: var(--learn-primary-light);
+  border-radius: var(--radius-full);
+  padding: 2px 10px;
+}
+
+/* 卡片區 */
+.lesson-card-area {
+  flex: 1;
+}
+.lesson-card {
+  min-height: 240px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+.lesson-card-num {
+  font-size: var(--font-size-xs);
+  color: var(--text-light);
+  font-weight: 700;
+}
+.lesson-card-title {
+  font-size: var(--font-size-xl);
+  font-weight: 900;
+  color: var(--text-primary);
+  margin: 0;
+}
+.lesson-card-body {
+  font-size: var(--font-size-base);
+  color: var(--text-secondary);
+  line-height: 1.8;
+  white-space: pre-line;
+  margin: 0;
+}
+
+/* 卡片導覽 */
+.lesson-nav {
+  display: flex;
+  gap: var(--space-md);
+}
+.lesson-nav-prev {
+  flex-shrink: 0;
+}
+.lesson-nav-next {
+  flex: 1;
+}
+
+/* 題目 */
+.lesson-question-box {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+.lesson-q-type-badge {
+  font-size: var(--font-size-xs);
+  font-weight: 800;
+  color: var(--learn-xp);
+  background: rgba(108, 92, 231, 0.1);
+  border-radius: var(--radius-full);
+  padding: 3px 12px;
+  align-self: flex-start;
+}
+.lesson-q-text {
+  font-size: var(--font-size-lg);
+  font-weight: 800;
+  color: var(--text-primary);
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* 選擇題 */
+.lesson-choices {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+.lesson-choice {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  border-radius: var(--radius-md);
+  border: 2px solid var(--border-card);
+  background: var(--bg-card);
+  font-size: var(--font-size-base);
+  font-weight: 700;
+  color: var(--text-primary);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s, background 0.15s;
+}
+.lesson-choice:hover:not(:disabled) {
+  border-color: var(--learn-xp);
+  background: rgba(108, 92, 231, 0.05);
+}
+.lesson-choice.selected {
+  border-color: var(--learn-xp);
+  background: rgba(108, 92, 231, 0.08);
+}
+.lesson-choice.correct {
+  border-color: var(--learn-success);
+  background: rgba(0, 184, 148, 0.1);
+  color: #007A63;
+}
+.lesson-choice.wrong {
+  border-color: var(--loss-color);
+  background: rgba(138, 201, 38, 0.1);
+}
+.lesson-choice-label {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-full);
+  background: var(--learn-primary-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--font-size-sm);
+  font-weight: 900;
+  flex-shrink: 0;
+}
+
+/* 是非急速 */
+.lesson-tf-area {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+.lesson-tf-timer {
+  position: relative;
+  height: 14px;
+  background: rgba(225, 112, 85, 0.15);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+}
+.lesson-tf-timer-bar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  background: linear-gradient(90deg, var(--learn-streak), #FDCB6E);
+  border-radius: var(--radius-full);
+  transition: width 1s linear;
+}
+.lesson-tf-timer span {
+  position: relative;
+  margin: 0 auto;
+  font-size: var(--font-size-xs);
+  font-weight: 900;
+  color: var(--learn-streak);
+}
+.lesson-tf-btns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-md);
+}
+.lesson-tf-btn {
+  padding: var(--space-lg) var(--space-md);
+  border-radius: var(--radius-lg);
+  border: none;
+  font-size: var(--font-size-xl);
+  font-weight: 900;
+  cursor: pointer;
+  transition: transform 0.12s;
+}
+.lesson-tf-btn:active { transform: scale(0.95); }
+.lesson-tf-btn.true {
+  background: rgba(0, 184, 148, 0.15);
+  color: #007A63;
+  border: 2px solid var(--learn-success);
+}
+.lesson-tf-btn.false {
+  background: rgba(255, 89, 94, 0.12);
+  color: var(--action-dark);
+  border: 2px solid var(--action);
+}
+
+/* 答題回饋 */
+.lesson-feedback {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-sm);
+  text-align: center;
+}
+.lesson-feedback.correct { border-color: var(--learn-success) !important; }
+.lesson-feedback.wrong { border-color: var(--action) !important; }
+.lesson-feedback-icon { font-size: 42px; }
+.lesson-feedback-main {
+  font-size: var(--font-size-lg);
+  font-weight: 900;
+  color: var(--text-primary);
+}
+.lesson-feedback-explain {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  line-height: 1.7;
+}
+.lesson-feedback-next {
+  margin-top: var(--space-sm);
+  width: 100%;
+}
+
+/* 結果頁 */
+.lesson-results {
+  align-items: stretch;
+}
+.lesson-results-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-xl) 0 var(--space-md);
+}
+.lesson-results-emoji { font-size: 72px; }
+.lesson-results-title {
+  font-size: var(--font-size-2xl);
+  font-weight: 900;
+  color: var(--text-primary);
+  margin: 0;
+}
+.lesson-results-score {
+  font-size: var(--font-size-xl);
+  font-weight: 800;
+  color: var(--learn-xp);
+}
+.lesson-xp-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-xs);
+  background: linear-gradient(135deg, rgba(108,92,231,0.08) 0%, rgba(162,155,254,0.08) 100%) !important;
+  border-color: rgba(108,92,231,0.2) !important;
+}
+.lesson-levelup {
+  font-size: var(--font-size-lg);
+  font-weight: 900;
+  color: var(--learn-coin);
+}
+.lesson-xp-earned {
+  font-size: var(--font-size-3xl);
+  font-weight: 900;
+  color: var(--learn-xp);
+}
+.lesson-coins-earned {
+  font-size: var(--font-size-xl);
+  font-weight: 900;
+  color: var(--learn-coin);
+}
+.lesson-xp-sub {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+.lesson-review {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+.lesson-review-item { display: flex; flex-direction: column; gap: 4px; }
+.lesson-review-item.correct { border-left: 4px solid var(--learn-success) !important; }
+.lesson-review-item.wrong { border-left: 4px solid var(--action) !important; }
+.lesson-review-q {
+  font-size: var(--font-size-sm);
+  font-weight: 800;
+  color: var(--text-primary);
+}
+.lesson-review-explain {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+.lesson-done-btn { width: 100%; }
+
+/* 404 */
+.lesson-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-lg);
+  padding: var(--space-2xl) 0;
+}
+.lesson-error-emoji { font-size: 64px; }
+.lesson-error-msg { font-size: var(--font-size-lg); font-weight: 800; color: var(--text-secondary); }

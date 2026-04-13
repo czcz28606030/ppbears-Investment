@@ -1,0 +1,72 @@
+{
+  "lesson_id": "L001",
+  "stage": 1,
+  "level": 1,
+  "domain": "basic",
+  "title": "什麼是錢？",
+  "summary": "認識錢的由來，知道為什麼人們需要錢。",
+  "cards": [
+    {
+      "type": "text_image",
+      "title": "很久很久以前...",
+      "body": "古時候還沒有「錢」，人們想要東西的時候，就用自己有的東西去交換。你有雞蛋，我有蘋果，那我們就交換吧！🥚🍎",
+      "image_key": "lesson_001_card_01"
+    },
+    {
+      "type": "text_image",
+      "title": "但這樣有點麻煩...",
+      "body": "想像一下：你想買一台腳踏車，結果老闆說「我只要大象！」你要去哪裡找大象呢？🐘 這樣交換真的很不方便。",
+      "image_key": "lesson_001_card_02"
+    },
+    {
+      "type": "text_image",
+      "title": "聰明的發明：錢！",
+      "body": "於是人們發明了「錢」。錢就像一張「兌換券」，不管你想換什麼東西，只要有錢，大家都會接受。💰",
+      "image_key": "lesson_001_card_03"
+    },
+    {
+      "type": "text_image",
+      "title": "錢能做什麼？",
+      "body": "• 買你想要的東西 🛒\n• 存起來以後用 🐷\n• 也可以讓它變多變多（這就是投資喔！）📈",
+      "image_key": "lesson_001_card_04"
+    }
+  ],
+  "preset_questions": [
+    {
+      "question_type": "choice",
+      "question_text": "為什麼古時候的人要發明「錢」？",
+      "options": [
+        "因為錢很漂亮",
+        "因為用東西換東西太麻煩了",
+        "因為錢可以吃",
+        "因為大家都喜歡收集"
+      ],
+      "correct_answer": 1,
+      "explanation": "答對了！🎉 用東西直接換東西叫做「以物易物」，但如果雙方想要的東西不一樣就換不成，所以才發明了錢。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "錢除了可以拿來買東西，也可以存起來讓它變多。",
+      "correct_answer": true,
+      "explanation": "對！把錢存起來或拿去「投資」，都可能讓錢變多～這就是我們在這裡要學的事情 🐻✨"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "下面哪一個「不是」錢可以做的事？",
+      "options": [
+        "買飲料",
+        "存進存錢筒",
+        "拿去投資",
+        "變成大象"
+      ],
+      "correct_answer": 3,
+      "explanation": "錢不能直接變成大象啦 🐘 不過可以用錢去動物園看大象喔！"
+    }
+  ],
+  "ai_prompt_context": {
+    "topic": "貨幣的基本概念與由來",
+    "age_hint": "6-8歲",
+    "vocabulary_level": "simple",
+    "metaphor_suggestions": ["便利商店", "零用錢", "存錢筒", "兌換券"]
+  }
+}

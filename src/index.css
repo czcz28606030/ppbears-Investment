@@ -90,6 +90,15 @@
   --font-size-3xl:  34px;
   --font-size-hero: 46px;
 
+  /* ── Learning Module ── */
+  --learn-primary:       #E17055;
+  --learn-primary-light: #FFF5E6;
+  --learn-secondary:     #FDCB6E;
+  --learn-xp:            #6C5CE7;
+  --learn-coin:          #F0932B;
+  --learn-success:       #00B894;
+  --learn-streak:        #E17055;
+
   /* ── Transitions ── */
   --transition-fast:   150ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-normal: 250ms cubic-bezier(0.4, 0, 0.2, 1);

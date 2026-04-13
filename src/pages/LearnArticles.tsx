@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import './Learn.css';
+import './LearnArticles.css';
 
 interface LearnCard {
   id: string;
@@ -157,7 +157,7 @@ const LEARN_CARDS: LearnCard[] = [
   },
 ];
 
-export default function Learn() {
+export default function LearnArticles() {
   const [selectedCard, setSelectedCard] = useState<LearnCard | null>(null);
 
   const difficultyColor = (d: string) => {

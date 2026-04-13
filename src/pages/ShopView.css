@@ -1,0 +1,104 @@
+.shop-view { display: flex; flex-direction: column; gap: var(--space-lg); }
+.shop-toast {
+  position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%);
+  background: var(--text-primary); color: #fff;
+  font-size: var(--font-size-sm); font-weight: 800;
+  padding: 10px 20px; border-radius: var(--radius-full); z-index: 999;
+  white-space: nowrap; animation: slideUp 0.25s ease;
+}
+@keyframes slideUp {
+  from { opacity:0; transform: translateX(-50%) translateY(12px); }
+  to   { opacity:1; transform: translateX(-50%) translateY(0); }
+}
+
+/* 餘額條 */
+.shop-balance-bar {
+  display: flex; align-items: center; gap: var(--space-sm);
+  font-size: var(--font-size-sm); font-weight: 800; color: var(--text-secondary);
+  padding: var(--space-md) !important;
+}
+.shop-balance-num {
+  font-size: var(--font-size-xl); font-weight: 900; color: var(--learn-coin); flex: 1;
+}
+.shop-wallet-link {
+  background: none; border: none; color: var(--learn-xp);
+  font-size: var(--font-size-sm); font-weight: 900; cursor: pointer;
+  text-decoration: underline;
+}
+
+/* 空白 */
+.shop-empty {
+  display: flex; flex-direction: column; align-items: center;
+  text-align: center; color: var(--text-secondary);
+  font-size: var(--font-size-sm); padding: var(--space-xl) !important;
+  gap: 4px;
+}
+
+/* 商品格 */
+.shop-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-md);
+}
+.shop-item {
+  display: flex; flex-direction: column; gap: var(--space-sm);
+  cursor: pointer; position: relative; transition: transform 0.12s;
+  padding: var(--space-md) !important;
+}
+.shop-item:active:not(.unaffordable):not(.pending) { transform: scale(0.97); }
+.shop-item.unaffordable { opacity: 0.6; cursor: default; }
+.shop-item.pending { cursor: default; }
+
+.shop-item-icon  { font-size: 36px; }
+.shop-item-name  { font-weight: 900; font-size: var(--font-size-sm); color: var(--text-primary); }
+.shop-item-desc  { font-size: var(--font-size-xs); color: var(--text-secondary); line-height: 1.5; }
+.shop-item-foot  { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 4px; margin-top: auto; }
+.shop-type-badge {
+  font-size: 10px; font-weight: 800; color: var(--text-secondary);
+  background: var(--bg-tag); border-radius: var(--radius-full); padding: 2px 6px;
+}
+.shop-item-cost { font-size: var(--font-size-sm); font-weight: 900; color: var(--learn-coin); }
+.shop-item-cost.short { color: var(--text-light); }
+
+.shop-pending-badge, .shop-short-badge {
+  position: absolute; top: 8px; right: 8px;
+  font-size: 10px; font-weight: 900; border-radius: var(--radius-full); padding: 2px 8px;
+}
+.shop-pending-badge { background: rgba(108,92,231,0.15); color: var(--learn-xp); }
+.shop-short-badge   { background: var(--bg-tag); color: var(--text-light); }
+
+/* 我的申請 */
+.shop-my-requests {
+  display: flex; align-items: center; gap: var(--space-md);
+  font-size: var(--font-size-sm); font-weight: 800; color: var(--text-primary);
+  cursor: pointer;
+}
+.shop-my-requests > span:first-child { flex: 1; }
+.shop-pending-count {
+  background: rgba(240,147,43,0.15); color: var(--learn-coin);
+  font-size: var(--font-size-xs); font-weight: 900;
+  border-radius: var(--radius-full); padding: 2px 8px;
+}
+
+/* 確認 Modal */
+.shop-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+  z-index: 200; display: flex; align-items: flex-end; padding: var(--space-md);
+}
+.shop-modal {
+  width: 100%; display: flex; flex-direction: column; align-items: center;
+  gap: var(--space-md); padding: var(--space-xl) !important;
+}
+.shop-modal-icon { font-size: 56px; }
+.shop-modal-name { font-size: var(--font-size-xl); font-weight: 900; color: var(--text-primary); }
+.shop-modal-rows { width: 100%; display: flex; flex-direction: column; gap: 8px; }
+.shop-modal-row {
+  display: flex; justify-content: space-between;
+  font-size: var(--font-size-sm); font-weight: 800; color: var(--text-secondary);
+  padding: 8px 12px; background: var(--bg-page); border-radius: var(--radius-md);
+}
+.shop-modal-cost { color: var(--learn-coin); font-weight: 900; }
+.shop-modal-note { font-size: var(--font-size-xs); color: var(--text-light); text-align: center; }
+.shop-modal-btns { display: flex; gap: var(--space-md); width: 100%; }
+.shop-modal-btns .btn-ghost   { flex: 1; }
+.shop-modal-btns .btn-primary { flex: 2; }

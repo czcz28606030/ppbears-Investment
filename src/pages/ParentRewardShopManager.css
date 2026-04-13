@@ -1,0 +1,76 @@
+.prsm-page { display: flex; flex-direction: column; gap: var(--space-lg); }
+.prsm-toast {
+  position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%);
+  background: var(--text-primary); color: #fff;
+  font-size: var(--font-size-sm); font-weight: 800;
+  padding: 10px 20px; border-radius: var(--radius-full); z-index: 999;
+  white-space: nowrap; animation: slideUp 0.25s ease;
+}
+@keyframes slideUp {
+  from { opacity:0; transform: translateX(-50%) translateY(12px); }
+  to   { opacity:1; transform: translateX(-50%) translateY(0); }
+}
+.prsm-section { display: flex; flex-direction: column; gap: var(--space-sm); }
+.prsm-section-title { font-size: var(--font-size-base); font-weight: 900; color: var(--text-primary); }
+
+/* 商品列表 */
+.prsm-list { display: flex; flex-direction: column; gap: var(--space-sm); }
+.prsm-item {
+  display: flex; align-items: center; gap: var(--space-md);
+  padding: var(--space-md) !important;
+}
+.prsm-item.inactive { opacity: 0.5; }
+.prsm-item-icon { font-size: 32px; flex-shrink: 0; }
+.prsm-item-body { flex: 1; }
+.prsm-item-name { font-weight: 900; font-size: var(--font-size-base); color: var(--text-primary); }
+.prsm-item-meta { display: flex; align-items: center; gap: var(--space-sm); flex-wrap: wrap; margin-top: 4px; }
+.prsm-type-badge {
+  font-size: var(--font-size-xs); font-weight: 800; color: var(--text-secondary);
+  background: var(--bg-tag); border-radius: var(--radius-full); padding: 2px 8px;
+}
+.prsm-cost  { font-size: var(--font-size-sm); font-weight: 900; color: var(--learn-coin); }
+.prsm-cash  { font-size: var(--font-size-xs); color: var(--text-secondary); }
+.prsm-item-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.prsm-toggle {
+  width: 28px; height: 28px; border-radius: var(--radius-full);
+  border: 2px solid var(--border-card); background: none;
+  font-size: 14px; font-weight: 900; cursor: pointer; color: var(--text-light);
+}
+.prsm-toggle.active { border-color: var(--learn-success); color: var(--learn-success); background: rgba(0,184,148,0.1); }
+.prsm-del {
+  width: 28px; height: 28px; border-radius: var(--radius-full);
+  border: none; background: none; color: var(--text-light);
+  font-size: 14px; cursor: pointer;
+}
+.prsm-del:hover { background: var(--action-soft); color: var(--action); }
+
+/* 預設商品 */
+.prsm-presets { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-md); }
+.prsm-preset {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: var(--space-md) !important; cursor: pointer; border: none;
+  transition: transform 0.12s;
+}
+.prsm-preset:active:not(:disabled) { transform: scale(0.96); }
+.prsm-preset-name { font-size: var(--font-size-sm); font-weight: 900; color: var(--text-primary); text-align: center; }
+.prsm-preset-cost { font-size: var(--font-size-xs); color: var(--learn-coin); font-weight: 800; }
+
+/* 新增表單 */
+.prsm-form { display: flex; flex-direction: column; gap: var(--space-md); }
+.prsm-field { display: flex; flex-direction: column; gap: 6px; }
+.prsm-field label { font-size: var(--font-size-sm); font-weight: 800; color: var(--text-secondary); }
+.prsm-field input, .prsm-field select {
+  padding: 10px 14px; border-radius: var(--radius-md);
+  border: 2px solid var(--border-card); background: var(--bg-input);
+  font-size: var(--font-size-base); font-family: inherit;
+  color: var(--text-primary);
+}
+.prsm-field input:focus, .prsm-field select:focus {
+  outline: none; border-color: var(--learn-xp);
+}
+.required { color: var(--action); }
+.prsm-error { font-size: var(--font-size-sm); color: var(--action); font-weight: 800; }
+.prsm-form-btns { display: flex; gap: var(--space-md); }
+.prsm-form-btns .btn-ghost { flex: 1; }
+.prsm-form-btns .btn-primary { flex: 2; }
+.prsm-add-btn { width: 100%; }
