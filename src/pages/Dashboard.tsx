@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore, formatMoney, formatPrice } from '../store';
-import { fetchTWSEAllStocks, fetchTWSEDividendYields, type TWSTEStockQuote, type TWSEDividendYield } from '../api';
+import { fetchStockData, fetchTWSEDividendYields, type TWSTEStockQuote, type TWSEDividendYield } from '../api';
 import AdBanner from '../components/AdBanner';
 import './Dashboard.css';
 
@@ -17,7 +17,7 @@ export default function Dashboard() {
   const [wLoading, setWLoading] = useState(false);
   
   const [livePnL, setLivePnL] = useState<{ todayPnL: number, todayPnLPct: number } | null>(null);
-  const [liveQuotes, setLiveQuotes] = useState<Record<string, TWSTEStockQuote>>({});
+  const [liveQuotes, setLiveQuotes] = useState<Record<string, any>>({});
   const [liveDividends, setLiveDividends] = useState<Record<string, TWSEDividendYield>>({});
 
   useEffect(() => {
@@ -32,30 +32,45 @@ export default function Dashboard() {
       // 先同步最新收盤價到 Supabase 與 store（確保所有頁面數據一致）
       await refreshHoldingPrices();
 
-      // 再抓 TWSE 資料計算今日漲跌顯示（快取已在上一步建立，不重複打 API）
-      const [twse, twseDivs] = await Promise.all([
-        fetchTWSEAllStocks(),
-        fetchTWSEDividendYields()
-      ]);
+      // 使用 IFalgo 即時資料計算今日漲跌顯示（支援上市與上櫃股）
+      const stockDatas = await Promise.all(
+        holdings.map(h => fetchStockData(h.stockCode))
+      );
+      const twseDivs = await fetchTWSEDividendYields();
+      
       const divsMap: Record<string, TWSEDividendYield> = {};
       twseDivs.forEach(d => divsMap[d.Code] = d);
       setLiveDividends(divsMap);
-      const quotesMap: Record<string, TWSTEStockQuote> = {};
+      
+      const quotesMap: Record<string, any> = {};
       let todayPnL = 0;
       let totalYesterdayValue = 0;
       
-      holdings.forEach(h => {
-        const quote = twse.find(t => t.Code === h.stockCode);
-        if (quote) {
-           quotesMap[h.stockCode] = quote;
-           if (quote.Change) {
-             const changeAmount = parseFloat(quote.Change);
-             todayPnL += changeAmount * h.totalShares;
-             const currentPrice = parseFloat(quote.ClosingPrice);
-             let prevPrice = currentPrice - changeAmount;
-             if (prevPrice <= 0) prevPrice = currentPrice;
-             totalYesterdayValue += prevPrice * h.totalShares;
-           }
+      holdings.forEach((h, idx) => {
+        const stockRes = stockDatas[idx];
+        if (stockRes && stockRes.prices && stockRes.prices.length >= 2) {
+           const prices = stockRes.prices;
+           const latest = prices[prices.length - 1];
+           const prev = prices[prices.length - 2];
+           
+           const close = parseFloat(latest.close_d);
+           const prevClose = parseFloat(prev.close_d);
+           const changeAmount = close - prevClose;
+           
+           quotesMap[h.stockCode] = {
+             ClosingPrice: latest.close_d,
+             Change: changeAmount.toString()
+           };
+           
+           todayPnL += changeAmount * h.totalShares;
+           totalYesterdayValue += prevClose * h.totalShares;
+        } else if (stockRes && stockRes.prices && stockRes.prices.length === 1) {
+           // 新上市掛牌等極端狀況只有一天資料
+           const latest = stockRes.prices[0];
+           quotesMap[h.stockCode] = {
+             ClosingPrice: latest.close_d,
+             Change: '0'
+           };
         }
       });
       const todayPnLPct = totalYesterdayValue > 0 ? (todayPnL / totalYesterdayValue) * 100 : 0;

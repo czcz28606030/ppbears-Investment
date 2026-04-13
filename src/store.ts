@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { supabase } from './supabase';
 import type { Session } from '@supabase/supabase-js';
 import type { UserAccount, Trade, Holding, WithdrawalRequest, FeatureOverride, SystemSettings, LessonResult, RewardRule, RewardTriggerType, WalletTransaction, RewardShopItem, RedemptionRequest } from './types';
-import { fetchTWSEAllStocks } from './api';
+import { fetchStockData } from './api';
 
 // ==========================================
 // 輔助函式
@@ -1087,18 +1087,22 @@ export const useStore = create<InvestmentStore>((set, get) => ({
     const { user, holdings } = get();
     if (!supabase || !user || holdings.length === 0) return;
 
-    // 1. 抓 TWSE 全市場收盤資料（同天有 in-memory 快取，只打一次 API）
-    const twseData = await fetchTWSEAllStocks();
-    if (twseData.length === 0) return;
+    // 1. 改用 ifalgo API 取得所有持股最新收盤價（包含上櫃股且資料即時）
+    const stockDatas = await Promise.all(
+      holdings.map(h => fetchStockData(h.stockCode))
+    );
 
     // 2. 找出有新價格且與現有不同的持股
     const updates: { stockCode: string; newPrice: number }[] = [];
-    const updatedHoldings = holdings.map(h => {
-      const quote = twseData.find(t => t.Code === h.stockCode);
-      const newPrice = quote ? parseFloat(quote.ClosingPrice) : NaN;
-      if (!isNaN(newPrice) && newPrice > 0 && newPrice !== h.currentPrice) {
-        updates.push({ stockCode: h.stockCode, newPrice });
-        return { ...h, currentPrice: newPrice };
+    const updatedHoldings = holdings.map((h, i) => {
+      const stockRes = stockDatas[i];
+      if (stockRes && stockRes.prices && stockRes.prices.length > 0) {
+        const latestPriceObj = stockRes.prices[stockRes.prices.length - 1];
+        const newPrice = parseFloat(latestPriceObj.close_d);
+        if (!isNaN(newPrice) && newPrice > 0 && newPrice !== h.currentPrice) {
+          updates.push({ stockCode: h.stockCode, newPrice });
+          return { ...h, currentPrice: newPrice };
+        }
       }
       return h;
     });
