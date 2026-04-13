@@ -1,0 +1,2 @@
+[functions.get-kid-description]
+verify_jwt = false
