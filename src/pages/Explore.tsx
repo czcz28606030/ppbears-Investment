@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { fetchSimonsData, toRecommendation, POPULAR_STOCKS, fetchTWSEAllStocks } from '../api';
+import { fetchSimonsData, toRecommendation, fetchTWSEAllStocks } from '../api';
 import type { StockRecommendation } from '../types';
 import { useStore } from '../store';
 import AdBanner from '../components/AdBanner';
@@ -63,14 +63,6 @@ export default function Explore() {
   }, []);
 
 
-  const MOCK_STRATEGIES = useMemo(() => ({
-    'A': ['2330', '2412', '2881', '2882'],
-    'B': ['2317', '2454', '2303', '3231'],
-    'C': ['3711', '8454', '8464', '8462'],
-    'D': ['1301', '1303', '2308', '2886'],
-    'E': ['0056', '00878', '2884', '2890'],
-    'F': ['2891', '1101', '2603', '2609'],
-  }), []);
 
   const STRATEGY_CARDS = [
     { id: 'A', title: '穩穩大公司', icon: '🏢', desc: '股本 > 100億\n成交量 > 1,000張', className: 'strategy-card-a' },
@@ -85,11 +77,9 @@ export default function Explore() {
   const filtered = useMemo(() => {
     if (search.trim()) {
       const q = search.trim().toLowerCase();
-      // Search across all TWSE stocks
       const globalMatches = Object.entries(twsePriceMap)
         .filter(([code, data]) => code.includes(q) || data.name.toLowerCase().includes(q))
-        .slice(0, 30); // Limit to 30 results for performance
-        
+        .slice(0, 30);
       return globalMatches.map(([code, twse]) => ({
         coid: code,
         stkname: twse.name,
@@ -102,42 +92,60 @@ export default function Explore() {
       } as StockRecommendation));
     }
 
-    // Default strategy view
-    let list: StockRecommendation[] = [];
-    if (activeStrategy === 'ai') {
-      list = recommendations;
-    } else {
-      const strategyCodes = MOCK_STRATEGIES[activeStrategy as keyof typeof MOCK_STRATEGIES] || [];
-      list = strategyCodes.map(code => {
-        const found = POPULAR_STOCKS.find(s => s.code === code);
-        const twse = twsePriceMap[code];
-        const stockName = found ? found.name : (twse?.name || `股票 ${code}`);
-        const getCategoryName = (id: string) => {
-          switch (id) {
-            case 'A': return '大型權值';
-            case 'B': return '高成長';
-            case 'C': return '籌碼面優';
-            case 'D': return '價值投資';
-            case 'E': return '高股息';
-            case 'F': return '低估值';
-            default: return '精選策略';
-          }
-        };
+    if (activeStrategy === 'ai') return recommendations;
 
-        return {
-          coid: code,
-          stkname: stockName,
-          close: twse ? twse.close : '0',
-          advice: 'buy',
-          score: 85,
-          category: getCategoryName(activeStrategy),
-          ret_w: 'rise',
-          kidAdvice: '符合我們的策略選股條件喔！'
-        } as StockRecommendation;
-      });
+    // 每日動態策略篩選（從 Simons 數據過濾，每天隨數據更新）
+    let list: StockRecommendation[] = [];
+
+    switch (activeStrategy) {
+      case 'A': // 穩穩大公司：PSR 高、月趨勢不跌
+        list = recommendations.filter(r => r.psr >= 7 && r.ret_m !== 'drop');
+        break;
+
+      case 'B': // 最近變強公司：週月雙漲，或強度夠高
+        list = recommendations.filter(r => r.ret_w === 'rise' && r.ret_m === 'rise');
+        if (list.length < 10)
+          list = recommendations.filter(r => parseFloat(r.strength || '0') >= 1.8);
+        break;
+
+      case 'C': // 市場有注意公司：籌碼強度高
+        list = recommendations.filter(r => parseFloat(r.strength || '0') > 2.0);
+        if (list.length < 10)
+          list = recommendations.filter(r => parseFloat(r.strength || '0') >= 1.5);
+        break;
+
+      case 'D': // 巴菲特風格：高品質 + 低於外資成本
+        list = recommendations.filter(r => {
+          const close = parseFloat(r.close || '0');
+          const wtcost = parseFloat(r.wtcost || '0');
+          return r.psr >= 6 && wtcost > 0 && close <= wtcost * 1.05;
+        });
+        if (list.length < 10)
+          list = recommendations.filter(r => r.psr >= 7 && r.ret_m !== 'drop');
+        break;
+
+      case 'E': // 配息安心公司：金融、電信類 + PSR 穩定
+        list = recommendations.filter(r =>
+          r.category?.includes('金融') ||
+          r.category?.includes('電信') ||
+          r.category?.includes('電力') ||
+          r.subindustry?.includes('金融') ||
+          (r.psr >= 8 && r.ret_m !== 'drop')
+        );
+        break;
+
+      case 'F': // 便宜好公司：收盤價低於外資或投信成本
+        list = recommendations.filter(r => {
+          const close = parseFloat(r.close || '0');
+          const wtcost = parseFloat(r.wtcost || '0');
+          const fcost = parseFloat(r.fcost || '0');
+          return r.psr >= 5 && ((wtcost > 0 && close < wtcost) || (fcost > 0 && close < fcost));
+        });
+        break;
     }
-    return list;
-  }, [recommendations, activeStrategy, search, twsePriceMap, MOCK_STRATEGIES]);
+
+    return list.sort((a, b) => b.score - a.score).slice(0, 20);
+  }, [recommendations, activeStrategy, search, twsePriceMap]);
 
   function getAdviceBadge(advice: string) {
     switch (advice) {
@@ -249,7 +257,7 @@ export default function Explore() {
                     <span className="rec-stars">{getScoreStars(rec.score)}</span>
                   </div>
                   <div className="rec-badges">
-                     {hasAiFeature && getAdviceBadge(rec.advice)}
+                     {getAdviceBadge(rec.advice)}
                      <span className="badge badge-neutral">評分 {rec.score}分</span>
                    </div>
                 </div>
