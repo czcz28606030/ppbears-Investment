@@ -13,7 +13,8 @@ export function formatMoney(amount: number): string {
 }
 
 export function formatPrice(price: number): string {
-  return price.toLocaleString('zh-TW', { minimumFractionDigits: 1, maximumFractionDigits: 2 });
+  // 不強制補小數點，最多保留小數點後兩位，除非有小數否則不顯示 .0
+  return price.toLocaleString('zh-TW', { maximumFractionDigits: 2 });
 }
 
 export interface PortfolioSummary {

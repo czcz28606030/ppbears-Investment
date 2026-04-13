@@ -268,7 +268,7 @@ export default function Dashboard() {
                         </div>
                         <div className={liveChangeAmt >= 0 ? 'text-profit' : 'text-loss'} style={{ display: 'flex', alignItems: 'baseline', gap: '2px' }}>
                            <span style={{ fontSize: '14px', fontWeight: 700 }}>NT</span>
-                           <span style={{ fontWeight: 800, fontSize: '38px', lineHeight: '1', letterSpacing: '-0.5px' }}>{formatMoney(currentPrice)}</span>
+                           <span style={{ fontWeight: 800, fontSize: '38px', lineHeight: '1', letterSpacing: '-0.5px' }}>{formatPrice(currentPrice)}</span>
                         </div>
                      </div>
                   </div>

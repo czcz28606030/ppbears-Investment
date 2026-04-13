@@ -2,6 +2,13 @@
 
 所有關於 PPBears Investment 的版本變更都會記錄在此檔案中。我們遵循 [語意化版本控制](https://semver.org/lang/zh-TW/) 的規範。
 
+## [1.6.3] - 2026-04-13
+
+### 修復 (Fixed)
+- **股價小數點精確度顯示 (Price Precision Fix)**:
+  - 取消了 Dashboard 首頁持股區塊的「股價四捨五入」機制。
+  - 將 Dashboard 個股現價顯示由 `formatMoney` (無小數點) 替換為 `formatPrice` (會如實呈現小數點後兩位)，確保「中華電 134.5 元」此類有小數位數的報價得以真實呈現，不會被強制四捨五入至 135 元。
+
 ## [1.6.2] - 2026-04-13
 
 ### 修復 (Fixed)
