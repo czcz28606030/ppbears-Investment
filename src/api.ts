@@ -92,140 +92,35 @@ export function makeKidFriendly(_code: string, name: string, status: string, _in
   return '一間認真做事、努力賺錢，也為社會貢獻的好公司 🏢✨';
 }
 
-// 動態取得或生成兒童版股票介紹
+// 動態取得或生成兒童版股票介紹（透過 Supabase Edge Function，API key 存在伺服器端）
 export async function getOrGenerateKidFriendlyDesc(
-  code: string, 
-  name: string, 
-  status: string, 
+  code: string,
+  name: string,
+  status: string,
   industry: string,
   onChunk?: (text: string) => void
 ): Promise<string> {
   const fallbackDesc = makeKidFriendly(code, name, status, industry);
 
   if (!supabase) return fallbackDesc;
-  
+
   try {
-    // 1. 嘗試從快取資料庫讀取
-    if (supabase) {
-      try {
-        const { data: cached, error: cacheErr } = await supabase
-          .from('stock_profiles')
-          .select('kid_description')
-          .eq('stock_code', code)
-          .maybeSingle();
-
-        if (!cacheErr && cached && cached.kid_description) {
-          if (onChunk) onChunk(cached.kid_description);
-          return cached.kid_description;
-        }
-      } catch (cacheError) {
-        console.warn('Supabase cache read error (ignored):', cacheError);
-      }
-    }
-
-    // 2. 如果沒有或快取失敗，嘗試呼叫 OpenAI gpt-4o-mini
-    const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
-    if (!apiKey) {
-      console.warn('No OpenAI API key found, using fallback.');
-      return fallbackDesc; // 如果沒有 API Key，就回退原本的寫法
-    }
-
-    const payload = {
-      model: 'gpt-4o-mini',
-      messages: [
-        {
-          role: 'system',
-          content: `你是一隻叫 PPBear 的可愛小熊解說員。你的唯一任務是「重點介紹這間公司生產的產品與服務」。
-
-規則（非常重要）：
-1. 絕對不能有任何客套話與廢話（禁止使用「嗨大家好」「小朋友們」「快來」「一起學習」「讓未來變得更美好」「PPBear 支持你」等開場或結尾）。
-2. 直接破題，必須以「[股票代碼] [公司名稱] 主要...」做為文章第一句話的開頭（例如：3583 辛耘 是一間...）。
-3. 必須使用白話文、用小朋友能輕鬆聽懂的方式說明。
-4. 一定要舉出生活中看得到的實體商品或情境當作例子（例如：手機裡的晶片、超商的飲料、平常用的網路...）。
-5. 全文字數必須嚴格控制在 50 到 200 字之間。
-6. 保持活潑生動但直接切入重點，可以適度使用 Emoji 輔助。`
-        },
-        {
-          role: 'user',
-          content: `公司名稱：${name} (${code})。所屬產業：${industry}。公司概況：${status}。請重申規則：直接介紹產品服務、舉生活例子、50到200字以內、拒絕任何客套話。`
-        }
-      ],
-      temperature: 0.75,
-      max_tokens: 350,
-      stream: true
-    };
-
-    const response = await fetch('/api/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
-      },
-      body: JSON.stringify(payload)
+    const { data, error } = await supabase.functions.invoke('get-kid-description', {
+      body: { code, name, status, industry },
     });
 
-    if (!response.ok) {
-      console.error('OpenAI API Error:', await response.text());
+    if (error) {
+      console.error('Edge Function error:', error.message);
       return fallbackDesc;
     }
 
-    const reader = response.body?.getReader();
-    const decoder = new TextDecoder('utf-8');
-    let fullText = '';
-    let buffer = '';
+    const description: string = data?.description || '';
+    if (!description) return fallbackDesc;
 
-    if (reader) {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        
-        buffer += decoder.decode(value, { stream: true });
-        const parts = buffer.split('\n\n');
-        buffer = parts.pop() || ''; // 將最後一段不完整的留到下一次
-        
-        for (const part of parts) {
-          const line = part.replace(/^data: /, '').trim();
-          if (line === '[DONE]' || !line) continue;
-          
-          try {
-            const parsed = JSON.parse(line);
-            if (parsed.choices?.[0]?.delta?.content) {
-              fullText += parsed.choices[0].delta.content;
-              if (onChunk) onChunk(fullText);
-            }
-          } catch (e) {
-            // 忽略無法解析的片段
-          }
-        }
-      }
-    }
-    
-    // 結束時如果還有東西可以收尾 (通常不會)
-    if (buffer.trim() && buffer.trim() !== 'data: [DONE]') {
-      try {
-        const parsed = JSON.parse(buffer.replace(/^data: /, '').trim());
-        if (parsed.choices?.[0]?.delta?.content) fullText += parsed.choices[0].delta.content;
-      } catch(e) {}
-    }
-
-    // 防禦性檢查，如果生成失敗
-    if (!fullText) return fallbackDesc;
-
-    // 3. 把生成的結果存入 Supabase，以後就不必再花錢請求了
-    if (supabase) {
-      try {
-        await supabase.from('stock_profiles').insert({
-          stock_code: code,
-          kid_description: fullText
-        });
-      } catch (insertErr) {
-        console.warn('Supabase cache insert error (ignored):', insertErr);
-      }
-    }
-
-    return fullText;
-  } catch (error) {
-    console.error('getOrGenerateKidFriendlyDesc error:', error);
+    if (onChunk) onChunk(description);
+    return description;
+  } catch (err) {
+    console.error('getOrGenerateKidFriendlyDesc error:', err);
     return fallbackDesc;
   }
 }
