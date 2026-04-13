@@ -82,31 +82,46 @@ export default function StockDetail() {
 
   // 非同步載入公司介紹
   useEffect(() => {
+    let typewriterTimer: ReturnType<typeof setInterval> | null = null;
+
     async function loadDesc() {
       if (!code) return;
       setDescLoading(true);
       setIsStreaming(true);
+      setKidDesc('');
+
       const rawName = stockData?.stkname || twseQuote?.Name || POPULAR_STOCKS.find(s => s.code === code)?.name || code || '';
       const status = stockData?.status || '';
       const industry = stockData?.subindustry || '';
-      const desc = await getOrGenerateKidFriendlyDesc(
-        code, 
-        rawName, 
-        status, 
-        industry,
-        (chunk) => {
-          setKidDesc(chunk);
-          // 只要有字進來，我們就不顯示這是在 spinner 的裝載階段了
-          setDescLoading(false); 
-        }
-      );
-      setKidDesc(desc);
-      setIsStreaming(false);
+      const desc = await getOrGenerateKidFriendlyDesc(code, rawName, status, industry);
+
       setDescLoading(false);
+
+      if (!desc) {
+        setIsStreaming(false);
+        return;
+      }
+
+      // 打字機動畫
+      let i = 0;
+      typewriterTimer = setInterval(() => {
+        i += 2; // 每次顯示 2 個字元，速度適中
+        setKidDesc(desc.slice(0, i));
+        if (i >= desc.length) {
+          if (typewriterTimer) clearInterval(typewriterTimer);
+          setKidDesc(desc);
+          setIsStreaming(false);
+        }
+      }, 16);
     }
+
     if (!loading) {
       loadDesc();
     }
+
+    return () => {
+      if (typewriterTimer) clearInterval(typewriterTimer);
+    };
   }, [code, loading, stockData, twseQuote]);
 
   // 價格優先展示：TWSE 即時收盤價 > ifalgo 歷史 K 線
