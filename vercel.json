@@ -18,8 +18,8 @@
       "source": "/api/twse-report/:path*",
       "destination": "https://www.twse.com.tw/exchangeReport/:path*"
     },
-{
-      "source": "/(.*)",
+    {
+      "source": "/((?!api/).*)",
       "destination": "/index.html"
     }
   ]
