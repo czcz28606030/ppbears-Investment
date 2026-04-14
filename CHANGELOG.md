@@ -2,6 +2,11 @@
 
 所有關於 PPBears Investment 的版本變更都會記錄在此檔案中。我們遵循 [語意化版本控制](https://semver.org/lang/zh-TW/) 的規範。
 
+## [1.6.16] - 2026-04-14
+### Added
+- Added force trigger parameter to newsletter cron API for testing
+- Ensured all required environment dependencies for Vercel functions
+
 ## [1.6.15] - 2026-04-14
 
 ### 修復 (Fixed)

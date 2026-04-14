@@ -292,8 +292,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const nowUTC = new Date();
     const nowTW = new Date(nowUTC.getTime() + 8 * 60 * 60 * 1000);
     const twHour = nowTW.getUTCHours();
+    
+    // 取得是否有強制執行的 query parameter (?force=true)
+    const isForce = req.query.force === 'true';
 
-    if (twHour !== newsletterHour) {
+    if (twHour !== newsletterHour && !isForce) {
       return res.status(200).json({
         skipped: true,
         reason: `目前台灣時間 ${twHour}:xx，尚未到設定的 ${newsletterHour}:00 發送時段`,
