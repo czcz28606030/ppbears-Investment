@@ -1106,7 +1106,7 @@ export const useStore = create<InvestmentStore>((set, get) => ({
       // ifalgo 最新收盤
       let ifalgoPrice = 0;
       let ifalgoDate = '';
-      if (stockRes?.prices?.length > 0) {
+      if (stockRes && stockRes.prices && stockRes.prices.length > 0) {
         const lp = stockRes.prices[stockRes.prices.length - 1];
         ifalgoPrice = parseFloat(lp.close_d) || 0;
         ifalgoDate = (lp.mdate || '').replace(/-/g, '').replace(/\//g, '');

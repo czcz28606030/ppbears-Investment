@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore, formatMoney, formatPrice } from '../store';
-import { fetchStockData, fetchTWSEDividendYields, fetchExDividendCalendar, type TWSEDividendYield, type ExDividendInfo } from '../api';
+import { fetchStockData, fetchExDividendCalendar, type ExDividendInfo } from '../api';
 import AdBanner from '../components/AdBanner';
 import './Dashboard.css';
 
@@ -18,7 +18,6 @@ export default function Dashboard() {
   
   const [livePnL, setLivePnL] = useState<{ todayPnL: number, todayPnLPct: number } | null>(null);
   const [liveQuotes, setLiveQuotes] = useState<Record<string, any>>({});
-  const [liveDividends, setLiveDividends] = useState<Record<string, TWSEDividendYield>>({});
   const [exDivCalendar, setExDivCalendar] = useState<Map<string, ExDividendInfo>>(new Map());
 
   useEffect(() => {
@@ -26,7 +25,6 @@ export default function Dashboard() {
       if (holdings.length === 0) {
         setLivePnL({ todayPnL: 0, todayPnLPct: 0 });
         setLiveQuotes({});
-        setLiveDividends({});
         return;
       }
       
@@ -37,14 +35,11 @@ export default function Dashboard() {
       const stockDatas = await Promise.all(
         holdings.map(h => fetchStockData(h.stockCode))
       );
-      const [twseDivs, exDivMap] = await Promise.all([
-        fetchTWSEDividendYields(),
+      const [, exDivMap] = await Promise.all([
+        Promise.resolve(),
         fetchExDividendCalendar(),
       ]);
       
-      const divsMap: Record<string, TWSEDividendYield> = {};
-      twseDivs.forEach(d => divsMap[d.Code] = d);
-      setLiveDividends(divsMap);
       setExDivCalendar(exDivMap);
       
       const quotesMap: Record<string, any> = {};
@@ -260,7 +255,6 @@ export default function Dashboard() {
               const prevPrice = currentPrice - liveChangeAmt;
               const liveChangePct = prevPrice > 0 ? (liveChangeAmt / prevPrice) * 100 : 0;
               
-              const todayPnL = liveChangeAmt * h.totalShares;
               const totalCost = h.avgCost * h.totalShares;
               const totalPnL = (currentPrice - h.avgCost) * h.totalShares;
               const totalPnLPct = h.avgCost > 0 ? ((currentPrice - h.avgCost) / h.avgCost * 100) : 0;
