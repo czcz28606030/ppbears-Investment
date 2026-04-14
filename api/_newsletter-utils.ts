@@ -200,7 +200,7 @@ export async function filterByAI(allStocks: SimonsItem[]): Promise<FilteredStock
   const sortedStocks = allStocks
     .map(s => ({ ...s, score: calculateScore(s) }))
     .sort((a, b) => b.score - a.score)
-    .slice(0, 30);
+    .slice(0, 15);
 
   const fetchPromises = sortedStocks.map(async (s) => {
     try {
