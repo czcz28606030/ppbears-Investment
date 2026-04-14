@@ -19,6 +19,50 @@ export interface TWSTEStockQuote {
   Date: string;
 }
 
+// ── TPEX 上櫃資料 ─────────────────────────────────────────────────────────────
+export interface TPEXStockQuote {
+  SecuritiesCompanyCode: string;
+  CompanyName: string;
+  Close: string;
+  Change: string;
+  Open: string;
+  High: string;
+  Low: string;
+  Average: string;
+  TradingShares: string;    // 成交股數
+  TransactionAmount: string; // 成交金額
+  TransactionNumber: string; // 成交筆數
+  Date?: string;             // 民國7碼 e.g. "1150414"
+  LatestBidPrice?: string;
+  LatesAskPrice?: string;
+  Capitals?: string;
+  NextReferencePrice?: string;
+  NextLimitUp?: string;
+  NextLimitDown?: string;
+}
+
+const TPEX_BASE = '/api/tpex';
+
+let tpexCache: TPEXStockQuote[] | null = null;
+let tpexCacheDate: string | null = null;
+
+export async function fetchTPEXAllStocks(): Promise<TPEXStockQuote[]> {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    if (tpexCache && tpexCacheDate === today) return tpexCache;
+    const url = `${TPEX_BASE}/tpex_mainboard_daily_close_quotes`;
+    const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+    if (!res.ok) throw new Error(`TPEX API error: ${res.status}`);
+    const data: TPEXStockQuote[] = await res.json();
+    tpexCache = data;
+    tpexCacheDate = today;
+    return data;
+  } catch (err) {
+    console.error('fetchTPEXAllStocks error:', err);
+    return [];
+  }
+}
+
 // 快取 TWSE 全市場資料（避免重複請求）
 let twseCache: TWSTEStockQuote[] | null = null;
 let twseCacheDate: string | null = null;
@@ -74,6 +118,92 @@ export async function fetchTWSEDividendYields(): Promise<TWSEDividendYield[]> {
   }
 }
 
+// ── 除權息預告資料（TWSE + TPEx）────────────────────────────────────────────────
+
+// 台灣民國年格式 "1150420" → JS Date
+function parseTWDate(twDate: string): Date | null {
+  if (!twDate || twDate.length < 7) return null;
+  const year = parseInt(twDate.substring(0, 3), 10) + 1911;
+  const month = parseInt(twDate.substring(3, 5), 10);
+  const day = parseInt(twDate.substring(5, 7), 10);
+  if (!year || !month || !day) return null;
+  return new Date(year, month - 1, day);
+}
+
+function formatDateTW(d: Date): string {
+  return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`;
+}
+
+export interface ExDividendInfo {
+  stockCode: string;
+  exDateStr: string;           // 除息日 "2026/04/20"
+  cashDividend: number;        // 現金股利（元/股）
+  estimatedPayDateStr: string; // 預估發放日（除息 +45 天）
+}
+
+let exDivCache: Map<string, ExDividendInfo> | null = null;
+let exDivCacheDate: string | null = null;
+
+/** 取兩個市場的除權息預告，回傳 stockCode → ExDividendInfo 的 Map */
+export async function fetchExDividendCalendar(): Promise<Map<string, ExDividendInfo>> {
+  const today = new Date().toISOString().split('T')[0];
+  if (exDivCache && exDivCacheDate === today) return exDivCache;
+
+  const map = new Map<string, ExDividendInfo>();
+
+  // ① TWSE 上市股票除權息預告表
+  try {
+    const res = await fetch('/api/twse/exchangeReport/TWT48U_ALL', { headers: { Accept: 'application/json' } });
+    if (res.ok) {
+      const items: any[] = await res.json();
+      for (const item of items) {
+        const cashDiv = parseFloat(item.CashDividend);
+        if (!item.CashDividend || isNaN(cashDiv) || cashDiv <= 0) continue;
+        const exDate = parseTWDate(item.Date);
+        if (!exDate) continue;
+        const payDate = new Date(exDate);
+        payDate.setDate(payDate.getDate() + 45);
+        map.set(item.Code, {
+          stockCode: item.Code,
+          exDateStr: formatDateTW(exDate),
+          cashDividend: cashDiv,
+          estimatedPayDateStr: formatDateTW(payDate),
+        });
+      }
+    }
+  } catch (e) {
+    console.error('TWSE ex-div fetch error:', e);
+  }
+
+  // ② TPEx 上櫃股票除權息預告表
+  try {
+    const res = await fetch('/api/tpex/tpex_exright_prepost', { headers: { Accept: 'application/json' } });
+    if (res.ok) {
+      const items: any[] = await res.json();
+      for (const item of items) {
+        const cashDiv = parseFloat(item.CashDividend);
+        if (!item.CashDividend || isNaN(cashDiv) || cashDiv <= 0) continue;
+        const exDate = parseTWDate(item.ExRrightsExDividendDate);
+        if (!exDate) continue;
+        const payDate = new Date(exDate);
+        payDate.setDate(payDate.getDate() + 45);
+        map.set(item.SecuritiesCompanyCode, {
+          stockCode: item.SecuritiesCompanyCode,
+          exDateStr: formatDateTW(exDate),
+          cashDividend: cashDiv,
+          estimatedPayDateStr: formatDateTW(payDate),
+        });
+      }
+    }
+  } catch (e) {
+    console.error('TPEx ex-div fetch error:', e);
+  }
+
+  exDivCache = map;
+  exDivCacheDate = today;
+  return map;
+}
+
 // 近10年平均殖利率快取
 const yieldHistoryCache: Record<string, number> = {};
 
@@ -125,6 +255,38 @@ export async function fetchTWSEStockPrice(code: string): Promise<TWSTEStockQuote
   const all = await fetchTWSEAllStocks();
   const stock = all.find(s => s.Code === code);
   return stock || null;
+}
+
+/** 查詢單一上櫃股票的今日官方收盤價（來自 TPEx tpex_mainboard_daily_close_quotes） */
+export async function fetchTPEXStockPrice(code: string): Promise<TPEXStockQuote | null> {
+  const all = await fetchTPEXAllStocks();
+  const stock = all.find(s => s.SecuritiesCompanyCode === code);
+  return stock || null;
+}
+
+/**
+ * 統一入口：先查 TWSE（上市），找不到再查 TPEx（上櫃）
+ * 回傳 { price, name, date } —— date 為西元 YYYYMMDD 格式
+ * 注意：TWSE/TPEx OpenAPI 盤後可能有 1~3 小時延遲，date 用於與 ifalgo 比較新舊
+ */
+export async function fetchOfficialClosePrice(code: string): Promise<{ price: number; name: string; date: string } | null> {
+  const twse = await fetchTWSEStockPrice(code);
+  if (twse && twse.ClosingPrice && parseFloat(twse.ClosingPrice) > 0) {
+    const d = twse.Date || '';
+    const date = d.length === 7
+      ? `${parseInt(d.slice(0, 3)) + 1911}${d.slice(3)}`
+      : d.replace(/-/g, '').replace(/\//g, '');
+    return { price: parseFloat(twse.ClosingPrice), name: twse.Name, date };
+  }
+  const tpex = await fetchTPEXStockPrice(code);
+  if (tpex && tpex.Close && parseFloat(tpex.Close) > 0) {
+    const d = tpex.Date || '';
+    const date = d.length === 7
+      ? `${parseInt(d.slice(0, 3)) + 1911}${d.slice(3)}`
+      : d.replace(/-/g, '').replace(/\//g, '');
+    return { price: parseFloat(tpex.Close), name: tpex.CompanyName, date };
+  }
+  return null;
 }
 
 export function makeKidFriendly(_code: string, name: string, status: string, _industry: string): string {

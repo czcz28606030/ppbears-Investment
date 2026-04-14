@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore, formatMoney, formatPrice } from '../store';
-import { fetchStockData, fetchTWSEDividendYields, type TWSEDividendYield } from '../api';
+import { fetchStockData, fetchTWSEDividendYields, fetchExDividendCalendar, type TWSEDividendYield, type ExDividendInfo } from '../api';
 import AdBanner from '../components/AdBanner';
 import './Dashboard.css';
 
@@ -19,6 +19,7 @@ export default function Dashboard() {
   const [livePnL, setLivePnL] = useState<{ todayPnL: number, todayPnLPct: number } | null>(null);
   const [liveQuotes, setLiveQuotes] = useState<Record<string, any>>({});
   const [liveDividends, setLiveDividends] = useState<Record<string, TWSEDividendYield>>({});
+  const [exDivCalendar, setExDivCalendar] = useState<Map<string, ExDividendInfo>>(new Map());
 
   useEffect(() => {
     async function fetchLive() {
@@ -36,11 +37,15 @@ export default function Dashboard() {
       const stockDatas = await Promise.all(
         holdings.map(h => fetchStockData(h.stockCode))
       );
-      const twseDivs = await fetchTWSEDividendYields();
+      const [twseDivs, exDivMap] = await Promise.all([
+        fetchTWSEDividendYields(),
+        fetchExDividendCalendar(),
+      ]);
       
       const divsMap: Record<string, TWSEDividendYield> = {};
       twseDivs.forEach(d => divsMap[d.Code] = d);
       setLiveDividends(divsMap);
+      setExDivCalendar(exDivMap);
       
       const quotesMap: Record<string, any> = {};
       let todayPnL = 0;
@@ -285,51 +290,63 @@ export default function Dashboard() {
                   
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', fontSize: '13px', paddingTop: '4px' }}>
                      <div style={{ display: 'flex', flexDirection: 'column', background: '#fafafa', padding: '10px', borderRadius: '10px' }}>
-                        <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '4px', fontWeight: 600 }}>今日損益</div>
-                        <div className={todayPnL >= 0 ? 'text-profit' : 'text-loss'} style={{ fontWeight: 700, fontSize: '15px' }}>
-                           {todayPnL >= 0 ? '+' : ''}{formatMoney(todayPnL)}
+                        <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '4px', fontWeight: 600 }}>成交均價</div>
+                        <div style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '15px' }}>
+                           {formatPrice(h.avgCost)}
                         </div>
                      </div>
                      <div style={{ display: 'flex', flexDirection: 'column', background: '#fafafa', padding: '10px', borderRadius: '10px' }}>
-                        <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '4px', fontWeight: 600 }}>未平倉損益</div>
+                        <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '4px', fontWeight: 600 }}>現值</div>
+                        <div style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '15px' }}>
+                           {formatMoney(currentPrice * h.totalShares)}
+                        </div>
+                     </div>
+                     <div style={{ display: 'flex', flexDirection: 'column', background: '#fafafa', padding: '10px', borderRadius: '10px' }}>
+                        <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '4px', fontWeight: 600 }}>付出成本</div>
+                        <div style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '15px' }}>
+                           {formatMoney(totalCost)}
+                        </div>
+                     </div>
+                     <div style={{ display: 'flex', flexDirection: 'column', background: '#fafafa', padding: '10px', borderRadius: '10px' }}>
+                        <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '4px', fontWeight: 600 }}>預估損益</div>
                         <div className={isProfit ? 'text-profit' : 'text-loss'} style={{ fontWeight: 800, fontSize: '15px' }}>
-                           {isProfit ? '+' : ''}{formatMoney(totalPnL)} <span style={{fontSize: '12px', fontWeight: 500}}>({isProfit ? '+' : ''}{totalPnLPct.toFixed(1)}%)</span>
+                           {isProfit ? '+' : ''}{formatMoney(totalPnL)}
                         </div>
                      </div>
                      <div style={{ display: 'flex', flexDirection: 'column', background: '#fafafa', padding: '10px', borderRadius: '10px' }}>
-                        <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '4px', fontWeight: 600 }}>股數 / 總成本</div>
-                        <div style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '14px' }}>
-                           {h.totalShares} 股 <span style={{fontSize: '12px', color: '#888', fontWeight: 500}}>/ NT${formatMoney(totalCost)}</span>
+                        <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '4px', fontWeight: 600 }}>股數</div>
+                        <div style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '15px' }}>
+                           {h.totalShares} 股
                         </div>
                      </div>
                      <div style={{ display: 'flex', flexDirection: 'column', background: '#fafafa', padding: '10px', borderRadius: '10px' }}>
-                        <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '4px', fontWeight: 600 }}>預估現金股利</div>
-                        <div style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '14px' }}>
-                            {(() => {
-                              const divInfo = liveDividends[h.stockCode];
-                              const divYield = divInfo && divInfo.DividendYield ? parseFloat(divInfo.DividendYield) / 100 : 0;
-                              if (divYield > 0) {
-                                const dps = currentPrice * divYield;
-                                const estDiv = dps * h.totalShares;
-                                return (
-                                  <>
-                                    <span>NT$ {formatMoney(estDiv)}</span>
-                                    <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', fontWeight: 500, display: 'block', marginTop: '2px' }}>
-                                      (預估約 {dps.toFixed(2)} 元 / 股)
-                                    </span>
-                                  </>
-                                );
-                              }
-                              return (
-                                <>
-                                  <span>NT$ 0</span>
-                                  <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', fontWeight: 500, display: 'block', marginTop: '2px' }}>(試算中)</span>
-                                </>
-                              );
-                            })()}
+                        <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '4px', fontWeight: 600 }}>報酬率</div>
+                        <div className={isProfit ? 'text-profit' : 'text-loss'} style={{ fontWeight: 800, fontSize: '15px' }}>
+                           {isProfit ? '+' : ''}{totalPnLPct.toFixed(2)}%
                         </div>
                      </div>
                   </div>
+
+                  {/* 預估現金股利（僅當有除息公告時顯示）*/}
+                  {(() => {
+                    const exDiv = exDivCalendar.get(h.stockCode);
+                    if (!exDiv) return null;
+                    const totalDiv = exDiv.cashDividend * h.totalShares;
+                    return (
+                      <div style={{ borderTop: '1px solid #f0f0f0', paddingTop: '10px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <div style={{ color: 'var(--text-secondary)', fontSize: '12px', fontWeight: 600, marginBottom: '2px' }}>💰 預估現金股利</div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                          <span style={{ fontWeight: 800, fontSize: '16px', color: '#e67e00' }}>NT$ {formatMoney(totalDiv)}</span>
+                          <span style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>{exDiv.cashDividend.toFixed(2)} 元 / 股</span>
+                        </div>
+                        <div style={{ display: 'flex', gap: '16px', fontSize: '11.5px', color: 'var(--text-tertiary)', marginTop: '2px' }}>
+                          <span>📅 除息日：<b style={{ color: 'var(--text-secondary)' }}>{exDiv.exDateStr}</b></span>
+                          <span>💸 預估發放：<b style={{ color: 'var(--text-secondary)' }}>{exDiv.estimatedPayDateStr}</b></span>
+                        </div>
+                        <div style={{ fontSize: '10.5px', color: '#aaa', marginTop: '1px' }}>＊發放日依公司公告為準，預估為除息後 45 天</div>
+                      </div>
+                    );
+                  })()}
                 </div>
               );
             })}

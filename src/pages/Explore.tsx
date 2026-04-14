@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { fetchSimonsData, toRecommendation, fetchTWSEAllStocks } from '../api';
+import { fetchSimonsData, toRecommendation, fetchTWSEAllStocks, fetchTPEXAllStocks } from '../api';
 import type { StockRecommendation } from '../types';
 import { useStore } from '../store';
 import AdBanner from '../components/AdBanner';
@@ -15,28 +15,51 @@ export default function Explore() {
   const [search, setSearch] = useState('');
   const [activeStrategy, setActiveStrategy] = useState(hasAiFeature ? 'ai' : 'A');
   const [error, setError] = useState('');
-  const [twsePriceMap, setTwsePriceMap] = useState<Record<string, { close: string; change: string; name: string; volume: number }>>({});
+  const [twsePriceMap, setTwsePriceMap] = useState<Record<string, { close: string; change: string; name: string; volume: number; date: string }>>({});
 
   async function loadData() {
     setLoading(true);
     setError('');
     try {
-      // 同時抓 TWSE 全市場資料和 Simons 推薦
-      const [twseAll] = await Promise.all([fetchTWSEAllStocks()]);
-      
-      // 建立 TWSE 快速查詢 map
-      if (twseAll.length > 0) {
-        const map: Record<string, { close: string; change: string; name: string; volume: number }> = {};
-        for (const s of twseAll) {
-          if (s.ClosingPrice) map[s.Code] = {
+      // 同時抓 TWSE（上市）+ TPEX（上櫃）全市場資料
+      const [twseAll, tpexAll] = await Promise.all([fetchTWSEAllStocks(), fetchTPEXAllStocks()]);
+
+      const map: Record<string, { close: string; change: string; name: string; volume: number; date: string }> = {};
+
+      // TWSE 上市股票
+      for (const s of twseAll) {
+        if (s.ClosingPrice) {
+          // 民國 7 碼 "1150413" → 西元 "20260413"
+          const d = s.Date || '';
+          const date = d.length === 7
+            ? `${parseInt(d.slice(0, 3)) + 1911}${d.slice(3)}`
+            : d.replace(/-/g, '');
+          map[s.Code] = {
             close: s.ClosingPrice,
             change: s.Change,
             name: s.Name || '',
-            volume: Math.floor(parseInt(s.TradeVolume || '0') / 1000), // 轉換為「張」
+            volume: Math.floor(parseInt(s.TradeVolume || '0') / 1000),
+            date,
           };
         }
-        setTwsePriceMap(map);
       }
+      // TPEX 上櫃股票（合併，不覆蓋已有的上市資料）
+      for (const s of tpexAll) {
+        if (s.Close && !map[s.SecuritiesCompanyCode]) {
+          const d = s.Date || '';
+          const date = d.length === 7
+            ? `${parseInt(d.slice(0, 3)) + 1911}${d.slice(3)}`
+            : d.replace(/-/g, '');
+          map[s.SecuritiesCompanyCode] = {
+            close: s.Close,
+            change: s.Change || '0',
+            name: s.CompanyName || '',
+            volume: Math.floor(parseInt(s.TradingShares || '0') / 1000),
+            date,
+          };
+        }
+      }
+      if (Object.keys(map).length > 0) setTwsePriceMap(map);
 
       // Try today first, then yesterday, then last few days
       const today = new Date();
@@ -67,7 +90,31 @@ export default function Explore() {
     loadData();
   }, []);
 
+  // Simons 每日推薦的收盤價 Map（用於與 TWSE/TPEx 日期比較，使用較新的）
+  const simonsPriceMap = useMemo(() => {
+    const map: Record<string, { close: string; date: string }> = {};
+    for (const r of recommendations) {
+      if (r.coid && r.close) {
+        map[r.coid] = {
+          close: r.close,
+          date: (r.mdate || '').replace(/-/g, ''),
+        };
+      }
+    }
+    return map;
+  }, [recommendations]);
 
+  // 取最新收盤價：比較 TWSE/TPEx 日期與 Simons 日期，用較新的那筆
+  function getBestClose(coid: string, fallback: string): string {
+    const official = twsePriceMap[coid];
+    const simons = simonsPriceMap[coid];
+    if (official && simons) {
+      const od = official.date.replace(/-/g, '');
+      const sd = simons.date;
+      if (sd.length === 8 && od.length === 8 && sd > od) return simons.close;
+    }
+    return official?.close || simons?.close || fallback;
+  }
 
   const STRATEGY_CARDS = [
     { id: 'A', title: '穩穩大公司', icon: '🏢', desc: '成交量 > 1,000張\nPSR 評分 ≥ 6', className: 'strategy-card-a' },
@@ -291,10 +338,7 @@ export default function Explore() {
                 </div>
                 <div className="rec-right">
                   <div className="stock-price">
-                    NT${twsePriceMap[rec.coid]?.close || rec.close}
-                    {twsePriceMap[rec.coid] && (
-                      <span style={{ fontSize: '0.65em', marginLeft: 4, color: '#aaa' }}>TWSE</span>
-                    )}
+                    NT${getBestClose(rec.coid, rec.close)}
                   </div>
                   <div className={`rec-trend ${rec.ret_w === 'rise' ? 'text-profit' : 'text-loss'}`}>
                     {rec.ret_w === 'rise' ? '📈 週漲' : '📉 週跌'}

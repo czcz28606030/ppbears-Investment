@@ -218,7 +218,14 @@ export default function AdminDashboard() {
         method: 'GET',
         headers: { 'Authorization': `Bearer ${token}` },
       });
-      const data = await res.json();
+      // 先讀取原始文字，避免 Vercel 超時/崩潰時回傳非 JSON 造成 SyntaxError
+      const text = await res.text();
+      let data: any;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        throw new Error(`伺服器錯誤 (HTTP ${res.status})，請稍後再試或聯絡技術支援`);
+      }
       if (data.success) {
         setNewsletterResult({ success: true, message: `✅ 電子報已成功發送至 ${newsletterTarget.email}` });
       } else {

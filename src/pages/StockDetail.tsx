@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { fetchStockData, fetchSimonsData, toRecommendation, POPULAR_STOCKS, fetchTWSEStockPrice, getOrGenerateKidFriendlyDesc, fetchTWSEDividendYields } from '../api';
-import type { TWSTEStockQuote } from '../api';
+import { fetchStockData, fetchSimonsData, toRecommendation, POPULAR_STOCKS, fetchTWSEStockPrice, fetchTPEXStockPrice, getOrGenerateKidFriendlyDesc, fetchTWSEDividendYields } from '../api';
+import type { TWSTEStockQuote, TPEXStockQuote } from '../api';
 import { useStore, formatPrice, formatMoney } from '../store';
 import type { StockData, StockPrice, StockRecommendation } from '../types';
 import './StockDetail.css';
@@ -13,6 +13,7 @@ export default function StockDetail() {
   const [recommendation, setRecommendation] = useState<StockRecommendation | null>(null);
   const [latestPrice, setLatestPrice] = useState<StockPrice | null>(null);
   const [twseQuote, setTwseQuote] = useState<TWSTEStockQuote | null>(null);
+  const [tpexQuote, setTpexQuote] = useState<TPEXStockQuote | null>(null);
   const [loading, setLoading] = useState(true);
   const [descLoading, setDescLoading] = useState(true);
   const [isStreaming, setIsStreaming] = useState(false);
@@ -41,7 +42,7 @@ export default function StockDetail() {
   async function loadStock(coid: string) {
     setLoading(true);
     try {
-      // 同時載入 ifalgo 資料、TWSE 即時行情、推薦
+      // 同時載入 ifalgo 資料、TWSE（上市）即時行情
       const [stockRes, twseRes] = await Promise.all([
         fetchStockData(coid),
         fetchTWSEStockPrice(coid),
@@ -55,9 +56,13 @@ export default function StockDetail() {
         }
       }
 
-      // TWSE 即時行情（收盤價最新）
       if (twseRes && twseRes.ClosingPrice) {
+        // 上市股票：使用 TWSE 官方收盤價
         setTwseQuote(twseRes);
+      } else {
+        // 上櫃股票：fallback 到 TPEx 官方收盤價（不用 ifalgo，避免時序落差）
+        const tpexRes = await fetchTPEXStockPrice(coid);
+        if (tpexRes && tpexRes.Close) setTpexQuote(tpexRes);
       }
 
       // 殖利率資料（最新）
@@ -132,10 +137,26 @@ export default function StockDetail() {
     };
   }, [code, loading, stockData, twseQuote]);
 
-  // 價格優先展示：TWSE 即時收盤價 > ifalgo 歷史 K 線
-  const price = twseQuote?.ClosingPrice
-    ? parseFloat(twseQuote.ClosingPrice)
-    : (latestPrice ? parseFloat(latestPrice.close_d) : 0);
+  // 價格選擇邏輯：比較官方 API 更新日期與 ifalgo 日期，使用最新的那筆
+  // TWSE/TPEx OpenAPI 盤後有 1~3 小時延遲；ifalgo 通常更即時
+  // 民國 7 碼 "1150413" → 西元 "20260413"
+  const officialDate = (() => {
+    const d = twseQuote?.Date || tpexQuote?.Date || '';
+    return d.length === 7
+      ? `${parseInt(d.slice(0, 3)) + 1911}${d.slice(3)}`
+      : d.replace(/-/g, '').replace(/\//g, '');
+  })();
+  const ifalgoDate = (latestPrice?.mdate || '').replace(/-/g, '').replace(/\//g, '');
+  const ifalgoClose = latestPrice ? parseFloat(latestPrice.close_d) : 0;
+  // 若 ifalgo 日期較新（官方 API 尚未更新當天收盤），改用 ifalgo
+  const useIfalgo = ifalgoClose > 0 && ifalgoDate.length === 8 && officialDate.length === 8 && ifalgoDate > officialDate;
+  const price = useIfalgo
+    ? ifalgoClose
+    : twseQuote?.ClosingPrice
+      ? parseFloat(twseQuote.ClosingPrice)
+      : tpexQuote?.Close
+        ? parseFloat(tpexQuote.Close)
+        : ifalgoClose;
 
   async function handleTrade() {
     if (!code || !tradeMode || price <= 0) return;
@@ -195,29 +216,41 @@ export default function StockDetail() {
   }
 
   async function doExecuteTrade() {
-    if (!code || !tradeMode || price <= 0) return;
+    if (!code || !tradeMode) return;
+    if (price <= 0) {
+      setTradeResult({ success: false, message: '❌ 無法取得目前股價，請稍後重試或重新整理頁面。' });
+      return;
+    }
     setShowWarningModal(false);
     const qty = parseInt(quantity);
 
-    let result;
-    if (tradeMode === 'buy') {
-      const name = stockData?.stkname || twseQuote?.Name || code;
-      result = await executeBuy(code, name, qty, price, stockData?.subindustry || '', tradeReason.trim());
-    } else {
-      result = await executeSell(code, qty, price, tradeReason.trim());
-    }
-
-    setTradeResult(result);
-    if (result.success) {
-      setQuantity('');
-      setTradeReason('');
+    try {
+      let result;
+      if (tradeMode === 'buy') {
+        const name = stockData?.stkname || twseQuote?.Name || tpexQuote?.CompanyName || code;
+        result = await executeBuy(code, name, qty, price, stockData?.subindustry || '', tradeReason.trim());
+      } else {
+        result = await executeSell(code, qty, price, tradeReason.trim());
+      }
+      setTradeResult(result);
+      if (result.success) {
+        setQuantity('');
+        setTradeReason('');
+      }
+    } catch (err) {
+      console.error('doExecuteTrade error:', err);
+      setTradeResult({ success: false, message: '⚠️ 交易時發生錯誤，請檢查網路後再試一次。' });
     }
   }
 
-  // 漲跌計算：TWSE Change 是絕對金額，轉為%
-  const changeAbsolute = twseQuote?.Change ? parseFloat(twseQuote.Change) : null;
+  // 漲跌計算：TWSE/TPEx Change 是絕對金額，轉為%
+  const changeAbsolute = twseQuote?.Change
+    ? parseFloat(twseQuote.Change)
+    : tpexQuote?.Change
+      ? parseFloat(tpexQuote.Change)
+      : null;
   const prevPrice = price - (changeAbsolute ?? 0);
-  const change = twseQuote?.ClosingPrice && changeAbsolute !== null && prevPrice > 0
+  const change = (twseQuote?.ClosingPrice || tpexQuote?.Close) && changeAbsolute !== null && prevPrice > 0
     ? (changeAbsolute / prevPrice) * 100
     : (latestPrice?.roia ? parseFloat(latestPrice.roia) : 0);
   const isUp = change >= 0;
@@ -225,16 +258,26 @@ export default function StockDetail() {
   const pe = latestPrice?.pe_ratio ? parseFloat(latestPrice.pe_ratio) : 0;
   const pb = latestPrice?.pb_ratio ? parseFloat(latestPrice.pb_ratio) : 0;
 
-  // 資料日期顯示
-  const priceDate = twseQuote?.Date
-    ? (() => {
-        const d = twseQuote.Date; // 民國日期如 "1150410"
-        if (d.length === 7) {
-          return `民國 ${d.slice(0, 3)} 年 ${d.slice(3, 5)} 月 ${d.slice(5, 7)} 日 (TWSE)`;
-        }
-        return d;
-      })()
-    : (latestPrice?.mdate || '');
+  // 資料日期顯示（若用 ifalgo 較新資料，顯示 ifalgo 日期）
+  const priceDate = useIfalgo
+    ? (latestPrice?.mdate || '')
+    : twseQuote?.Date
+      ? (() => {
+          const d = twseQuote.Date;
+          if (d.length === 7) {
+            return `民國 ${d.slice(0, 3)} 年 ${d.slice(3, 5)} 月 ${d.slice(5, 7)} 日 (TWSE)`;
+          }
+          return d;
+        })()
+      : tpexQuote?.Date
+        ? (() => {
+            const d = tpexQuote.Date;
+            if (d.length === 7) {
+              return `民國 ${d.slice(0, 3)} 年 ${d.slice(3, 5)} 月 ${d.slice(5, 7)} 日 (TPEx)`;
+            }
+            return d;
+          })()
+        : (latestPrice?.mdate || '');
 
   if (loading) {
     return (
@@ -280,6 +323,14 @@ export default function StockDetail() {
             <span style={{ color: '#e05050' }}>高 {twseQuote.HighestPrice}</span>
             <span style={{ color: '#3cc464' }}>低 {twseQuote.LowestPrice}</span>
             <span>量 {parseInt(twseQuote.TradeVolume || '0').toLocaleString()} 股</span>
+          </div>
+        )}
+        {!twseQuote && tpexQuote && (
+          <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 8, fontSize: '0.82rem', color: 'var(--color-text-secondary, #888)' }}>
+            <span>開 {tpexQuote.Open}</span>
+            <span style={{ color: '#e05050' }}>高 {tpexQuote.High}</span>
+            <span style={{ color: '#3cc464' }}>低 {tpexQuote.Low}</span>
+            <span>量 {parseInt(tpexQuote.TradingShares || '0').toLocaleString()} 股</span>
           </div>
         )}
         <div className="price-date">

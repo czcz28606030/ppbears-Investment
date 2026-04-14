@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { supabase } from './supabase';
 import type { Session } from '@supabase/supabase-js';
 import type { UserAccount, Trade, Holding, WithdrawalRequest, FeatureOverride, SystemSettings, LessonResult, RewardRule, RewardTriggerType, WalletTransaction, RewardShopItem, RedemptionRequest } from './types';
-import { fetchStockData } from './api';
+import { fetchStockData, fetchOfficialClosePrice } from './api';
 
 // ==========================================
 // 輔助函式
@@ -1090,22 +1090,44 @@ export const useStore = create<InvestmentStore>((set, get) => ({
     const { user, holdings } = get();
     if (!supabase || !user || holdings.length === 0) return;
 
-    // 1. 改用 ifalgo API 取得所有持股最新收盤價（包含上櫃股且資料即時）
-    const stockDatas = await Promise.all(
-      holdings.map(h => fetchStockData(h.stockCode))
-    );
+    // 1. 同時取官方 TWSE/TPEx（快取，快速）與 ifalgo（最新當日收盤，即時）
+    //    比較兩者日期，使用較新的那筆 → 解決官方 API 盤後延遲問題
+    const [officialResults, stockDatas] = await Promise.all([
+      Promise.all(holdings.map(h => fetchOfficialClosePrice(h.stockCode))),
+      Promise.all(holdings.map(h => fetchStockData(h.stockCode))),
+    ]);
 
     // 2. 找出有新價格且與現有不同的持股
     const updates: { stockCode: string; newPrice: number }[] = [];
     const updatedHoldings = holdings.map((h, i) => {
+      const official = officialResults[i];
       const stockRes = stockDatas[i];
-      if (stockRes && stockRes.prices && stockRes.prices.length > 0) {
-        const latestPriceObj = stockRes.prices[stockRes.prices.length - 1];
-        const newPrice = parseFloat(latestPriceObj.close_d);
-        if (!isNaN(newPrice) && newPrice > 0 && newPrice !== h.currentPrice) {
-          updates.push({ stockCode: h.stockCode, newPrice });
-          return { ...h, currentPrice: newPrice };
+
+      // ifalgo 最新收盤
+      let ifalgoPrice = 0;
+      let ifalgoDate = '';
+      if (stockRes?.prices?.length > 0) {
+        const lp = stockRes.prices[stockRes.prices.length - 1];
+        ifalgoPrice = parseFloat(lp.close_d) || 0;
+        ifalgoDate = (lp.mdate || '').replace(/-/g, '').replace(/\//g, '');
+      }
+
+      // 比較日期，選最新
+      let newPrice = 0;
+      if (official && official.price > 0) {
+        const officialDate = (official.date || '').replace(/-/g, '');
+        if (ifalgoPrice > 0 && ifalgoDate.length === 8 && officialDate.length === 8 && ifalgoDate > officialDate) {
+          newPrice = ifalgoPrice; // ifalgo 有更新的當日資料
+        } else {
+          newPrice = official.price;
         }
+      } else if (ifalgoPrice > 0) {
+        newPrice = ifalgoPrice;
+      }
+
+      if (!isNaN(newPrice) && newPrice > 0 && newPrice !== h.currentPrice) {
+        updates.push({ stockCode: h.stockCode, newPrice });
+        return { ...h, currentPrice: newPrice };
       }
       return h;
     });
@@ -1164,29 +1186,34 @@ export const useStore = create<InvestmentStore>((set, get) => ({
       }
     }
 
-    await supabase.from('users').update({ available_balance: user.availableBalance - totalCost }).eq('id', user.id);
-    await supabase.from('trades').insert([{
-      user_id: user.id, stock_code: stockCode, stock_name: stockName,
-      trade_type: 'buy', quantity, price, total_amount: totalCost, reason: reason || null, timestamp: Date.now(),
-    }]);
-
-    const existing = holdings.find(h => h.stockCode === stockCode);
-    if (existing) {
-      const newShares = existing.totalShares + quantity;
-      // 加總總花費 / 總股數
-      const newAvgCost = parseFloat(((existing.avgCost * existing.totalShares + totalCost) / newShares).toFixed(2));
-      await supabase.from('holdings').update({
-        total_shares: newShares, avg_cost: newAvgCost, current_price: price,
-        updated_at: new Date().toISOString(),
-      }).eq('user_id', user.id).eq('stock_code', stockCode);
-    } else {
-      await supabase.from('holdings').insert([{
+    try {
+      await supabase.from('users').update({ available_balance: user.availableBalance - totalCost }).eq('id', user.id);
+      await supabase.from('trades').insert([{
         user_id: user.id, stock_code: stockCode, stock_name: stockName,
-        total_shares: quantity, avg_cost: price, current_price: price, industry: industry || '',
+        trade_type: 'buy', quantity, price, total_amount: totalCost, reason: reason || null, timestamp: Date.now(),
       }]);
+
+      const existing = holdings.find(h => h.stockCode === stockCode);
+      if (existing) {
+        const newShares = existing.totalShares + quantity;
+        // 加總總花費 / 總股數
+        const newAvgCost = parseFloat(((existing.avgCost * existing.totalShares + totalCost) / newShares).toFixed(2));
+        await supabase.from('holdings').update({
+          total_shares: newShares, avg_cost: newAvgCost, current_price: price,
+          updated_at: new Date().toISOString(),
+        }).eq('user_id', user.id).eq('stock_code', stockCode);
+      } else {
+        await supabase.from('holdings').insert([{
+          user_id: user.id, stock_code: stockCode, stock_name: stockName,
+          total_shares: quantity, avg_cost: price, current_price: price, industry: industry || '',
+        }]);
+      }
+      await get().loadUserData(user.id);
+      return { success: true, message: `成功買入 ${stockName} ${quantity} 股 🎉` };
+    } catch (err) {
+      console.error('executeBuy error:', err);
+      return { success: false, message: '⚠️ 買入時發生網路或資料庫錯誤，請稍後再試。' };
     }
-    await get().loadUserData(user.id);
-    return { success: true, message: `成功買入 ${stockName} ${quantity} 股 🎉` };
   },
 
   executeSell: async (stockCode, quantity, price, reason) => {
@@ -1226,28 +1253,33 @@ export const useStore = create<InvestmentStore>((set, get) => ({
     // profit 計算: 實收金額 - (當初買這些股票的總成本)
     const profit = totalReceived - (holding.avgCost * quantity);
     
-    await supabase.from('users').update({ available_balance: user.availableBalance + totalReceived }).eq('id', user.id);
-    await supabase.from('trades').insert([{
-      user_id: user.id, stock_code: stockCode, stock_name: holding.stockName,
-      trade_type: 'sell', quantity, price, total_amount: totalReceived, 
-      reason: reason || null, profit: profit, timestamp: Date.now(),
-    }]);
+    try {
+      await supabase.from('users').update({ available_balance: user.availableBalance + totalReceived }).eq('id', user.id);
+      await supabase.from('trades').insert([{
+        user_id: user.id, stock_code: stockCode, stock_name: holding.stockName,
+        trade_type: 'sell', quantity, price, total_amount: totalReceived,
+        reason: reason || null, profit: profit, timestamp: Date.now(),
+      }]);
 
-    const remaining = holding.totalShares - quantity;
-    if (remaining <= 0) {
-      await supabase.from('holdings').delete().eq('user_id', user.id).eq('stock_code', stockCode);
-    } else {
-      await supabase.from('holdings').update({
-        total_shares: remaining, current_price: price, updated_at: new Date().toISOString(),
-      }).eq('user_id', user.id).eq('stock_code', stockCode);
+      const remaining = holding.totalShares - quantity;
+      if (remaining <= 0) {
+        await supabase.from('holdings').delete().eq('user_id', user.id).eq('stock_code', stockCode);
+      } else {
+        await supabase.from('holdings').update({
+          total_shares: remaining, current_price: price, updated_at: new Date().toISOString(),
+        }).eq('user_id', user.id).eq('stock_code', stockCode);
+      }
+
+      await get().loadUserData(user.id);
+      const emoji = profit >= 0 ? '📈' : '📉';
+      return {
+        success: true,
+        message: `成功賣出 ${holding.stockName} ${quantity} 股 ${emoji}\n${profit >= 0 ? '賺了' : '虧了'} NT$${Math.abs(profit).toFixed(0)}`,
+      };
+    } catch (err) {
+      console.error('executeSell error:', err);
+      return { success: false, message: '⚠️ 賣出時發生網路或資料庫錯誤，請稍後再試。' };
     }
-
-    await get().loadUserData(user.id);
-    const emoji = profit >= 0 ? '📈' : '📉';
-    return {
-      success: true,
-      message: `成功賣出 ${holding.stockName} ${quantity} 股 ${emoji}\n${profit >= 0 ? '賺了' : '虧了'} NT$${Math.abs(profit).toFixed(0)}`,
-    };
   },
 
   // ─── Profile ───────────────────────────────

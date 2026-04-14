@@ -100,6 +100,13 @@ export function calculateScore(item: SimonsItem): number {
   return Math.max(0, Math.min(100, score));
 }
 
+// ─── 通用：帶超時的 fetch ────────────────────────────────────────────────────
+function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs = 8000): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  return fetch(url, { ...options, signal: controller.signal }).finally(() => clearTimeout(timer));
+}
+
 // ─── 抓取 Simons 資料 ─────────────────────────────────────────────────────────
 export async function fetchLatestSimonsData(): Promise<SimonsItem[]> {
   const today = new Date();
@@ -109,9 +116,10 @@ export async function fetchLatestSimonsData(): Promise<SimonsItem[]> {
     if (date.getDay() === 0 || date.getDay() === 6) continue;
     const dateStr = date.toISOString().split('T')[0];
     try {
-      const res = await fetch(
+      const res = await fetchWithTimeout(
         `https://api.ifalgo.com.tw/frontapi/common/getSimonsData?searchDate=${dateStr}`,
-        { headers: { 'Accept': 'application/json' } }
+        { headers: { 'Accept': 'application/json' } },
+        8000
       );
       if (!res.ok) continue;
       const json = await res.json() as { data?: { dataItems?: SimonsItem[] } };
@@ -187,7 +195,6 @@ export function filterByStrategy(allStocks: SimonsItem[], strategy: string): Fil
   const strategyLabel = STRATEGY_LABELS[strategy] || strategy;
   return list
     .sort((a, b) => b.score - a.score)
-    .slice(0, 3)
     .map(s => ({
       ...s,
       cum_ret: s.ret_w === 'rise' ? '週漲' : s.ret_m === 'rise' ? '月漲' : '持平',
@@ -204,7 +211,8 @@ export async function filterByAI(allStocks: SimonsItem[]): Promise<FilteredStock
 
   const fetchPromises = sortedStocks.map(async (s) => {
     try {
-      const res = await fetch(`https://api.ifalgo.com.tw/frontapi/stock?coid=${s.coid}`);
+      const res = await fetchWithTimeout(`https://api.ifalgo.com.tw/frontapi/stock?coid=${s.coid}`, {}, 8000);
+      if (!res.ok) return null;
       const json = await res.json();
       const comment = json.data?.stock?.aiQuanBackDataComment;
       if (comment) {
@@ -217,7 +225,7 @@ export async function filterByAI(allStocks: SimonsItem[]): Promise<FilteredStock
         if (isPositive && isHighRec) {
           let latestNews: string[] = [];
           try {
-            const yRes = await fetch(`https://tw.stock.yahoo.com/quote/${s.coid}/news`);
+            const yRes = await fetchWithTimeout(`https://tw.stock.yahoo.com/quote/${s.coid}/news`, {}, 5000);
             if (yRes.ok) {
               const yText = await yRes.text();
               const matches = [...yText.matchAll(/<h3[^>]*>(.*?)<\/h3>/g)];
@@ -233,12 +241,11 @@ export async function filterByAI(allStocks: SimonsItem[]): Promise<FilteredStock
       return null;
     }
     return null;
-  });
+  }); // end fetchPromises
 
   const results = await Promise.all(fetchPromises);
   return (results.filter(Boolean) as FilteredStock[])
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 3);
+    .sort((a, b) => b.score - a.score);
 }
 
 // ─── AI 多面向分析（gpt-4o-mini）─────────────────────────────────────────────
@@ -271,7 +278,7 @@ export async function generateStocksAnalysis(stocks: FilteredStock[]): Promise<v
 ${JSON.stringify(stocksData, null, 2)}`;
 
   try {
-    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    const res = await fetchWithTimeout('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${openaiKey}` },
       body: JSON.stringify({
@@ -280,7 +287,7 @@ ${JSON.stringify(stocksData, null, 2)}`;
         response_format: { type: 'json_object' },
         temperature: 0.7,
       }),
-    });
+    }, 25000);
     const data = await res.json() as any;
     const content = data.choices?.[0]?.message?.content || '{}';
     const parsed = JSON.parse(content);
@@ -319,7 +326,8 @@ export async function buildHoldingsWithSignals(
   const getStockDetail = async (coid: string) => {
     if (stockCache[coid] !== undefined) return stockCache[coid];
     try {
-      const res = await fetch(`https://api.ifalgo.com.tw/frontapi/stock?coid=${coid}`);
+      const res = await fetchWithTimeout(`https://api.ifalgo.com.tw/frontapi/stock?coid=${coid}`, {}, 8000);
+      if (!res.ok) { stockCache[coid] = { sell_sig: '' }; return stockCache[coid]; }
       const json = await res.json();
       const list = json.data?.stock?.aiQuanBackDataTradingList || [];
       const last = list.length > 0 ? list[list.length - 1].sell_sig : '';
@@ -533,4 +541,41 @@ export async function sendNewsletterToUser(
   } catch (e) {
     return { success: false, error: String(e) };
   }
+}
+
+// ─── 電子報每日快取 ───────────────────────────────────────────────────────────
+
+export interface NewsletterCache {
+  cache_date: string;           // YYYY-MM-DD
+  all_stocks: SimonsItem[];     // 當日完整 Simons 資料
+  ai_filtered: FilteredStock[]; // AI 篩選 + OpenAI 分析完成的結果
+}
+
+/** 取得今日台灣日期字串（YYYY-MM-DD）*/
+export function getTodayTW(): string {
+  return new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
+/** 將準備好的資料寫入 newsletter_daily_cache */
+export async function saveTodayCache(data: Omit<NewsletterCache, never>): Promise<void> {
+  await supabase
+    .from('newsletter_daily_cache')
+    .upsert({
+      cache_date: data.cache_date,
+      all_stocks: data.all_stocks,
+      ai_filtered: data.ai_filtered,
+      created_at: new Date().toISOString(),
+    }, { onConflict: 'cache_date' });
+}
+
+/** 讀取今日快取；無快取則回傳 null */
+export async function loadTodayCache(date?: string): Promise<NewsletterCache | null> {
+  const cacheDate = date ?? getTodayTW();
+  const { data, error } = await supabase
+    .from('newsletter_daily_cache')
+    .select('cache_date, all_stocks, ai_filtered')
+    .eq('cache_date', cacheDate)
+    .maybeSingle();
+  if (error || !data) return null;
+  return data as NewsletterCache;
 }

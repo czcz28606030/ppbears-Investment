@@ -1,4 +1,4 @@
--- ==========================================================
+--- ==========================================================
 -- PPBears Investment - Supabase Schema v2.1
 -- 主帳號 / 副帳號系統（無總額度上限設計）
 -- 請在 Supabase SQL Editor 執行此完整腳本
@@ -245,3 +245,20 @@ CREATE POLICY "Allow authenticated access to view stock profiles"
 CREATE POLICY "Allow authenticated users to insert stock profiles"
   ON public.stock_profiles FOR INSERT
   WITH CHECK (auth.role() = 'authenticated');
+
+-- ==========================================================
+-- 升級 v2.3 (電子報每日資料快取表)
+-- 供 cron-newsletter-prepare（06:00）寫入，
+-- 供 cron-newsletter（07:00）與 send-newsletter-single 讀取
+-- ==========================================================
+CREATE TABLE IF NOT EXISTS public.newsletter_daily_cache (
+  cache_date date PRIMARY KEY,
+  all_stocks  jsonb NOT NULL DEFAULT '[]',  -- 完整 Simons 當日選股
+  ai_filtered jsonb NOT NULL DEFAULT '[]',  -- AI 篩選 + OpenAI 分析結果
+  created_at  timestamptz DEFAULT now()
+);
+
+-- 僅服務端（service_role）可寫，不對外公開
+ALTER TABLE public.newsletter_daily_cache ENABLE ROW LEVEL SECURITY;
+
+-- service_role 繞過 RLS，前端無法直接存取，無需額外 policy

@@ -17,7 +17,13 @@ import {
   userHasAiFeature,
   STRATEGY_LABELS,
   resend,
+  loadTodayCache,
+  getTodayTW,
 } from './_newsletter-utils';
+
+export const config = {
+  maxDuration: 60,
+};
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // ── 驗證：Supabase admin JWT 或 CRON_SECRET ──────────────────────────────
@@ -60,14 +66,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(404).json({ error: '找不到此用戶' });
     }
 
-    // ── 取得 Simons 資料 ──────────────────────────────────────────────────────
-    const allStocks = await fetchLatestSimonsData();
-    if (allStocks.length === 0) {
-      return res.status(200).json({ success: false, error: '無法取得 Simons 資料' });
+    // ── 優先使用 6AM 快取資料；無快取則即時抓取 ──────────────────────────────
+    const todayDate = getTodayTW();
+    const cache = await loadTodayCache(todayDate);
+
+    let allStocks;
+    let cachedAiFiltered;
+
+    if (cache && cache.all_stocks.length > 0) {
+      allStocks = cache.all_stocks;
+      cachedAiFiltered = cache.ai_filtered; // 包含 aiAnalysis，已分析完畢
+    } else {
+      allStocks = await fetchLatestSimonsData();
+      if (allStocks.length === 0) {
+        return res.status(200).json({ success: false, error: '無法取得 Simons 資料' });
+      }
+      cachedAiFiltered = null;
     }
 
     const nowTW = new Date(Date.now() + 8 * 60 * 60 * 1000);
-    const todayDate = nowTW.toISOString().slice(0, 10);
+    // todayDate 已在上方由 getTodayTW() 取得，此處不重複宣告
 
     // ── 依用戶功能決定篩選方式 ────────────────────────────────────────────────
     const hasAi = await userHasAiFeature(userId, userData.tier);
@@ -77,10 +95,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     let strategyLabel: string | undefined;
 
     if (hasAi || !strategy) {
-      // AI 模式（呼叫 ifalgo 逐支篩選）
-      stocks = await filterByAI(allStocks);
-      if (stocks.length === 0) {
-        return res.status(200).json({ success: false, error: '無符合 AI 條件的精選股票' });
+      // AI 模式：優先使用快取（已含 aiAnalysis）；無快取才即時篩選
+      if (cachedAiFiltered && cachedAiFiltered.length > 0) {
+        stocks = cachedAiFiltered;
+      } else {
+        stocks = await filterByAI(allStocks);
+        if (stocks.length === 0) {
+          return res.status(200).json({ success: false, error: '無符合 AI 條件的精選股票' });
+        }
+        await generateStocksAnalysis(stocks);
       }
     } else {
       // 策略模式（直接從 Simons 資料篩選，不需外部 API）

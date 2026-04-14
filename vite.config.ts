@@ -12,6 +12,16 @@ export default defineConfig({
   },
   server: {
     proxy: {
+      // Vercel serverless functions — 轉發到已部署的 production 環境
+      '/api/send-newsletter-single': {
+        target: 'https://ppbears-investment.vercel.app',
+        changeOrigin: true,
+      },
+      '/api/cron-newsletter': {
+        target: 'https://ppbears-investment.vercel.app',
+        changeOrigin: true,
+      },
+      // 外部 API proxy
       '/api/ifalgo': {
         target: 'https://api.ifalgo.com.tw/frontapi',
         changeOrigin: true,
@@ -26,6 +36,11 @@ export default defineConfig({
         target: 'https://www.twse.com.tw/exchangeReport',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/twse-report/, '')
+      },
+      '/api/tpex': {
+        target: 'https://www.tpex.org.tw/openapi/v1',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/tpex/, '')
       },
     }
   }

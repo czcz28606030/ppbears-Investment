@@ -6,7 +6,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import {
   supabase, fetchLatestSimonsData, filterByAI,
-  sendNewsletterToUser,
+  sendNewsletterToUser, loadTodayCache, getTodayTW,
 } from './_newsletter-utils';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -34,13 +34,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // ── 抓取 Simons 資料 ─────────────────────────────────────────────────────
-    const allStocks = await fetchLatestSimonsData();
-    if (allStocks.length === 0) {
-      return res.status(200).json({ error: '無法取得 Simons 資料' });
-    }
+    // 優先使用 6AM 準備 cron 寫入的快取；若快取不存在才即時計算
+    const todayDate = getTodayTW();
+    let allStocks;
+    let aiFiltered;
 
-    // ── 預先執行 AI 篩選（所有 AI 用戶共用，只跑一次）─────────────────────
-    const aiFiltered = await filterByAI(allStocks);
+    const cache = await loadTodayCache(todayDate);
+    if (cache && cache.all_stocks.length > 0) {
+      console.log(`[cron-newsletter] 使用快取資料（${todayDate}），跳過 AI 篩選`);
+      allStocks = cache.all_stocks;
+      aiFiltered = cache.ai_filtered;
+    } else {
+      console.log('[cron-newsletter] 無快取，即時計算（時間可能較長）');
+      allStocks = await fetchLatestSimonsData();
+      if (allStocks.length === 0) {
+        return res.status(200).json({ error: '無法取得 Simons 資料' });
+      }
+      aiFiltered = await filterByAI(allStocks);
+    }
 
     // ── 取得所有 Premium 用戶（含 newsletter_strategy）──────────────────────
     const { data: premiumUsers } = await supabase
@@ -52,7 +63,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ message: '目前沒有 Premium 用戶，跳過發信' });
     }
 
-    const todayDate = nowTW.toISOString().slice(0, 10);
     let sentCount = 0;
     const errors: string[] = [];
 

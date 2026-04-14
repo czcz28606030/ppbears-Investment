@@ -1,6 +1,10 @@
 {
   "crons": [
     {
+      "path": "/api/cron-newsletter-prepare",
+      "schedule": "0 22 * * *"
+    },
+    {
       "path": "/api/cron-newsletter",
       "schedule": "0 23 * * *"
     }
@@ -17,6 +21,10 @@
     {
       "source": "/api/twse-report/:path*",
       "destination": "https://www.twse.com.tw/exchangeReport/:path*"
+    },
+    {
+      "source": "/api/tpex/:path*",
+      "destination": "https://www.tpex.org.tw/openapi/v1/:path*"
     },
     {
       "source": "/((?!api/).*)",
