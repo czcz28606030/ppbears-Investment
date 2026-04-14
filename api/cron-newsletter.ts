@@ -350,7 +350,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // ── Step 4: 呼叫 API 篩選 累計報酬正 + AI推薦中度以上 ────────────────
     const fetchPromises = sortedStocks.map(async (s) => {
       try {
-        const res = await fetch(\`https://api.ifalgo.com.tw/frontapi/stock?coid=\${s.coid}\`);
+        const res = await fetch(`https://api.ifalgo.com.tw/frontapi/stock?coid=${s.coid}`);
         const json = await res.json();
         const comment = json.data?.stock?.aiQuanBackDataComment;
         if (comment) {
