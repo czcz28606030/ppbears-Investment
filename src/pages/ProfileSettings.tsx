@@ -3,14 +3,28 @@ import { useNavigate } from 'react-router-dom';
 import { useStore } from '../store';
 import './ProfileSettings.css';
 
+const STRATEGY_OPTIONS = [
+  { id: 'A', label: '🏢 穩穩大公司', desc: '成交量大、PSR 評分高的穩健股' },
+  { id: 'B', label: '🚀 最近變強公司', desc: '週漲 + 月漲雙確認，動能強勁' },
+  { id: 'C', label: '👀 市場有注意公司', desc: '法人籌碼強度高，外資積極布局' },
+  { id: 'D', label: '👴 價值潛力公司', desc: 'PSR 高品質，股價低於外資持股成本' },
+  { id: 'E', label: '💰 配息安心公司', desc: '金融、電信、公用事業，月趨勢穩定' },
+  { id: 'F', label: '🏷️ 便宜好公司', desc: '低於外資 + 投信持股成本，雙重折價' },
+];
+
 export default function ProfileSettings() {
   const navigate = useNavigate();
-  const { user, updateProfile, uploadAvatar, logout, updateBrokerSettings } = useStore();
+  const { user, updateProfile, uploadAvatar, logout, updateBrokerSettings, updateNewsletterStrategy, hasFeature } = useStore();
+  const hasAiFeature = hasFeature('ai_stock_picking');
 
   const [displayName, setDisplayName] = useState(user?.displayName || '');
   const [brokerFeeRate, setBrokerFeeRate] = useState(user?.brokerFeeRate?.toString() || '0.001425');
   const [brokerMinFee, setBrokerMinFee] = useState(user?.brokerMinFee?.toString() || '20');
   const [brokerTaxRate, setBrokerTaxRate] = useState(user?.brokerTaxRate?.toString() || '0.003');
+
+  const [newsletterStrategy, setNewsletterStrategy] = useState<string>(user?.newsletterStrategy || 'A');
+  const [strategySaving, setStrategySaving] = useState(false);
+  const [strategyMsg, setStrategyMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -81,6 +95,18 @@ export default function ProfileSettings() {
         URL.revokeObjectURL(previewUrl);
         setPreviewUrl(null);
       }
+    }
+  };
+
+  const handleStrategySave = async () => {
+    setStrategySaving(true);
+    setStrategyMsg(null);
+    const result = await updateNewsletterStrategy(newsletterStrategy);
+    setStrategySaving(false);
+    if (result.error) {
+      setStrategyMsg({ text: result.error, type: 'error' });
+    } else {
+      setStrategyMsg({ text: '✅ 電子報策略已儲存！', type: 'success' });
     }
   };
 
@@ -211,6 +237,53 @@ export default function ProfileSettings() {
           {isSaving ? '儲存中...' : '💾 儲存設定'}
         </button>
       </div>
+
+      {/* 電子報策略設定（只有 Premium 且無 AI 聰明選股的用戶才顯示） */}
+      {user?.tier === 'premium' && !hasAiFeature && (
+        <div className="settings-card">
+          <div className="settings-section-title">📧 電子報策略選擇</div>
+          <p style={{ fontSize: 13, color: '#888', margin: '0 0 16px', padding: '0 20px' }}>
+            選擇你想收到的選股策略，每日電子報將依此策略推薦股票給你。
+          </p>
+          <div style={{ padding: '0 20px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {STRATEGY_OPTIONS.map(opt => (
+              <label
+                key={opt.id}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px',
+                  borderRadius: 10, cursor: 'pointer',
+                  border: newsletterStrategy === opt.id ? '2px solid var(--primary)' : '1.5px solid #eee',
+                  background: newsletterStrategy === opt.id ? 'rgba(255,89,94,0.04)' : '#fafafa',
+                  transition: 'all 0.15s',
+                }}
+              >
+                <input
+                  type="radio"
+                  name="newsletter_strategy"
+                  value={opt.id}
+                  checked={newsletterStrategy === opt.id}
+                  onChange={() => setNewsletterStrategy(opt.id)}
+                  style={{ accentColor: 'var(--primary)', width: 16, height: 16, flexShrink: 0 }}
+                />
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 14 }}>{opt.label}</div>
+                  <div style={{ fontSize: 12, color: '#999', marginTop: 2 }}>{opt.desc}</div>
+                </div>
+              </label>
+            ))}
+          </div>
+          {strategyMsg && (
+            <div className={`settings-msg ${strategyMsg.type}`} style={{ margin: '12px 20px 0' }}>
+              {strategyMsg.text}
+            </div>
+          )}
+          <div style={{ padding: '16px 20px 4px' }}>
+            <button className="save-btn" onClick={handleStrategySave} disabled={strategySaving}>
+              {strategySaving ? '儲存中...' : '💾 儲存策略'}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* 登出 */}
       <div className="settings-card danger-zone">

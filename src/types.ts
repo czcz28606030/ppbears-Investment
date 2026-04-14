@@ -85,6 +85,7 @@ export interface UserAccount {
   brokerMinFee: number;      // 交易手續費低消 (e.g., 20)
   brokerTaxRate: number;     // 交易證交稅率 (e.g., 0.003)
   parentId?: string;
+  newsletterStrategy?: string; // 電子報策略：'A'~'F' 或 null（使用 AI 選股）
 }
 
 export interface ChildAccount extends UserAccount {

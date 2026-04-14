@@ -35,6 +35,9 @@ export default function AdminDashboard() {
   const [tradesLoading, setTradesLoading] = useState(false);
 
   const [relationModal, setRelationModal] = useState<{ userId: string; name: string; role: 'parent' | 'child'; parentId: string | null } | null>(null);
+  const [newsletterTarget, setNewsletterTarget] = useState<{ userId: string; name: string; email: string } | null>(null);
+  const [newsletterSending, setNewsletterSending] = useState(false);
+  const [newsletterResult, setNewsletterResult] = useState<{ success: boolean; message: string } | null>(null);
 
   useEffect(() => {
     if (user?.isAdmin) {
@@ -204,6 +207,29 @@ export default function AdminDashboard() {
     return userTier === 'premium';
   };
 
+  const handleSendNewsletter = async () => {
+    if (!newsletterTarget) return;
+    setNewsletterSending(true);
+    setNewsletterResult(null);
+    try {
+      const { data: { session } } = await supabase!.auth.getSession();
+      const token = session?.access_token || '';
+      const res = await fetch(`/api/send-newsletter-single?userId=${newsletterTarget.userId}`, {
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (data.success) {
+        setNewsletterResult({ success: true, message: `✅ 電子報已成功發送至 ${newsletterTarget.email}` });
+      } else {
+        setNewsletterResult({ success: false, message: `❌ 發送失敗：${data.error || '未知錯誤'}` });
+      }
+    } catch (e) {
+      setNewsletterResult({ success: false, message: `❌ 請求失敗：${String(e)}` });
+    }
+    setNewsletterSending(false);
+  };
+
   const handleSettingSave = async () => {
     if (!settingModal) return;
     const val = parseInt(settingInput);
@@ -368,6 +394,12 @@ export default function AdminDashboard() {
                  setRelationModal({ userId: u.id, name: u.displayName, role: u.role, parentId: u.parentId || null });
               }}>🔗 變更歸屬</button>
               <button className="admin-btn admin-btn-feature" onClick={() => toggleFeaturePanel(u.id)}>🔧 功能開關</button>
+              {u.tier === 'premium' && (
+                <button className="admin-btn" style={{ background: '#e8f5e9', color: '#2e7d32', border: '1px solid #a5d6a7' }}
+                  onClick={() => { setNewsletterTarget({ userId: u.id, name: u.displayName, email: u.email }); setNewsletterResult(null); }}>
+                  📧 發電子報
+                </button>
+              )}
               {u.id !== user.id && (
                 <button className="admin-btn admin-btn-delete" onClick={() => handleDelete(u)}>🗑️ 刪除</button>
               )}
@@ -554,6 +586,37 @@ export default function AdminDashboard() {
           </div>
         </div>
       )}
+      {/* 發電子報確認彈窗 */}
+      {newsletterTarget && (
+        <div className="admin-modal-overlay" onClick={() => { setNewsletterTarget(null); setNewsletterResult(null); }}>
+          <div className="admin-modal" onClick={e => e.stopPropagation()}>
+            <h3>📧 發送電子報</h3>
+            <p style={{ fontSize: 14, color: '#555', margin: '8px 0 16px' }}>
+              確定立即發送當日電子報給 <strong>{newsletterTarget.name}</strong>？<br />
+              <span style={{ fontSize: 12, color: '#999' }}>{newsletterTarget.email}</span>
+            </p>
+            {newsletterResult && (
+              <div style={{
+                padding: '10px 14px', borderRadius: 8, marginBottom: 16,
+                background: newsletterResult.success ? '#e8f5e9' : '#fdecea',
+                color: newsletterResult.success ? '#2e7d32' : '#c62828',
+                fontSize: 13, fontWeight: 600,
+              }}>
+                {newsletterResult.message}
+              </div>
+            )}
+            <div className="admin-modal-btns">
+              <button className="btn-cancel" onClick={() => { setNewsletterTarget(null); setNewsletterResult(null); }}>關閉</button>
+              {!newsletterResult?.success && (
+                <button className="btn-confirm" onClick={handleSendNewsletter} disabled={newsletterSending}>
+                  {newsletterSending ? '發送中...' : '確認發送'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 系統設定編輯彈窗 */}
       {settingModal && (
         <div className="admin-modal-overlay" onClick={() => setSettingModal(null)}>

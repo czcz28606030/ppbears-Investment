@@ -122,6 +122,7 @@ interface InvestmentStore {
   updateProfile: (displayName: string, avatarUrl: string) => Promise<{ error: string | null }>;
   uploadAvatar: (file: File) => Promise<{ url: string | null; error: string | null }>;
   updateBrokerSettings: (brokerFeeRate: number, brokerMinFee: number, brokerTaxRate: number) => Promise<{ error: string | null }>;
+  updateNewsletterStrategy: (strategy: string | null) => Promise<{ error: string | null }>;
 
   // Admin Actions
   loadAllUsers: () => Promise<void>;
@@ -194,6 +195,7 @@ function rowToUser(row: Record<string, unknown>): UserAccount {
     brokerMinFee: row.broker_min_fee !== undefined ? Number(row.broker_min_fee) : 20,
     brokerTaxRate: row.broker_tax_rate !== undefined ? Number(row.broker_tax_rate) : 0.003,
     parentId: (row.parent_id as string) || undefined,
+    newsletterStrategy: (row.newsletter_strategy as string) || undefined,
   };
 }
 
@@ -1261,6 +1263,18 @@ export const useStore = create<InvestmentStore>((set, get) => ({
 
     if (error) return { error: error.message };
     set({ user: { ...user, displayName, avatar: avatarUrl } });
+    return { error: null };
+  },
+
+  updateNewsletterStrategy: async (strategy: string | null) => {
+    if (!supabase) return { error: '資料庫未連線' };
+    const { user } = get();
+    if (!user) return { error: '尚未登入' };
+    const { error } = await supabase.from('users').update({
+      newsletter_strategy: strategy,
+    }).eq('id', user.id);
+    if (error) return { error: error.message };
+    set({ user: { ...user, newsletterStrategy: strategy ?? undefined } });
     return { error: null };
   },
 
