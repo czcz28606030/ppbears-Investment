@@ -74,6 +74,52 @@ export async function fetchTWSEDividendYields(): Promise<TWSEDividendYield[]> {
   }
 }
 
+// 近10年平均殖利率快取
+const yieldHistoryCache: Record<string, number> = {};
+
+/**
+ * 抓取個股近10年12月份的殖利率，計算平均值
+ * 資料來源：TWSE exchangeReport/BWIBBU（個股月查詢）
+ */
+export async function fetchStock10YrAvgYield(stockCode: string): Promise<number | null> {
+  if (yieldHistoryCache[stockCode] !== undefined) {
+    return yieldHistoryCache[stockCode];
+  }
+  try {
+    const TWSE_REPORT_BASE = '/api/twse-report';
+    const currentYear = new Date().getFullYear();
+    const yearlyYields: number[] = [];
+
+    // 每年抓12月份資料（並行10個請求）
+    const requests = Array.from({ length: 10 }, (_, i) => {
+      const year = currentYear - 1 - i; // 從去年往前推10年
+      const dateStr = `${year}1201`; // YYYYMMDD 西元
+      const url = `${TWSE_REPORT_BASE}/BWIBBU?response=json&stockNo=${stockCode}&date=${dateStr}`;
+      return fetch(url).then(r => r.ok ? r.json() : null).catch(() => null);
+    });
+
+    const results = await Promise.all(requests);
+
+    results.forEach(json => {
+      if (!json || json.stat !== 'OK' || !json.data || json.data.length === 0) return;
+      // 取最後一筆（月底最後一個交易日）
+      const lastRow = json.data[json.data.length - 1];
+      const yieldVal = parseFloat(lastRow[1]); // index 1 = 殖利率(%)
+      if (!isNaN(yieldVal) && yieldVal > 0) {
+        yearlyYields.push(yieldVal);
+      }
+    });
+
+    if (yearlyYields.length === 0) return null;
+    const avg = yearlyYields.reduce((a, b) => a + b, 0) / yearlyYields.length;
+    yieldHistoryCache[stockCode] = avg;
+    return avg;
+  } catch (err) {
+    console.error('fetchStock10YrAvgYield error:', err);
+    return null;
+  }
+}
+
 // 查詢單一股票的 TWSE 即時收盤價
 export async function fetchTWSEStockPrice(code: string): Promise<TWSTEStockQuote | null> {
   const all = await fetchTWSEAllStocks();

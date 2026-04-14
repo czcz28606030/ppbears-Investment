@@ -144,6 +144,7 @@ export interface SystemSettings {
   free_max_child_accounts: number;
   free_max_holdings: number;
   free_max_daily_trades: number;
+  newsletter_send_hour: number; // 電子報發送時段（台灣時間 0-23），預設 7
 }
 
 // ── Learning Module ──────────────────────────────────────

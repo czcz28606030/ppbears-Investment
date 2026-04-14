@@ -22,6 +22,11 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/twse/, '')
       },
+      '/api/twse-report': {
+        target: 'https://www.twse.com.tw/exchangeReport',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/twse-report/, '')
+      },
     }
   }
 })

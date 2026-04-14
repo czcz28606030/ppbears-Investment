@@ -55,15 +55,25 @@ export default function Dashboard() {
            
            const close = parseFloat(latest.close_d);
            const prevClose = parseFloat(prev.close_d);
-           const changeAmount = close - prevClose;
+
+           // ─── 只有當最新 K 線資料是「今天」才計算今日損益 ───
+           // 若最新資料是昨天或更早（例如開盤前、假日），漲跌視為 0
+           const todayStr = new Date().toISOString().split('T')[0].replace(/-/g, '');
+           // mdate 格式可能是 "20240411" 或 "2024-04-11"，統一去除 "-"
+           const latestDateStr = (latest.mdate || '').replace(/-/g, '');
+           const isMarketDataFromToday = latestDateStr === todayStr;
+
+           const changeAmount = isMarketDataFromToday ? (close - prevClose) : 0;
            
            quotesMap[h.stockCode] = {
              ClosingPrice: latest.close_d,
              Change: changeAmount.toString()
            };
            
-           todayPnL += changeAmount * h.totalShares;
-           totalYesterdayValue += prevClose * h.totalShares;
+           if (isMarketDataFromToday) {
+             todayPnL += changeAmount * h.totalShares;
+             totalYesterdayValue += prevClose * h.totalShares;
+           }
         } else if (stockRes && stockRes.prices && stockRes.prices.length === 1) {
            // 新上市掛牌等極端狀況只有一天資料
            const latest = stockRes.prices[0];
@@ -237,7 +247,7 @@ export default function Dashboard() {
             <span className="section-action" onClick={() => navigate('/portfolio')}>查看全部</span>
           </div>
           <div className="holdings-preview" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            {holdings.slice(0, 3).map((h) => {
+            {holdings.map((h) => {
               const quote = liveQuotes[h.stockCode];
               
               const currentPrice = quote ? parseFloat(quote.ClosingPrice) : h.currentPrice;

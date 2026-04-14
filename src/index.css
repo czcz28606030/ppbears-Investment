@@ -372,15 +372,15 @@ ul, ol { list-style: none; }
 }
 
 .btn-buy {
-  background: linear-gradient(135deg, var(--green) 0%, #A8DC4A 100%);
-  color: white;
-  box-shadow: var(--shadow-green);
-}
-
-.btn-sell {
   background: linear-gradient(135deg, var(--coral) 0%, #FF8386 100%);
   color: white;
   box-shadow: var(--shadow-coral);
+}
+
+.btn-sell {
+  background: linear-gradient(135deg, var(--green) 0%, #A8DC4A 100%);
+  color: white;
+  box-shadow: var(--shadow-green);
 }
 
 .btn-outline {
@@ -793,8 +793,8 @@ ul, ol { list-style: none; }
   background: rgba(255, 255, 255, 0.2);
 }
 
-.ai-card-buy  { background: linear-gradient(135deg, var(--green) 0%, #A8DC4A 100%); color: white; }
-.ai-card-sell { background: linear-gradient(135deg, var(--coral) 0%, #FF8386 100%); color: white; }
+.ai-card-buy  { background: linear-gradient(135deg, var(--coral) 0%, #FF8386 100%); color: white; }
+.ai-card-sell { background: linear-gradient(135deg, var(--green) 0%, #A8DC4A 100%); color: white; }
 .ai-card-hold {
   background: linear-gradient(135deg, var(--yellow) 0%, #FFD96A 100%);
   color: var(--text-primary);

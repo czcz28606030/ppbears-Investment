@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { fetchStockData, fetchSimonsData, toRecommendation, POPULAR_STOCKS, fetchTWSEStockPrice, getOrGenerateKidFriendlyDesc } from '../api';
+import { fetchStockData, fetchSimonsData, toRecommendation, POPULAR_STOCKS, fetchTWSEStockPrice, getOrGenerateKidFriendlyDesc, fetchTWSEDividendYields } from '../api';
 import type { TWSTEStockQuote } from '../api';
 import { useStore, formatPrice, formatMoney } from '../store';
 import type { StockData, StockPrice, StockRecommendation } from '../types';
@@ -21,6 +21,7 @@ export default function StockDetail() {
   const [quantity, setQuantity] = useState('');
   const [tradeReason, setTradeReason] = useState('');
   const [tradeResult, setTradeResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [latestYield, setLatestYield] = useState<number | null>(null);
   
   const { user, holdings, executeBuy, executeSell, getPortfolioSummary } = useStore();
   const holding = holdings.find(h => h.stockCode === code);
@@ -57,6 +58,13 @@ export default function StockDetail() {
       // TWSE 即時行情（收盤價最新）
       if (twseRes && twseRes.ClosingPrice) {
         setTwseQuote(twseRes);
+      }
+
+      // 殖利率資料（最新）
+      const divYields = await fetchTWSEDividendYields();
+      const divInfo = divYields.find(d => d.Code === coid);
+      if (divInfo?.DividendYield) {
+        setLatestYield(parseFloat(divInfo.DividendYield));
       }
 
       // 嘗試載入推薦
@@ -364,6 +372,21 @@ export default function StockDetail() {
               {stockData?.subindustry?.split(',')[0] || '-'}
             </div>
           </div>
+          <div className="stat-item" style={{ gridColumn: '1 / -1' }}>
+            <div className="stat-label">殖利率 💵</div>
+            <div className="stat-value-row" style={{ marginTop: 4 }}>
+              <div className="stat-value">
+                {latestYield !== null ? `${latestYield.toFixed(2)}%` : '--'}
+              </div>
+              {latestYield !== null && (
+                <div className={`stat-badge ${
+                  latestYield >= 5 ? 'badge-cheap' : latestYield >= 3 ? 'badge-ok' : 'badge-expensive'
+                }`}>
+                  {latestYield >= 5 ? '高殖利率 💰' : latestYield >= 3 ? '普通 😊' : '偏低 💡'}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </section>
 
@@ -579,8 +602,17 @@ export default function StockDetail() {
 
                 <button
                   className={`btn ${tradeMode === 'buy' ? 'btn-buy' : 'btn-sell'} btn-lg btn-block`}
-                  onClick={handleTrade}
-                  disabled={!quantity || parseInt(quantity) <= 0 || !tradeReason.trim()}
+                  onClick={() => {
+                    if (!quantity || parseInt(quantity) <= 0) {
+                      alert('⚠️ 請輸入大於 0 的正確交易股數！');
+                      return;
+                    }
+                    if (!tradeReason.trim()) {
+                      alert(`⚠️ 下單前請先填寫「投資筆記」，告訴 PPBear 為什麼想${tradeMode === 'buy' ? '買' : '賣'}這檔股票喔！`);
+                      return;
+                    }
+                    handleTrade();
+                  }}
                 >
                   確認{tradeMode === 'buy' ? '買入' : '賣出'}
                 </button>

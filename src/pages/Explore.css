@@ -154,12 +154,31 @@
 
 @media (max-width: 900px) {
   .strategy-grid {
-    grid-template-columns: 1fr 1fr;
+    gap: 12px;
   }
 }
 
 @media (max-width: 500px) {
   .strategy-grid {
-    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  
+  .strategy-card {
+    padding: 10px;
+    border-radius: 12px;
+  }
+
+  .strategy-icon {
+    font-size: 22px;
+    margin-bottom: 6px;
+  }
+
+  .strategy-title {
+    font-size: 12px;
+    margin-bottom: 2px;
+  }
+
+  .strategy-desc {
+    font-size: 9px;
   }
 }

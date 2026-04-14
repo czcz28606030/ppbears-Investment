@@ -284,6 +284,14 @@ export default function AdminDashboard() {
               <td style={{ textAlign: 'center', padding: '8px 4px' }}>✅ 開放</td>
             </tr>
             <tr style={{ borderBottom: '1px solid #f5f5f5' }}>
+              <td style={{ padding: '8px 4px', fontWeight: 600 }}>📧 每日電子報</td>
+              <td style={{ textAlign: 'center', padding: '8px 4px' }}>❌ 鎖定</td>
+              <td style={{ textAlign: 'center', padding: '8px 4px' }}>
+                每天 {systemSettings.newsletter_send_hour?.toString().padStart(2, '0')}:00 發送
+                <span style={{ cursor: 'pointer', marginLeft: 6 }} onClick={() => { setSettingModal({ key: 'newsletter_send_hour', label: '電子報發送時間 (0-23)', value: systemSettings.newsletter_send_hour || 7 }); setSettingInput(String(systemSettings.newsletter_send_hour || 7)); }}>✏️</span>
+              </td>
+            </tr>
+            <tr style={{ borderBottom: '1px solid #f5f5f5' }}>
               <td style={{ padding: '8px 4px', fontWeight: 600 }}>廣告顯示</td>
               <td style={{ textAlign: 'center', padding: '8px 4px' }}>有廣告</td>
               <td style={{ textAlign: 'center', padding: '8px 4px' }}>無廣告</td>

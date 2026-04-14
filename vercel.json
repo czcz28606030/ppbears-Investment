@@ -1,4 +1,10 @@
 {
+  "crons": [
+    {
+      "path": "/api/cron-newsletter",
+      "schedule": "0 * * * *"
+    }
+  ],
   "rewrites": [
     {
       "source": "/api/ifalgo/:path*",
@@ -7,6 +13,10 @@
     {
       "source": "/api/twse/:path*",
       "destination": "https://openapi.twse.com.tw/v1/:path*"
+    },
+    {
+      "source": "/api/twse-report/:path*",
+      "destination": "https://www.twse.com.tw/exchangeReport/:path*"
     },
 {
       "source": "/(.*)",

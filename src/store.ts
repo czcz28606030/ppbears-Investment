@@ -256,7 +256,7 @@ export const useStore = create<InvestmentStore>((set, get) => ({
   trades: [],
   withdrawalRequests: [],
   featureOverrides: [],
-  systemSettings: { free_max_child_accounts: 2, free_max_holdings: 5, free_max_daily_trades: 10 },
+  systemSettings: { free_max_child_accounts: 2, free_max_holdings: 5, free_max_daily_trades: 10, newsletter_send_hour: 7 },
   allUsers: [],
   loading: false,
   authLoading: true,
