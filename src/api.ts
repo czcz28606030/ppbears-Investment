@@ -265,11 +265,44 @@ export async function fetchTPEXStockPrice(code: string): Promise<TPEXStockQuote 
 }
 
 /**
- * 統一入口：先查 TWSE（上市），找不到再查 TPEx（上櫃）
+ * 透過 TWSE MIS 即時報價 API 取得今日現價
+ * ex: tse_{code}.tw = 上市, otc_{code}.tw = 上櫃
+ * z = 最新成交價（可能是 "-" 表示鎖漲停）, h = 今日最高, y = 昨收, n = 公司名, d = 日期 YYYYMMDD
+ */
+async function fetchMISRealtime(code: string, market: 'tse' | 'otc'): Promise<{ price: number; name: string; date: string } | null> {
+  try {
+    const url = `/api/mis/getStockInfo.jsp?ex_ch=${market}_${code}.tw&json=1&delay=0`;
+    const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+    if (!res.ok) return null;
+    const json = await res.json();
+    const item = json?.msgArray?.[0];
+    if (!item) return null;
+    const name: string = item.n || item.nf || '';
+    const date: string = item.d || '';
+    // z = 最新成交價，若 "-" 表示目前無成交（如鎖漲停），取 h（今日最高）
+    const zRaw = item.z;
+    const hRaw = item.h;
+    const price = (zRaw && zRaw !== '-') ? parseFloat(zRaw) : (hRaw && hRaw !== '-' ? parseFloat(hRaw) : 0);
+    if (!price || price <= 0) return null;
+    return { price, name, date };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 統一入口：優先使用 MIS 即時報價（盤中/漲跌停即時反映），
+ * 再 fallback 到 TWSE/TPEx OpenAPI 昨日收盤。
  * 回傳 { price, name, date } —— date 為西元 YYYYMMDD 格式
- * 注意：TWSE/TPEx OpenAPI 盤後可能有 1~3 小時延遲，date 用於與 ifalgo 比較新舊
  */
 export async function fetchOfficialClosePrice(code: string): Promise<{ price: number; name: string; date: string } | null> {
+  // 先試上市 (tse)，再試上櫃 (otc)，MIS 即時資料優先
+  const misTse = await fetchMISRealtime(code, 'tse');
+  if (misTse) return misTse;
+  const misOtc = await fetchMISRealtime(code, 'otc');
+  if (misOtc) return misOtc;
+
+  // MIS 失敗時 fallback 到舊有 OpenAPI（盤後延遲資料）
   const twse = await fetchTWSEStockPrice(code);
   if (twse && twse.ClosingPrice && parseFloat(twse.ClosingPrice) > 0) {
     const d = twse.Date || '';

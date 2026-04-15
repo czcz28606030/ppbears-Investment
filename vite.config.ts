@@ -42,6 +42,11 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/tpex/, '')
       },
+      '/api/mis': {
+        target: 'https://mis.twse.com.tw/stock/api',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/mis/, '')
+      },
     }
   }
 })

@@ -27,6 +27,10 @@
       "destination": "https://www.tpex.org.tw/openapi/v1/:path*"
     },
     {
+      "source": "/api/mis/:path*",
+      "destination": "https://mis.twse.com.tw/stock/api/:path*"
+    },
+    {
       "source": "/((?!api/).*)",
       "destination": "/index.html"
     }

@@ -5,7 +5,7 @@ import './WithdrawalApproval.css';
 
 export default function WithdrawalApproval() {
   const navigate = useNavigate();
-  const { withdrawalRequests, approveWithdrawal, rejectWithdrawal, user, requestWithdrawal, availableBalance: balance } = useStore();
+  const { withdrawalRequests, approveWithdrawal, rejectWithdrawal, user, requestWithdrawal } = useStore();
   const isParent = user?.role === 'parent';
 
   // 申請出金表單狀態
@@ -105,29 +105,6 @@ export default function WithdrawalApproval() {
           </div>
         </section>
       )}
-
-  const pending = withdrawalRequests.filter(r => r.status === 'pending');
-  const reviewed = withdrawalRequests.filter(r => r.status !== 'pending');
-
-  const handleApprove = async (id: string) => {
-    const result = await approveWithdrawal(id);
-    if (result.error) alert('無法同意：' + result.error);
-  };
-
-  const handleReject = async (id: string) => {
-    const result = await rejectWithdrawal(id);
-    if (result.error) alert('操作失敗：' + result.error);
-  };
-
-  return (
-    <div className="approval-page">
-      <div className="page-header">
-        <button className="page-header-back" onClick={() => navigate('/')}>←</button>
-        <h1 className="page-title">{isParent ? '💸 出金審核' : '💸 出金紀錄'}</h1>
-        {isParent && pending.length > 0 && (
-          <span className="pending-badge">{pending.length}</span>
-        )}
-      </div>
 
       {/* 待審核 */}
       <section className="approval-section">
