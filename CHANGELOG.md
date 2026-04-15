@@ -1,4 +1,8 @@
-﻿## [v1.6.23] - 2026-04-15
+﻿## [v1.6.24] - 2026-04-15
+### Optimized
+- **股價刷新智慧快取**：`refreshHoldingPrices` 加入盤中/盤後分段快取控制。台股盤中（平日 09:00–13:30）快取 5 分鐘，收盤後與週末快取 24 小時，避免收盤後或假日持續浪費 API 請求
+
+## [v1.6.23] - 2026-04-15
 ### Fixed
 - **ESM 模組解析修復**：`package.json` 設有 `"type": "module"`，Node.js ESM 嚴格要求相對路徑 import 必須含副檔名；`cron-newsletter.ts`、`cron-newsletter-prepare.ts`、`send-newsletter-single.ts` 三個 api 函數的 `_newsletter-utils` import 改為 `.js` 副檔名，修復 `FUNCTION_INVOCATION_FAILED / ERR_MODULE_NOT_FOUND` 錯誤
 

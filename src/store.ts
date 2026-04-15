@@ -4,6 +4,18 @@ import type { Session } from '@supabase/supabase-js';
 import type { UserAccount, Trade, Holding, WithdrawalRequest, FeatureOverride, SystemSettings, LessonResult, RewardRule, RewardTriggerType, WalletTransaction, RewardShopItem, RedemptionRequest } from './types';
 import { fetchStockData, fetchOfficialClosePrice } from './api';
 
+// ─── 股價刷新快取控制 ─────────────────────────────────────────────────────────
+let lastPriceRefreshAt: number | null = null;
+
+/** 判斷現在是否台股盤中（平日 09:00–13:30 台灣時間） */
+function isMarketOpen(): boolean {
+  const now = new Date(Date.now() + 8 * 60 * 60 * 1000);
+  const day = now.getUTCDay(); // 0=日, 6=六
+  if (day === 0 || day === 6) return false;
+  const minutes = now.getUTCHours() * 60 + now.getUTCMinutes();
+  return minutes >= 9 * 60 && minutes < 13 * 60 + 30;
+}
+
 // ==========================================
 // 輔助函式
 // ==========================================
@@ -1089,6 +1101,12 @@ export const useStore = create<InvestmentStore>((set, get) => ({
   refreshHoldingPrices: async () => {
     const { user, holdings } = get();
     if (!supabase || !user || holdings.length === 0) return;
+
+    // ── 快取判斷：盤中 5 分鐘、盤後/假日 24 小時 ──────────────────────────
+    const now = Date.now();
+    const ttl = isMarketOpen() ? 5 * 60 * 1000 : 24 * 60 * 60 * 1000;
+    if (lastPriceRefreshAt !== null && now - lastPriceRefreshAt < ttl) return;
+    lastPriceRefreshAt = now;
 
     // 1. 同時取官方 TWSE/TPEx（快取，快速）與 ifalgo（最新當日收盤，即時）
     //    比較兩者日期，使用較新的那筆 → 解決官方 API 盤後延遲問題
