@@ -155,6 +155,9 @@ interface InvestmentStore {
   // Price Refresh
   refreshHoldingPrices: () => Promise<void>;
 
+  // Trade Note
+  updateTradeNote: (tradeId: string, note: string) => Promise<{ error: string | null }>;
+
   // Getters
   getPortfolioSummary: () => PortfolioSummary;
 }
@@ -1163,6 +1166,23 @@ export const useStore = create<InvestmentStore>((set, get) => ({
       // 4. 同步更新 store，觸發所有頁面 re-render
       set({ holdings: updatedHoldings });
     }
+  },
+
+  // ─── Trade Note ────────────────────────────
+  updateTradeNote: async (tradeId, note) => {
+    const { user } = get();
+    if (!user || !supabase) return { error: '尚未登入' };
+    const { error } = await supabase
+      .from('trades')
+      .update({ reason: note })
+      .eq('id', tradeId)
+      .eq('user_id', user.id);
+    if (error) return { error: error.message };
+    // 同步更新 store
+    set(state => ({
+      trades: state.trades.map(t => t.id === tradeId ? { ...t, reason: note } : t),
+    }));
+    return { error: null };
   },
 
   // ─── Trading ───────────────────────────────

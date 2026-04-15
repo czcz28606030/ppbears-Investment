@@ -5,6 +5,99 @@
   padding-bottom: 80px;
 }
 
+/* ── 日期快選列 ──────────────────────────────── */
+.th-range-bar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.th-range-btn {
+  flex: 1;
+  min-width: 48px;
+  padding: 8px 6px;
+  border-radius: 10px;
+  border: 1.5px solid rgba(0,0,0,0.1);
+  background: var(--bg-card);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: var(--transition-fast);
+  text-align: center;
+}
+.th-range-btn.active {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
+
+/* ── 自訂日期 ────────────────────────────────── */
+.th-custom-range {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--bg-card);
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(0,0,0,0.07);
+}
+.th-custom-range input[type="date"] {
+  flex: 1;
+  border: 1px solid rgba(0,0,0,0.12);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 14px;
+  font-family: inherit;
+  background: var(--bg-base);
+  color: var(--text-primary);
+}
+.th-custom-range span {
+  color: var(--text-tertiary);
+  font-weight: 700;
+}
+
+/* ── 統計摘要卡 ──────────────────────────────── */
+.th-stats-card {
+  background: var(--bg-card);
+  border-radius: 16px;
+  padding: 16px 20px;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-left: 5px solid var(--text-tertiary);
+}
+.th-stats-card.profit { border-left-color: #4CAF50; }
+.th-stats-card.loss   { border-left-color: #F44336; }
+
+.th-stats-main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.th-stats-label {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  font-weight: 600;
+}
+.th-stats-value {
+  font-size: 22px;
+  font-weight: 900;
+}
+.th-stats-sub {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.th-stats-win   { color: #4CAF50; }
+.th-stats-loss  { color: #F44336; }
+.th-stats-total { color: var(--text-tertiary); }
+
+/* ── 搜尋列 ──────────────────────────────────── */
 .history-search-bar {
   display: flex;
   align-items: center;
@@ -153,4 +246,70 @@
 
 .btn-yahoo-chart:hover {
   background: rgba(123, 44, 191, 0.1);
+}
+
+/* ── 投資心得編輯 ─────────────────────────────── */
+.trade-reason-box {
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.trade-reason-box:hover {
+  background: rgba(0,0,0,0.06);
+}
+.trade-note-edit-hint {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  font-weight: 400;
+}
+.trade-note-empty {
+  color: var(--text-tertiary);
+  font-style: italic;
+}
+
+.trade-note-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.trade-note-textarea {
+  width: 100%;
+  border: 1.5px solid var(--primary);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-family: inherit;
+  resize: vertical;
+  background: var(--bg-base);
+  color: var(--text-primary);
+  outline: none;
+  box-sizing: border-box;
+}
+.trade-note-edit-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+.btn-note-save {
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 7px 16px;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+}
+.btn-note-save:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.btn-note-cancel {
+  background: transparent;
+  border: 1px solid rgba(0,0,0,0.15);
+  border-radius: 8px;
+  padding: 7px 16px;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  color: var(--text-secondary);
 }
