@@ -1,4 +1,8 @@
-﻿## [v1.6.22] - 2026-04-15
+﻿## [v1.6.23] - 2026-04-15
+### Fixed
+- **ESM 模組解析修復**：`package.json` 設有 `"type": "module"`，Node.js ESM 嚴格要求相對路徑 import 必須含副檔名；`cron-newsletter.ts`、`cron-newsletter-prepare.ts`、`send-newsletter-single.ts` 三個 api 函數的 `_newsletter-utils` import 改為 `.js` 副檔名，修復 `FUNCTION_INVOCATION_FAILED / ERR_MODULE_NOT_FOUND` 錯誤
+
+## [v1.6.22] - 2026-04-15
 ### Fixed
 - **電子報 cron 逾時修復**：`cron-newsletter.ts` 補上 `export const config = { maxDuration: 60 }`，與 `cron-newsletter-prepare` 及 `send-newsletter-single` 一致，解決 Vercel 預設 10 秒上限導致 7 點電子報發送被強制中斷、用戶收不到信的問題
 

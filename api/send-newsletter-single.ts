@@ -19,7 +19,7 @@ import {
   resend,
   loadTodayCache,
   getTodayTW,
-} from './_newsletter-utils';
+} from './_newsletter-utils.js';
 
 export const config = {
   maxDuration: 60,

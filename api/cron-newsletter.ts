@@ -7,7 +7,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import {
   supabase, fetchLatestSimonsData, filterByAI,
   sendNewsletterToUser, loadTodayCache, getTodayTW,
-} from './_newsletter-utils';
+} from './_newsletter-utils.js';
 
 export const config = {
   maxDuration: 60,
