@@ -2,6 +2,104 @@
   padding: 0 0 100px;
 }
 
+/* ── 申請出金表單 ────────────────────────────────── */
+.withdrawal-form-section {
+  padding: 16px;
+  margin-bottom: 24px;
+}
+
+.form-title {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin-bottom: 12px;
+}
+
+.withdrawal-form-card {
+  background: var(--bg-card);
+  border: 2px solid var(--primary);
+  border-radius: 16px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.form-balance-note {
+  background: rgba(0,0,0,0.04);
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  font-weight: 700;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.form-input {
+  border: 1px solid rgba(0,0,0,0.1);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-family: inherit;
+  background: var(--bg-base);
+  color: var(--text-primary);
+  outline: none;
+}
+.form-input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(123, 44, 191, 0.1);
+}
+.form-input:disabled {
+  background: rgba(0,0,0,0.04);
+  cursor: not-allowed;
+}
+
+.form-textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+.form-error {
+  background: rgba(244, 67, 54, 0.1);
+  border-left: 3px solid #f44336;
+  color: #c62828;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.btn-withdrawal-submit {
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  padding: 12px 16px;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+.btn-withdrawal-submit:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(123, 44, 191, 0.3);
+}
+.btn-withdrawal-submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .approval-section {
   padding: 0 16px;
   margin-bottom: 24px;
