@@ -1,4 +1,8 @@
-﻿## [v1.6.21] - 2026-04-14
+﻿## [v1.6.22] - 2026-04-15
+### Fixed
+- **電子報 cron 逾時修復**：`cron-newsletter.ts` 補上 `export const config = { maxDuration: 60 }`，與 `cron-newsletter-prepare` 及 `send-newsletter-single` 一致，解決 Vercel 預設 10 秒上限導致 7 點電子報發送被強制中斷、用戶收不到信的問題
+
+## [v1.6.21] - 2026-04-14
 ### Fixed
 - **股價時序落差全面修復**：TWSE/TPEx OpenAPI 盤後有延遲時，自動比較日期並 fallback 至較新的 ifalgo 收盤價，確保個股頁、探索搜尋、Dashboard/Portfolio 三處顯示完全一致
 - **上櫃股 vite proxy 補漏**：`vite.config.ts` 補上 `/api/tpex` 開發 proxy，修正 dev 模式下上櫃股（如台耀 6274）查詢全部 404 的問題

@@ -9,6 +9,10 @@ import {
   sendNewsletterToUser, loadTodayCache, getTodayTW,
 } from './_newsletter-utils';
 
+export const config = {
+  maxDuration: 60,
+};
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const authHeader = req.headers.authorization;
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}` && process.env.NODE_ENV === 'production') {
