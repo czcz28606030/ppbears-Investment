@@ -1,0 +1,72 @@
+{
+  "lesson_id": "L012",
+  "stage": 1,
+  "level": 3,
+  "domain": "basic",
+  "title": "什麼是存款帳戶？",
+  "summary": "認識銀行帳戶的概念，了解存款和提款的基本操作。",
+  "cards": [
+    {
+      "type": "text_image",
+      "title": "你在銀行的小房間",
+      "body": "「帳戶」就像你在銀行裡的一個專屬小房間 🏠。你的錢都放在這個小房間裡，只有你（和你的爸媽）可以進去拿錢。每個帳戶都有一個專屬號碼，叫做「帳號」。",
+      "image_key": "lesson_012_card_01"
+    },
+    {
+      "type": "text_image",
+      "title": "存款和提款",
+      "body": "• 「存款」= 把錢放進帳戶裡 📥\n  就像把東西放進保險箱\n\n• 「提款」= 從帳戶裡拿錢出來 📤\n  就像打開保險箱拿東西\n\n存了多少、拿了多少，銀行都會幫你記得清清楚楚！",
+      "image_key": "lesson_012_card_02"
+    },
+    {
+      "type": "text_image",
+      "title": "存摺：你的錢的日記",
+      "body": "「存摺」就像一本小日記 📖，記錄你的帳戶裡每一筆進出：\n\n04/01 存入 +500 元\n04/05 提款 -200 元\n04/10 利息 +2 元\n餘額：302 元\n\n隨時都能知道你有多少錢！",
+      "image_key": "lesson_012_card_03"
+    },
+    {
+      "type": "text_image",
+      "title": "兒童也能開帳戶！",
+      "body": "你知道嗎？小朋友也可以開銀行帳戶喔！🎉\n只要爸爸媽媽帶著你的身分證和印章，就可以去銀行開一個屬於你自己的帳戶。\n\n從今天開始，你也可以是有銀行帳戶的小大人了！🐻💪",
+      "image_key": "lesson_012_card_04"
+    }
+  ],
+  "preset_questions": [
+    {
+      "question_type": "choice",
+      "question_text": "把錢放進銀行帳戶裡，這個動作叫什麼？",
+      "options": [
+        "提款",
+        "存款",
+        "轉帳",
+        "換匯"
+      ],
+      "correct_answer": 1,
+      "explanation": "對！📥 把錢放進帳戶叫做「存款」，把錢取出來叫做「提款」。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "存摺會記錄你帳戶裡每一筆錢的進出。",
+      "correct_answer": true,
+      "explanation": "沒錯！📖 存摺就像帳戶的日記，存了多少、花了多少、還剩多少，都記得一清二楚。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "下面關於銀行帳戶的說法，哪個是「對」的？",
+      "options": [
+        "任何人都可以到你的帳戶拿錢",
+        "帳戶裡的錢會自己消失",
+        "每個帳戶都有一個專屬的帳號",
+        "小朋友不能開銀行帳戶"
+      ],
+      "correct_answer": 2,
+      "explanation": "答對了！🔢 每個帳戶都有唯一的帳號，而且小朋友只要有爸媽陪同也可以開帳戶喔！"
+    }
+  ],
+  "ai_prompt_context": {
+    "topic": "銀行帳戶、存款、提款和存摺",
+    "age_hint": "6-8歲",
+    "vocabulary_level": "simple",
+    "metaphor_suggestions": ["保險箱小房間", "日記本", "存摺紀錄", "帳號像電話號碼"]
+  }
+}

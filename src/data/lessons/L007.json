@@ -1,0 +1,72 @@
+{
+  "lesson_id": "L007",
+  "stage": 1,
+  "level": 2,
+  "domain": "psychology",
+  "title": "想要 vs 需要",
+  "summary": "學會分辨「想要」和「需要」，做出更聰明的花錢決定。",
+  "cards": [
+    {
+      "type": "text_image",
+      "title": "想要和需要不一樣？",
+      "body": "你知道嗎？「想要」和「需要」是不一樣的！🤔\n\n• 需要 = 沒有會很困擾的東西\n• 想要 = 有了會很開心的東西\n\n學會分辨它們，你就能做出更聰明的決定！",
+      "image_key": "lesson_007_card_01"
+    },
+    {
+      "type": "text_image",
+      "title": "什麼是「需要」？",
+      "body": "「需要」的東西是生活中不能少的：\n• 食物和水 🍚💧 — 不吃會餓肚子\n• 衣服 👕 — 不穿會冷\n• 上學的文具 ✏️ — 不帶沒辦法學習\n• 看醫生 🏥 — 生病了要治療\n\n這些是「必須要有」的東西！",
+      "image_key": "lesson_007_card_02"
+    },
+    {
+      "type": "text_image",
+      "title": "什麼是「想要」？",
+      "body": "「想要」的東西是有了會開心，但沒有也不會怎樣：\n• 最新的玩具 🧸\n• 第三杯飲料 🧋\n• 遊樂園的紀念品 🎪\n• 已經有很多了的貼紙 ✨\n\n想要的東西不是不能買，但要先滿足需要！",
+      "image_key": "lesson_007_card_03"
+    },
+    {
+      "type": "text_image",
+      "title": "購物前問自己",
+      "body": "下次想買東西的時候，先問自己：\n\n❓ 這是「需要」還是「想要」？\n❓ 如果不買，會怎樣？\n❓ 我的存錢目標更重要嗎？\n\n想清楚再買，你就是聰明的小小理財家！🐻💡",
+      "image_key": "lesson_007_card_04"
+    }
+  ],
+  "preset_questions": [
+    {
+      "question_type": "choice",
+      "question_text": "下面哪一個是「需要」的東西？",
+      "options": [
+        "最新款的遊戲機",
+        "每天要吃的午餐",
+        "第五個布偶玩具",
+        "遊樂園的棉花糖"
+      ],
+      "correct_answer": 1,
+      "explanation": "答對了！🍱 午餐是每天都需要的，不吃會餓肚子。遊戲機和玩具是「想要」的東西。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "「想要」的東西一定不能買。",
+      "correct_answer": false,
+      "explanation": "不是喔！😊 想要的東西也可以買，但要先確定「需要」的東西都有了，而且不會超出預算。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "買東西之前，哪個問題最應該先問自己？",
+      "options": [
+        "這個好不好看？",
+        "別人有沒有買？",
+        "這是需要還是想要？",
+        "這個貴不貴？"
+      ],
+      "correct_answer": 2,
+      "explanation": "很棒！💡 買東西前先想想是「需要」還是「想要」，這樣才能做出聰明的花錢決定。"
+    }
+  ],
+  "ai_prompt_context": {
+    "topic": "需要與想要的區別，理性消費",
+    "age_hint": "6-8歲",
+    "vocabulary_level": "simple",
+    "metaphor_suggestions": ["買玩具", "午餐便當", "零用錢決策", "文具和飲料"]
+  }
+}

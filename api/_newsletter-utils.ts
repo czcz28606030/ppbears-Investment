@@ -514,13 +514,32 @@ export async function sendNewsletterToUser(
 
     if (hasAi || !strategy) {
       // AI 模式：使用快取的 AI 篩選結果
-      if (!aiFilteredCache || aiFilteredCache.length === 0) return { success: false, error: '無 AI 精選股票' };
-      stocks = aiFilteredCache;
+      // 若 AI 快取為空（篩選嚴格或當日資料未備妥），fallback 至策略 B（最近變強公司）
+      if (!aiFilteredCache || aiFilteredCache.length === 0) {
+        console.warn(`[newsletter] ${user.email}: AI 快取空，fallback 至策略 B`);
+        stocks = filterByStrategy(allStocks, 'B');
+        strategyLabel = STRATEGY_LABELS['B'];
+        if (stocks.length === 0) {
+          // 最後 fallback：策略 A（穩穩大公司）
+          stocks = filterByStrategy(allStocks, 'A');
+          strategyLabel = STRATEGY_LABELS['A'];
+        }
+        if (stocks.length === 0) return { success: false, error: 'AI 快取與策略篩選均無結果，跳過發信' };
+        await generateStocksAnalysis(stocks);
+      } else {
+        stocks = aiFilteredCache;
+      }
     } else {
       // 策略模式
       stocks = filterByStrategy(allStocks, strategy);
       strategyLabel = STRATEGY_LABELS[strategy];
-      if (stocks.length === 0) return { success: false, error: `策略 ${strategy} 無符合股票` };
+      if (stocks.length === 0) {
+        // fallback 至策略 A 避免漏信
+        console.warn(`[newsletter] ${user.email}: 策略 ${strategy} 無結果，fallback 至策略 A`);
+        stocks = filterByStrategy(allStocks, 'A');
+        strategyLabel = STRATEGY_LABELS['A'];
+        if (stocks.length === 0) return { success: false, error: `策略 ${strategy} 及 fallback 均無符合股票` };
+      }
       await generateStocksAnalysis(stocks);
     }
 

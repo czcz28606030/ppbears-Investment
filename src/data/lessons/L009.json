@@ -1,0 +1,72 @@
+{
+  "lesson_id": "L009",
+  "stage": 1,
+  "level": 2,
+  "domain": "basic",
+  "title": "什麼是利息？",
+  "summary": "認識存錢到銀行會產生利息的概念，理解錢可以自己長大。",
+  "cards": [
+    {
+      "type": "text_image",
+      "title": "錢也會長大？",
+      "body": "你知道嗎？如果你把錢存到銀行，銀行會每年多給你一點點錢！🏦 這多出來的錢就叫做「利息」。就像你的錢在銀行裡默默地長大了一樣 🌱",
+      "image_key": "lesson_009_card_01"
+    },
+    {
+      "type": "text_image",
+      "title": "為什麼銀行要給利息？",
+      "body": "因為你把錢存進銀行，銀行會拿你的錢去借給其他人用（例如借給要開店的老闆）。借錢的人會付給銀行「利息」，銀行再把一部分分給你 🤝\n\n所以「存錢 = 你在幫助銀行，銀行用利息感謝你」！",
+      "image_key": "lesson_009_card_02"
+    },
+    {
+      "type": "text_image",
+      "title": "利息有多少？",
+      "body": "如果利率是 1%，你存 1,000 元到銀行：\n• 一年後 → 得到 10 元利息 💰\n• 你的錢變成 1,010 元！\n\n雖然聽起來不多，但如果存的錢越多、時間越久，利息也會越來越多喔！📈",
+      "image_key": "lesson_009_card_03"
+    },
+    {
+      "type": "text_image",
+      "title": "利息的小秘密：複利",
+      "body": "有一個超酷的秘密叫「複利」🔮：\n\n第二年的利息，會用你的 1,010 元去算（而不是只用 1,000 元）。也就是「利息也會生利息」！\n\n愛因斯坦說：複利是世界第八大奇蹟！🐻✨",
+      "image_key": "lesson_009_card_04"
+    }
+  ],
+  "preset_questions": [
+    {
+      "question_type": "choice",
+      "question_text": "把錢存到銀行，銀行多給你的錢叫什麼？",
+      "options": [
+        "零用錢",
+        "利息",
+        "罰金",
+        "紅包"
+      ],
+      "correct_answer": 1,
+      "explanation": "答對了！💰 銀行多給你的錢叫做「利息」，是銀行感謝你把錢存進去的報酬。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "複利就是「利息也會再生利息」的意思。",
+      "correct_answer": true,
+      "explanation": "完全正確！🔮 複利就是利滾利，你的利息也會繼續產生利息，這是累積財富的大秘密！"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "存 1,000 元在銀行，利率 1%，一年後利息是多少？",
+      "options": [
+        "1 元",
+        "10 元",
+        "100 元",
+        "1,000 元"
+      ],
+      "correct_answer": 1,
+      "explanation": "對！🎉 1,000 × 1% = 10 元。所以一年後你的存款變成 1,010 元！"
+    }
+  ],
+  "ai_prompt_context": {
+    "topic": "利息與複利的基本概念",
+    "age_hint": "6-8歲",
+    "vocabulary_level": "simple",
+    "metaphor_suggestions": ["錢長大", "銀行感謝你", "利滾利", "種子發芽"]
+  }
+}

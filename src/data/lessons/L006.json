@@ -1,0 +1,72 @@
+{
+  "lesson_id": "L006",
+  "stage": 1,
+  "level": 2,
+  "domain": "basic",
+  "title": "存錢筒大冒險",
+  "summary": "了解儲蓄的重要性，以及存錢可以幫助我們達成目標。",
+  "cards": [
+    {
+      "type": "text_image",
+      "title": "小豬存錢筒",
+      "body": "你有存錢筒嗎？🐷 存錢筒就像一個小小的銀行，專門幫你保管零錢。每次投進一枚硬幣，叮叮叮～它就會幫你把錢存好！",
+      "image_key": "lesson_006_card_01"
+    },
+    {
+      "type": "text_image",
+      "title": "設定儲蓄目標",
+      "body": "存錢最有趣的方式就是設定一個目標 🎯！\n\n例如：「我想存到 500 元買一本漫畫！」\n\n有了目標，你就會更有動力把錢存起來，而不是隨便花掉。",
+      "image_key": "lesson_006_card_02"
+    },
+    {
+      "type": "text_image",
+      "title": "積少成多的威力",
+      "body": "每天存 10 元，聽起來很少對吧？但是：\n• 1 週 = 70 元 🪙\n• 1 個月 = 300 元 💰\n• 1 年 = 3,650 元 🤩\n\n哇！一年後居然有這麼多！這就是「積少成多」的威力。",
+      "image_key": "lesson_006_card_03"
+    },
+    {
+      "type": "text_image",
+      "title": "存錢小挑戰",
+      "body": "小熊老師給你一個挑戰 🐻：\n從今天開始，每天找一枚硬幣投進存錢筒。等存錢筒滿了，打開來數數看有多少錢！你會發現，原來一點一點的累積，最後會變成好大一筆呢！✨",
+      "image_key": "lesson_006_card_04"
+    }
+  ],
+  "preset_questions": [
+    {
+      "question_type": "choice",
+      "question_text": "每天存 10 元，一年後大約有多少錢？",
+      "options": [
+        "100 元",
+        "1,000 元",
+        "3,650 元",
+        "10,000 元"
+      ],
+      "correct_answer": 2,
+      "explanation": "答對了！🎉 10 元 × 365 天 = 3,650 元。每天一點點，累積起來很驚人喔！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "存錢之前最好先設定一個目標。",
+      "correct_answer": true,
+      "explanation": "對！🎯 有了目標（例如：存到 500 元買漫畫），你就會更有動力堅持存錢。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "「積少成多」是什麼意思？",
+      "options": [
+        "一次存很多錢",
+        "一點一點累積，最後變很多",
+        "把錢全部花掉",
+        "跟別人借很多錢"
+      ],
+      "correct_answer": 1,
+      "explanation": "沒錯！✨ 積少成多就是每次存一點點，經過時間的累積，就會變成很大一筆錢。"
+    }
+  ],
+  "ai_prompt_context": {
+    "topic": "儲蓄的概念與積少成多",
+    "age_hint": "6-8歲",
+    "vocabulary_level": "simple",
+    "metaphor_suggestions": ["存錢筒", "撲滿", "每天存10元", "買漫畫的目標"]
+  }
+}

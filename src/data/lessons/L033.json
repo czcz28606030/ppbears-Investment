@@ -1,0 +1,72 @@
+{
+  "lesson_id": "L033",
+  "stage": 2,
+  "level": 7,
+  "domain": "basic",
+  "title": "為什麼股票會跌？",
+  "summary": "了解股票下跌的原因，學會面對虧損的正確心態。",
+  "cards": [
+    {
+      "type": "text_image",
+      "title": "壞消息讓股票跌",
+      "body": "股票下跌最常見的原因是「壞消息」📰：\n\n• 📉 公司虧錢 — 賺的比預期少\n• 🏭 產品出問題 — 被消費者抱怨\n• 👤 重要人物離開 — 大老闆辭職\n• ⚖️ 被罰款 — 違反法規被政府處罰\n• 🌧️ 天災 — 工廠被颱風損壞",
+      "image_key": "lesson_033_card_01"
+    },
+    {
+      "type": "text_image",
+      "title": "大家一起怕",
+      "body": "有時候不只一間公司跌，是所有股票一起跌！😱\n\n• 全球經濟不好 → 大家怕虧錢都在賣\n• 央行升息 → 借錢成本增加\n• 戰爭或疫情 → 大家恐慌\n\n整個市場一起下跌叫做「空頭市場」🐻（熊市）",
+      "image_key": "lesson_033_card_02"
+    },
+    {
+      "type": "text_image",
+      "title": "跌了怎麼辦？",
+      "body": "當你的股票跌了，最重要的是：\n\n❌ 不要恐慌亂賣\n❌ 不要一直看股價讓自己害怕\n\n✅ 冷靜分析：公司本身還好嗎？\n✅ 如果公司沒有大問題，可以耐心等待\n\n好公司的股票跌了通常還會漲回來！⏰",
+      "image_key": "lesson_033_card_03"
+    },
+    {
+      "type": "text_image",
+      "title": "危機就是轉機",
+      "body": "換個角度想 💡：\n\n股票跌了 = 打折了！\n\n就像你最愛的鞋子打 7 折，你會高興還是擔心？🛍️\n\n如果是好公司的股票便宜賣，反而是買進的好機會！\n\n「別人恐懼時要貪婪」— 巴菲特 🧙‍♂️🐻",
+      "image_key": "lesson_033_card_04"
+    }
+  ],
+  "preset_questions": [
+    {
+      "question_type": "choice",
+      "question_text": "整個股票市場一起下跌，這叫做什麼市場？",
+      "options": [
+        "多頭市場（牛市）",
+        "空頭市場（熊市）",
+        "菜市場",
+        "跳蚤市場"
+      ],
+      "correct_answer": 1,
+      "explanation": "對！🐻 整個市場一起下跌叫做「空頭市場」或「熊市」。市場一起上漲則叫「多頭市場」或「牛市」。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "股票跌了就應該馬上全部賣掉。",
+      "correct_answer": false,
+      "explanation": "不對！❌ 恐慌亂賣通常會虧更多。要先冷靜分析公司是否真的有問題，再決定要不要賣。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "巴菲特說「別人恐懼時要？」",
+      "options": [
+        "更恐懼",
+        "趕快逃",
+        "貪婪（尋找好機會）",
+        "不投資了"
+      ],
+      "correct_answer": 2,
+      "explanation": "🧙‍♂️ 別人恐懼時要貪婪 — 意思是市場恐慌、好公司的股票被低估時，反而是買進的好機會！"
+    }
+  ],
+  "ai_prompt_context": {
+    "topic": "股票下跌的原因與正確應對心態",
+    "age_hint": "7-9歲",
+    "vocabulary_level": "simple",
+    "metaphor_suggestions": ["壞消息", "空頭市場", "打折買", "巴菲特恐懼與貪婪"]
+  }
+}

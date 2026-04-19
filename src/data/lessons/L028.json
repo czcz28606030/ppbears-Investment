@@ -1,0 +1,72 @@
+{
+  "lesson_id": "L028",
+  "stage": 2,
+  "level": 6,
+  "domain": "basic",
+  "title": "成本與利潤",
+  "summary": "深入了解成本的種類和利潤的計算方式。",
+  "cards": [
+    {
+      "type": "text_image",
+      "title": "成本有很多種",
+      "body": "開一間雞排店的成本不只是買雞肉 🍗：\n\n📦 材料成本 — 雞肉、油、調味料\n🏠 租金 — 店面租金\n👷 人事 — 員工薪水\n💡 水電 — 水費、電費、瓦斯\n📣 行銷 — 招牌、傳單、廣告\n\n全部加起來才是真正的「總成本」！",
+      "image_key": "lesson_028_card_01"
+    },
+    {
+      "type": "text_image",
+      "title": "毛利 vs 淨利",
+      "body": "利潤其實有兩種算法：\n\n🟡 毛利 = 營收 - 材料成本\n（雞排賣 60 元 - 雞肉成本 30 元 = 毛利 30 元）\n\n🟢 淨利 = 營收 - 全部成本\n（還要再扣租金、薪水、水電等）\n\n淨利才是最後真正賺到的！",
+      "image_key": "lesson_028_card_02"
+    },
+    {
+      "type": "text_image",
+      "title": "來算算看",
+      "body": "小明雞排店一個月：\n• 營收：180,000 元 💰\n• 材料：60,000 元\n• 租金：30,000 元\n• 薪水：50,000 元\n• 水電：10,000 元\n\n毛利 = 180,000 - 60,000 = 120,000 \n淨利 = 180,000 - 150,000 = 30,000 元 ✨",
+      "image_key": "lesson_028_card_03"
+    },
+    {
+      "type": "text_image",
+      "title": "省成本也是賺錢",
+      "body": "公司要賺更多錢有兩種方法：\n\n📈 方法一：賣更多東西（增加營收）\n📉 方法二：降低成本\n\n就像你要存更多零用錢：可以想辦法多賺，也可以減少不必要的花費。兩者並用效果最好！🐻💡",
+      "image_key": "lesson_028_card_04"
+    }
+  ],
+  "preset_questions": [
+    {
+      "question_type": "choice",
+      "question_text": "「毛利」是怎麼算的？",
+      "options": [
+        "營收 + 成本",
+        "營收 - 材料成本",
+        "營收 - 全部成本",
+        "營收 × 成本"
+      ],
+      "correct_answer": 1,
+      "explanation": "對！🟡 毛利 = 營收 - 材料成本。它只扣掉最直接的材料成本，還沒扣租金和薪水等。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "降低成本也是讓公司賺更多錢的方法之一。",
+      "correct_answer": true,
+      "explanation": "沒錯！📉 賺更多或省更多，都能讓利潤增加。好的公司會兩者並用！"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "營收 180,000 元 - 總成本 150,000 元 = ？",
+      "options": [
+        "毛利 30,000",
+        "淨利 30,000",
+        "營收 30,000",
+        "成本 30,000"
+      ],
+      "correct_answer": 1,
+      "explanation": "答對了！💚 營收扣掉全部成本後的結果是「淨利」30,000 元，這是公司真正賺到的錢。"
+    }
+  ],
+  "ai_prompt_context": {
+    "topic": "成本種類、毛利與淨利的計算",
+    "age_hint": "7-9歲",
+    "vocabulary_level": "simple",
+    "metaphor_suggestions": ["雞排店成本", "毛利vs淨利", "省成本=賺錢", "材料租金薪水"]
+  }
+}

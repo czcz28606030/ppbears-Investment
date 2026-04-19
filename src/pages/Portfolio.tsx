@@ -19,7 +19,8 @@ export default function Portfolio() {
   const pl = summary.totalProfitLoss;
   const isProfit = pl >= 0;
 
-  const [aiSignals, setAiSignals] = useState<Record<string, { advice: string, color: string, icon: string }>>({});
+  const [aiSignals, setAiSignals] = useState<Record<string, { advice: string, color: string, icon: string, signalType: 'buy' | 'sell' | 'neutral' }>>({});
+  const [signalDataDate, setSignalDataDate] = useState<string>('');;
   const [enableCustomSignal, setEnableCustomSignal] = useState(() => {
     return localStorage.getItem('ppbears_custom_signal') === 'true';
   });
@@ -38,28 +39,30 @@ export default function Portfolio() {
         return;
       }
       
-      const signals: Record<string, { advice: string, color: string, icon: string }> = {};
+      const signals: Record<string, { advice: string, color: string, icon: string, signalType: 'buy' | 'sell' | 'neutral' }> = {};
       
       if (hasAiFeature) {
         try {
           let buySet = new Set<string>();
+          const _pad = (n: number) => String(n).padStart(2, '0');
           for (let i = 0; i < 7; i++) {
             const d = new Date();
             d.setDate(d.getDate() - i);
             if (d.getDay() === 0 || d.getDay() === 6) continue;
-            const dateStr = d.toISOString().split('T')[0];
+            const dateStr = `${d.getFullYear()}-${_pad(d.getMonth() + 1)}-${_pad(d.getDate())}`;
             const res = await fetch(`https://api.ifalgo.com.tw/frontapi/common/getSimonsData?searchDate=${dateStr}`);
             const data = await res.json();
             const items = data.data?.dataItems || [];
             if (items.length > 0) {
               buySet = new Set(items.map((it: any) => it.coid));
+              if (mounted) setSignalDataDate(dateStr);
               break;
             }
           }
 
           await Promise.all(holdings.map(async (h) => {
             if (buySet.has(h.stockCode)) {
-              signals[h.stockCode] = { advice: 'AI 加碼', color: '#FF2424', icon: '👑 🚀' };
+              signals[h.stockCode] = { advice: 'AI 加碼', color: '#dc2626', icon: '🚀', signalType: 'buy' };
               return;
             }
             try {
@@ -69,13 +72,13 @@ export default function Portfolio() {
               if (list.length > 0) {
                 const last = list[list.length - 1];
                 if (last.sell_sig === '出場' || last.sell_sig === '賣出') {
-                  signals[h.stockCode] = { advice: 'AI 出場', color: 'var(--loss-color)', icon: '👑 ⚠️' };
+                  signals[h.stockCode] = { advice: 'AI 出場', color: '#16a34a', icon: '⚠️', signalType: 'sell' };
                   return;
                 }
               }
-              signals[h.stockCode] = { advice: 'AI 中立', color: '#888888', icon: '👑 ⚖️' };
+              signals[h.stockCode] = { advice: 'AI 中立', color: '#888888', icon: '⚖️', signalType: 'neutral' };
             } catch {
-              signals[h.stockCode] = { advice: 'AI 中立', color: '#888888', icon: '👑 ⚖️' };
+              signals[h.stockCode] = { advice: 'AI 中立', color: '#888888', icon: '⚖️', signalType: 'neutral' };
             }
           }));
 
@@ -87,7 +90,8 @@ export default function Portfolio() {
           try {
              const start = new Date();
              start.setDate(start.getDate() - 150);
-             const dateStr = start.toISOString().split('T')[0];
+             const _pad2 = (n: number) => String(n).padStart(2, '0');
+             const dateStr = `${start.getFullYear()}-${_pad2(start.getMonth() + 1)}-${_pad2(start.getDate())}`;
              const res = await fetch(`https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockPrice&data_id=${h.stockCode}&start_date=${dateStr}`);
              const json = await res.json();
              const data = json.data;
@@ -106,11 +110,11 @@ export default function Portfolio() {
                const max20 = Math.max(...closes.slice(-20));
                
                if (lastClose > sma60 && lastClose >= max20) {
-                 signals[h.stockCode] = { advice: '技術 加碼', color: '#FF2424', icon: '📈 🚀' };
+                 signals[h.stockCode] = { advice: '技術 加碼', color: '#dc2626', icon: '🚀', signalType: 'buy' };
                } else if (lastClose < sma60 && prevClose < sma60Prev) {
-                 signals[h.stockCode] = { advice: '技術 出場', color: 'var(--loss-color)', icon: '📉 ⚠️' };
+                 signals[h.stockCode] = { advice: '技術 出場', color: '#16a34a', icon: '⚠️', signalType: 'sell' };
                } else {
-                 signals[h.stockCode] = { advice: '技術 中立', color: '#888888', icon: '➖ ⚖️' };
+                 signals[h.stockCode] = { advice: '技術 中立', color: '#888888', icon: '⚖️', signalType: 'neutral' };
                }
              }
           } catch (e) {
@@ -133,32 +137,42 @@ export default function Portfolio() {
 
       {/* 總覽卡片 */}
       <div className={`card portfolio-summary-card ${summary.totalCost > 0 ? (isProfit ? 'card-profit' : 'card-loss') : 'card-primary'}`}>
-        <div className="ps-row">
-          <div className="ps-item">
-            <div className="ps-label">總資產</div>
-            <div className="ps-value ps-total">NT$ {formatMoney(summary.totalAssets)}</div>
-          </div>
+        <div className="portfolio-asset-label">我的總資產 💰</div>
+        <div className="portfolio-asset-value">
+          <span className="portfolio-asset-currency">NT$</span>
+          <span className="portfolio-asset-number">{formatMoney(summary.totalAssets)}</span>
         </div>
-        <div className="ps-row">
-          <div className="ps-item">
-            <div className="ps-label">💵 可用現金</div>
-            <div className="ps-value">NT$ {formatMoney(summary.cashBalance)}</div>
+
+        <div className="portfolio-asset-details portfolio-asset-details-three">
+          <div className="portfolio-asset-detail">
+            <span className="portfolio-asset-detail-label">💵 可用現金</span>
+            <span className="portfolio-asset-detail-value">
+              <span className="portfolio-asset-currency">NT$</span>
+              <span className="portfolio-asset-number">{formatMoney(summary.cashBalance)}</span>
+            </span>
           </div>
-          <div className="ps-item">
-            <div className="ps-label">📈 投資市值</div>
-            <div className="ps-value">NT$ {formatMoney(summary.totalMarketValue)}</div>
+          <div className="portfolio-asset-detail">
+            <span className="portfolio-asset-detail-label">📈 股票市值</span>
+            <span className="portfolio-asset-detail-value">
+              <span className="portfolio-asset-currency">NT$</span>
+              <span className="portfolio-asset-number">{formatMoney(summary.totalMarketValue)}</span>
+            </span>
           </div>
-        </div>
-        <div className="ps-profit-row">
-          <span>{isProfit ? '📈 目前賺' : '📉 目前虧'}</span>
-          <span className="ps-profit-value">
-            NT$ {formatMoney(Math.abs(pl))}
-            {summary.totalCost > 0 && ` (${isProfit ? '+' : ''}${summary.profitLossPct.toFixed(1)}%)`}
-          </span>
+          <div className="portfolio-asset-detail">
+            <span className="portfolio-asset-detail-label">📊 未平倉損益</span>
+            <span className={`portfolio-asset-detail-value ${pl > 0 ? 'portfolio-asset-pnl-profit' : pl < 0 ? 'portfolio-asset-pnl-loss' : ''}`}>
+              <span className="portfolio-asset-number-row">
+                <span>{pl > 0 ? '+' : ''}</span>
+                <span className="portfolio-asset-currency">NT$</span>
+                <span className="portfolio-asset-number">{formatMoney(pl)}</span>
+              </span>
+              <span className="portfolio-asset-pct">({summary.profitLossPct > 0 ? '+' : ''}{summary.profitLossPct.toFixed(1)}%)</span>
+            </span>
+          </div>
         </div>
       </div>
 
-      <div className="section-header" style={{ marginTop: '24px', marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div className="section-header" style={{ marginTop: '24px', marginBottom: '4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h2 className="section-title" style={{ margin: 0 }}>📊 持股清單 ({holdings.length})</h2>
         {!hasAiFeature && (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
@@ -181,6 +195,18 @@ export default function Portfolio() {
         )}
       </div>
 
+      {/* 資料來源小字 */}
+      <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', marginBottom: '16px', marginTop: '6px', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 600 }}>
+        <span>ℹ️ 資料來源與時間：</span>
+        {(hasAiFeature && signalDataDate) ? (
+          <span style={{ color: 'var(--primary)' }}>Simons 量化模型（{signalDataDate}）</span>
+        ) : enableCustomSignal ? (
+          <span style={{ color: 'var(--primary)' }}>FinMind 技術指標（近 150 日）</span>
+        ) : (
+          <span style={{ color: 'var(--text-tertiary)' }}>台灣證券交易所 TWSE（持倉成本為入場均價）</span>
+        )}
+      </div>
+
       {/* 持股列表 */}
       <div className="holdings-list">
           {holdings.length === 0 ? (
@@ -200,14 +226,14 @@ export default function Portfolio() {
               return (
                 <div
                   key={h.stockCode}
-                  className="holding-item"
+                  className={`holding-item${aiSignals[h.stockCode] ? ` signal-${aiSignals[h.stockCode].signalType}` : ''}`}
                   onClick={() => navigate(`/stock/${h.stockCode}`)}
                 >
                   <div className="holding-left">
                     {aiSignals[h.stockCode] ? (
-                      <div className="holding-emoji" style={{ display: 'flex', flexDirection: 'column', padding: '4px', background: '#f5f5f5', borderRadius: 8, textAlign: 'center' }}>
-                        <span style={{ fontSize: '18px' }}>{aiSignals[h.stockCode].icon}</span>
-                        <span style={{ fontSize: '10px', fontWeight: 800, color: aiSignals[h.stockCode].color }}>{aiSignals[h.stockCode].advice}</span>
+                      <div className={`signal-badge signal-badge-${aiSignals[h.stockCode].signalType}`}>
+                        <span className="signal-badge-icon">{aiSignals[h.stockCode].icon}</span>
+                        <span className="signal-badge-text">{aiSignals[h.stockCode].advice}</span>
                       </div>
                     ) : (
                       <div className="holding-emoji">{itemIsProfit ? '😊' : '😢'}</div>

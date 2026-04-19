@@ -1,0 +1,72 @@
+{
+  "lesson_id": "L004",
+  "stage": 1,
+  "level": 1,
+  "domain": "basic",
+  "title": "零用錢的秘密",
+  "summary": "學會管理零用錢，認識記帳和預算的基本觀念。",
+  "cards": [
+    {
+      "type": "text_image",
+      "title": "你的第一筆收入",
+      "body": "你有拿過零用錢嗎？💰 零用錢就是爸媽給你自己管理的一小筆錢。雖然不多，但這可是你練習理財的第一步！",
+      "image_key": "lesson_004_card_01"
+    },
+    {
+      "type": "text_image",
+      "title": "記帳小達人",
+      "body": "聰明的小朋友會「記帳」📝 — 就是把花了多少錢、買了什麼東西記下來。\n\n例如：\n• 買飲料 -25元 🧋\n• 買文具 -45元 ✏️\n• 剩下 30元\n\n這樣你就知道錢花到哪裡去了！",
+      "image_key": "lesson_004_card_02"
+    },
+    {
+      "type": "text_image",
+      "title": "做一個小預算",
+      "body": "「預算」就是提前計畫好錢要怎麼花。假設你每週有 100 元零用錢：\n• 50 元存起來 🐷\n• 30 元買想要的小東西 🎁\n• 20 元留著備用 🔒\n這就是一個簡單的預算！",
+      "image_key": "lesson_004_card_03"
+    },
+    {
+      "type": "text_image",
+      "title": "零用錢的魔法",
+      "body": "如果你每週存 50 元，一年後你就有 2,600 元了！🤯 這就是「積少成多」的魔法。會管理零用錢的小朋友，長大後也會管理更多的錢 🐻✨",
+      "image_key": "lesson_004_card_04"
+    }
+  ],
+  "preset_questions": [
+    {
+      "question_type": "choice",
+      "question_text": "「記帳」是什麼意思？",
+      "options": [
+        "把錢藏起來",
+        "把花了多少錢記下來",
+        "把錢送給別人",
+        "把錢埋在土裡"
+      ],
+      "correct_answer": 1,
+      "explanation": "答對了！📝 記帳就是記錄自己花了多少錢、買了什麼東西，這樣才知道錢花到哪裡去了。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "每週存50元，一年後大約可以存到2,600元。",
+      "correct_answer": true,
+      "explanation": "對！50 × 52 週 = 2,600 元 🎉 積少成多的力量很強大！"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "什麼是「預算」？",
+      "options": [
+        "把錢全部花光",
+        "提前計畫好錢要怎麼花",
+        "跟別人借錢",
+        "把錢丟掉"
+      ],
+      "correct_answer": 1,
+      "explanation": "沒錯！🌟 預算就是提前計畫好錢要花在哪裡。先做好計畫，才不會亂花錢喔！"
+    }
+  ],
+  "ai_prompt_context": {
+    "topic": "零用錢管理、記帳與預算",
+    "age_hint": "6-8歲",
+    "vocabulary_level": "simple",
+    "metaphor_suggestions": ["存錢筒", "記帳本", "每週零用錢", "便利商店"]
+  }
+}

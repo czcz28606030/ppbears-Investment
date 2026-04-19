@@ -1,0 +1,72 @@
+{
+  "lesson_id": "L029",
+  "stage": 2,
+  "level": 6,
+  "domain": "basic",
+  "title": "好公司的特徵",
+  "summary": "學習辨別好公司和壞公司的基本標準。",
+  "cards": [
+    {
+      "type": "text_image",
+      "title": "什麼樣的公司值得投資？",
+      "body": "不是所有公司都適合投資！好公司通常有這些特徵 🌟：\n\n1️⃣ 持續賺錢（不是只賺一年）\n2️⃣ 營收越來越多\n3️⃣ 大家都認識的品牌\n4️⃣ 做有用的產品或服務\n5️⃣ 管理團隊很認真",
+      "image_key": "lesson_029_card_01"
+    },
+    {
+      "type": "text_image",
+      "title": "護城河：公司的保護罩",
+      "body": "「護城河」是巴菲特最愛用的詞 🏰，指的是公司的競爭優勢：\n\n🛡️ 品牌：大家只認這個牌子（如可口可樂）\n🔬 技術：只有它做得出來（如台積電）\n🌐 網路效應：越多人用越好用（如 LINE）\n💰 成本優勢：它做的最便宜",
+      "image_key": "lesson_029_card_02"
+    },
+    {
+      "type": "text_image",
+      "title": "好公司 vs 壞公司",
+      "body": "✅ 好公司的跡象：\n• 營收穩定成長 📈\n• 每年都有盈餘\n• 會把利潤分給股東\n• 員工對公司評價好\n\n❌ 壞公司的跡象：\n• 一直虧損 📉\n• 常常換管理層\n• 做的東西沒人要\n• 借了很多債",
+      "image_key": "lesson_029_card_03"
+    },
+    {
+      "type": "text_image",
+      "title": "用眼睛觀察",
+      "body": "你不需要看財報也能初步判斷公司好不好 👀：\n\n• 便利商店永遠有人進去 → 生意好\n• 餐廳排隊排超長 → 很受歡迎\n• 新產品總是被搶光 → 有市場需求\n• 朋友都在用某個品牌 → 有品牌力\n\n觀察生活就能學投資 🐻✨",
+      "image_key": "lesson_029_card_04"
+    }
+  ],
+  "preset_questions": [
+    {
+      "question_type": "choice",
+      "question_text": "巴菲特說的「護城河」在投資裡是什麼意思？",
+      "options": [
+        "公司門口的水溝",
+        "公司的競爭優勢，別人很難模仿",
+        "公司的存款金額",
+        "公司的國際營收"
+      ],
+      "correct_answer": 1,
+      "explanation": "對！🏰 護城河就是公司獨有的競爭優勢，讓競爭對手很難搶走它的客人。如品牌、技術、規模等。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "一間好公司應該是長期穩定賺錢，不是只賺一年。",
+      "correct_answer": true,
+      "explanation": "沒錯！📈 持續穩定賺錢的公司比偶爾賺大錢的公司更值得信任和投資。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "下面哪個是「壞公司」的跡象？",
+      "options": [
+        "每年營收都在成長",
+        "每年都有配發股利",
+        "一直虧損而且借很多錢",
+        "品牌很受消費者歡迎"
+      ],
+      "correct_answer": 2,
+      "explanation": "對！⚠️ 一直虧損又借很多錢的公司，可能撐不了太久。投資前一定要避開這種公司。"
+    }
+  ],
+  "ai_prompt_context": {
+    "topic": "判斷好公司的基本標準與護城河概念",
+    "age_hint": "7-9歲",
+    "vocabulary_level": "simple",
+    "metaphor_suggestions": ["護城河", "便利商店排隊", "巴菲特名言", "品牌力"]
+  }
+}

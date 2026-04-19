@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useStore } from '../store';
+import { getAllLessonIds, getLesson } from '../data/lessons';
 import './LearnHome.css';
 
 const STAGES: { id: number; emoji: string; name: string; ageHint: string }[] = [
@@ -20,13 +21,22 @@ const XP_PER_LEVEL = 100;
 
 export default function LearnHome() {
   const navigate = useNavigate();
-  const { user, learningProfile, learningWallet, fetchLearningProfile, fetchLearningWallet } = useStore();
+  const { user, learningProfile, learningWallet, completedLessonIds, fetchLearningProfile, fetchLearningWallet, fetchCompletedLessonIds } = useStore();
 
   useEffect(() => {
     if (!user) return;
     if (!learningProfile) fetchLearningProfile();
     if (!learningWallet) fetchLearningWallet();
-  }, [user, learningProfile, learningWallet, fetchLearningProfile, fetchLearningWallet]);
+    fetchCompletedLessonIds();
+  }, [user, learningProfile, learningWallet, fetchLearningProfile, fetchLearningWallet, fetchCompletedLessonIds]);
+
+  // 找出下一堂未完成的課程
+  const nextLesson = useMemo(() => {
+    const allIds = getAllLessonIds(); // L001, L002, ...
+    const nextId = allIds.find(id => !completedLessonIds.includes(id)) ?? allIds[allIds.length - 1];
+    const lesson = getLesson(nextId);
+    return { id: nextId, title: lesson?.title ?? nextId };
+  }, [completedLessonIds]);
 
   const stage = useMemo(
     () => STAGES.find(s => s.id === (learningProfile?.currentStage ?? 1)) ?? STAGES[0],
@@ -70,11 +80,11 @@ export default function LearnHome() {
       </div>
 
       {/* 今日課程入口 */}
-      <Link to="/learn/lesson/L001" className="card learn-today-cta">
+      <Link to={`/learn/lesson/${nextLesson.id}`} className="card learn-today-cta">
         <div className="learn-today-emoji">📚</div>
         <div className="learn-today-body">
           <div className="learn-today-title">今日課程</div>
-          <div className="learn-today-desc">L001 · 什麼是錢？</div>
+          <div className="learn-today-desc">{nextLesson.id} · {nextLesson.title}</div>
         </div>
         <div className="learn-today-arrow">▶</div>
       </Link>

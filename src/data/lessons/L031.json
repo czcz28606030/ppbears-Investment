@@ -1,0 +1,72 @@
+{
+  "lesson_id": "L031",
+  "stage": 2,
+  "level": 7,
+  "domain": "basic",
+  "title": "股價是怎麼決定的？",
+  "summary": "了解股票價格由買賣雙方的供需決定，就像市場拍賣。",
+  "cards": [
+    {
+      "type": "text_image",
+      "title": "價格由買賣決定",
+      "body": "股票的價格是怎麼決定的呢？🤔\n\n答案是：由想買的人和想賣的人一起決定！\n\n就像在夜市喊價 🎪：\n賣家說：「我的股票 100 元賣！」\n買家說：「我願意出 100 元買！」\n成交！股價 = 100 元。",
+      "image_key": "lesson_031_card_01"
+    },
+    {
+      "type": "text_image",
+      "title": "供給和需求",
+      "body": "🧲 想買的人很多（需求大）→ 股價上漲 📈\n因為大家搶著買，願意出更高的價格\n\n📤 想賣的人很多（供給大）→ 股價下跌 📉\n因為大家搶著賣，願意降低價格\n\n這就是「供需法則」！",
+      "image_key": "lesson_031_card_02"
+    },
+    {
+      "type": "text_image",
+      "title": "像拍賣一樣",
+      "body": "股票市場就像一個超大的拍賣會 🏛️：\n\n每秒鐘都有人在喊：\n「我要買！」「我要賣！」\n\n電腦系統會自動把出價一樣的配對在一起，完成交易。所以股價每秒都在變動！",
+      "image_key": "lesson_031_card_03"
+    },
+    {
+      "type": "text_image",
+      "title": "什麼會影響股價？",
+      "body": "很多事情都會影響股價 🌊：\n\n📈 可能漲的原因：\n• 公司賺很多錢\n• 推出超棒的新產品\n• 大家對未來很樂觀\n\n📉 可能跌的原因：\n• 公司虧錢\n• 發生意外或壞消息\n• 大家對未來很擔心\n\n股價反映的是大家對公司的「期待」🐻",
+      "image_key": "lesson_031_card_04"
+    }
+  ],
+  "preset_questions": [
+    {
+      "question_type": "choice",
+      "question_text": "當很多人想買一檔股票的時候，股價通常會怎樣？",
+      "options": [
+        "下跌",
+        "不變",
+        "上漲",
+        "消失"
+      ],
+      "correct_answer": 2,
+      "explanation": "對！📈 當很多人搶著買（需求大），大家願意出更高的價格，所以股價會上漲。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "股票的價格是由政府統一規定的。",
+      "correct_answer": false,
+      "explanation": "不對喔！🏛️ 股價是由市場上買賣雙方的供需決定的，不是由政府規定。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "下面哪個可能讓股價上漲？",
+      "options": [
+        "公司虧了很多錢",
+        "公司推出非常受歡迎的新產品",
+        "公司的工廠失火了",
+        "公司的老闆跑掉了"
+      ],
+      "correct_answer": 1,
+      "explanation": "沒錯！🎉 推出受歡迎的新產品 → 大家看好公司未來 → 更多人想買 → 股價上漲！"
+    }
+  ],
+  "ai_prompt_context": {
+    "topic": "股票價格的決定機制：供給與需求",
+    "age_hint": "7-9歲",
+    "vocabulary_level": "simple",
+    "metaphor_suggestions": ["夜市喊價", "拍賣會", "供需法則", "搶購vs拋售"]
+  }
+}

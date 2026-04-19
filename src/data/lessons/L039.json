@@ -1,0 +1,72 @@
+{
+  "lesson_id": "L039",
+  "stage": 2,
+  "level": 8,
+  "domain": "technical",
+  "title": "紅色和綠色的秘密",
+  "summary": "認識台灣股市的顏色慣例：紅色代表漲、綠色代表跌，剛好跟歐美相反。",
+  "cards": [
+    {
+      "type": "text_image",
+      "title": "台股的顏色規則",
+      "body": "在台灣看股票，記住這個規則 🎨：\n\n🔴 紅色 = 漲（價格上升）\n🟢 綠色 = 跌（價格下降）\n\n為什麼？因為在華人文化中，紅色代表喜氣和好運 🧧，所以用紅色表示股價上漲！",
+      "image_key": "lesson_039_card_01"
+    },
+    {
+      "type": "text_image",
+      "title": "跟美國剛好相反！",
+      "body": "有趣的小知識 🌍：\n\n🇹🇼 台灣：紅漲綠跌\n🇺🇸 美國：綠漲紅跌\n\n在美國，綠色代表「通行」（像綠燈 🟢）= 好的\n紅色代表「警告」（像紅燈 🔴）= 不好\n\n所以同一個數字，在不同國家用不同顏色！看股票時要注意你看的是哪裡的系統喔 👀",
+      "image_key": "lesson_039_card_02"
+    },
+    {
+      "type": "text_image",
+      "title": "看APP時注意顏色",
+      "body": "打開股票APP或網站時 📱：\n\n• 看到紅色數字 → 今天漲了（比昨天貴）\n• 看到綠色數字 → 今天跌了（比昨天便宜）\n• 看到白色/灰色 → 今天持平（沒漲沒跌）\n\n旁邊還會顯示「+3.5%」或「-2.1%」，代表漲跌幅度。\n\n「+」就是漲，「-」就是跌 ✨",
+      "image_key": "lesson_039_card_03"
+    },
+    {
+      "type": "text_image",
+      "title": "顏色只是參考",
+      "body": "看到紅色不用太開心，看到綠色也不用太擔心 🐻：\n\n• 好公司偶爾跌一天很正常\n• 不好的公司偶爾漲一天也很正常\n\n重要的是長期趨勢，不是今天紅或綠。\n\n就像一次考試不理想不代表你學不好，要看長期進步！📚",
+      "image_key": "lesson_039_card_04"
+    }
+  ],
+  "preset_questions": [
+    {
+      "question_type": "choice",
+      "question_text": "在台灣股市，紅色代表什麼意思？",
+      "options": [
+        "股價下跌",
+        "股價上漲",
+        "股市休息",
+        "沒有變化"
+      ],
+      "correct_answer": 1,
+      "explanation": "答對！🔴 在台灣，紅色代表股價上漲。因為華人文化中紅色象徵喜氣和好運。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "台灣和美國的股市漲跌顏色規則是一樣的。",
+      "correct_answer": false,
+      "explanation": "不對喔！🌍 剛好相反！台灣是紅漲綠跌，美國是綠漲紅跌。看國際股市時要特別注意。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "在台股APP上看到一檔股票顯示「-1.5%」和綠色，代表什麼？",
+      "options": [
+        "今天漲了 1.5%",
+        "今天跌了 1.5%",
+        "今天沒有變化",
+        "這檔股票已經下市"
+      ],
+      "correct_answer": 1,
+      "explanation": "對！📉 綠色加上「-」號，代表今天的價格比昨天低了 1.5%，也就是跌了。"
+    }
+  ],
+  "ai_prompt_context": {
+    "topic": "台灣股市紅漲綠跌的顏色慣例",
+    "age_hint": "7-9歲",
+    "vocabulary_level": "simple",
+    "metaphor_suggestions": ["紅色=喜氣=漲", "綠色=跌", "跟美國相反", "紅綠燈比喻"]
+  }
+}

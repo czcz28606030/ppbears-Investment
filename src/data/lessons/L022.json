@@ -1,0 +1,72 @@
+{
+  "lesson_id": "L022",
+  "stage": 1,
+  "level": 5,
+  "domain": "basic",
+  "title": "股票市場在哪裡？",
+  "summary": "認識台灣證券交易所和股票市場，了解買賣股票的地方。",
+  "cards": [
+    {
+      "type": "text_image",
+      "title": "股票的市場",
+      "body": "你買菜去菜市場 🥬，買衣服去百貨公司 🏬。\n那買股票呢？要去「股票市場」！\n\n但股票市場不是一個你可以走進去的地方 — 它是一個電子交易系統，所有買賣都在電腦上完成 💻",
+      "image_key": "lesson_022_card_01"
+    },
+    {
+      "type": "text_image",
+      "title": "台灣證券交易所",
+      "body": "台灣的股票市場叫做「台灣證券交易所」🏛️，簡稱「台股」。地址在台北市的信義區。\n\n台灣有超過 1,700 間公司的股票在這裡買賣！從台積電到統一超商，很多你認識的品牌都在上面。",
+      "image_key": "lesson_022_card_02"
+    },
+    {
+      "type": "text_image",
+      "title": "股票的交易時間",
+      "body": "台股的交易時間是：\n• ⏰ 週一到週五\n• 🕘 早上 9:00 開始（開盤）\n• 🕐 下午 1:30 結束（收盤）\n• 📅 週末和國定假日休息\n\n所以股票不是隨時都能買賣的，要在營業時間才行！",
+      "image_key": "lesson_022_card_03"
+    },
+    {
+      "type": "text_image",
+      "title": "怎樣才能買股票？",
+      "body": "要買股票，你需要：\n1️⃣ 去證券公司（如元大、國泰）開一個「證券帳戶」\n2️⃣ 把錢存進去\n3️⃣ 用手機 APP 或電腦下單\n\n就像銀行帳戶可以存提款，證券帳戶可以買賣股票！🐻\n\n（未滿 18 歲要爸媽幫忙開喔）",
+      "image_key": "lesson_022_card_04"
+    }
+  ],
+  "preset_questions": [
+    {
+      "question_type": "choice",
+      "question_text": "台灣的股票市場叫什麼？",
+      "options": [
+        "台灣銀行",
+        "台灣證券交易所",
+        "台灣郵局",
+        "台灣便利商店"
+      ],
+      "correct_answer": 1,
+      "explanation": "對！🏛️ 台灣的股票市場叫做「台灣證券交易所」，簡稱台股，是台灣最主要的股票交易市場。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "台股在週六、週日也可以交易。",
+      "correct_answer": false,
+      "explanation": "不行喔！📅 台股只在週一到週五的 9:00~13:30 營業，週末和國定假日都休息。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "台股的收盤時間是幾點？",
+      "options": [
+        "上午 9:00",
+        "下午 1:30",
+        "下午 5:00",
+        "晚上 9:00"
+      ],
+      "correct_answer": 1,
+      "explanation": "答對了！🕐 台股早上 9:00 開盤，下午 1:30 收盤。交易時間只有 4.5 小時。"
+    }
+  ],
+  "ai_prompt_context": {
+    "topic": "台灣股票市場、證券交易所與交易時間",
+    "age_hint": "6-8歲",
+    "vocabulary_level": "simple",
+    "metaphor_suggestions": ["菜市場vs股票市場", "台灣證券交易所", "9:00開盤", "手機APP下單"]
+  }
+}

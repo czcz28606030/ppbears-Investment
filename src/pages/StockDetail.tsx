@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { fetchStockData, fetchSimonsData, toRecommendation, POPULAR_STOCKS, fetchTWSEStockPrice, fetchTPEXStockPrice, getOrGenerateKidFriendlyDesc, fetchTWSEDividendYields } from '../api';
+import { fetchStockData, fetchSimonsData, fetchStockQuantData, toRecommendation, POPULAR_STOCKS, fetchTWSEStockPrice, fetchTPEXStockPrice, getOrGenerateKidFriendlyDesc, fetchTWSEDividendYields, getFreshStockAnalysis } from '../api';
+import type { StockQuantData } from '../api';
 import type { TWSTEStockQuote, TPEXStockQuote } from '../api';
 import { useStore, formatPrice, formatMoney } from '../store';
-import type { StockData, StockPrice, StockRecommendation } from '../types';
+import type { StockData, StockPrice, StockRecommendation, StockLiveAnalysis } from '../types';
 import './StockDetail.css';
 
 export default function StockDetail() {
@@ -18,13 +19,19 @@ export default function StockDetail() {
   const [descLoading, setDescLoading] = useState(true);
   const [isStreaming, setIsStreaming] = useState(false);
   const [kidDesc, setKidDesc] = useState('');
+  const [liveAnalysis, setLiveAnalysis] = useState<StockLiveAnalysis | null>(null);
+  const [analysisLoading, setAnalysisLoading] = useState(false);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [analysisRetryTick, setAnalysisRetryTick] = useState(0);
   const [tradeMode, setTradeMode] = useState<'buy' | 'sell' | null>(null);
   const [quantity, setQuantity] = useState('');
   const [tradeReason, setTradeReason] = useState('');
   const [tradeResult, setTradeResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [isTrading, setIsTrading] = useState(false);
   const [latestYield, setLatestYield] = useState<number | null>(null);
+  const [quantData, setQuantData] = useState<StockQuantData | null>(null);
   
-  const { user, holdings, executeBuy, executeSell, getPortfolioSummary } = useStore();
+  const { user, holdings, executeBuy, executeSell, getPortfolioSummary, hasFeature } = useStore();
   const holding = holdings.find(h => h.stockCode === code);
   const summary = getPortfolioSummary();
 
@@ -32,10 +39,27 @@ export default function StockDetail() {
   type RiskWarning = { title: string; message: string; tip: string; icon: string };
   const [pendingWarnings, setPendingWarnings] = useState<RiskWarning[]>([]);
   const [showWarningModal, setShowWarningModal] = useState(false);
+  const analysisRequestRef = useRef<{ key: string; startedAt: number }>({ key: '', startedAt: 0 });
 
   const stockEmoji = POPULAR_STOCKS.find(s => s.code === code)?.emoji || '📊';
 
   useEffect(() => {
+    // 切換到不同股票時，重置所有下單狀態，避免 isTrading 卡住
+    setTradeMode(null);
+    setQuantity('');
+    setTradeReason('');
+    setTradeResult(null);
+    setIsTrading(false);
+    setLiveAnalysis(null);
+    setAnalysisError(null);
+    setAnalysisRetryTick(0);
+    analysisRequestRef.current = { key: '', startedAt: 0 };
+    setStockData(null);
+    setLatestPrice(null);
+    setTwseQuote(null);
+    setTpexQuote(null);
+    setKidDesc('');
+    setQuantData(null);
     if (code) loadStock(code);
   }, [code]);
 
@@ -74,11 +98,12 @@ export default function StockDetail() {
 
       // 嘗試載入推薦
       const today = new Date();
+      const pad = (n: number) => String(n).padStart(2, '0');
       for (let i = 0; i < 7; i++) {
         const date = new Date(today);
         date.setDate(date.getDate() - i);
         if (date.getDay() === 0 || date.getDay() === 6) continue;
-        const dateStr = date.toISOString().split('T')[0];
+        const dateStr = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
         const items = await fetchSimonsData(dateStr);
         const match = items.find(item => item.coid === coid);
         if (match) {
@@ -90,7 +115,11 @@ export default function StockDetail() {
     } catch (err) {
       console.error(err);
     }
+    // 先把 loading 設為 false，讓 PPBear 即時整理可以立即觸發
     setLoading(false);
+
+    // Simons 量化模型詳細資料非同步載入（不阻塞主流程）
+    fetchStockQuantData(coid).then(qd => setQuantData(qd)).catch(() => {});
   }
 
   // 非同步載入公司介紹
@@ -136,6 +165,57 @@ export default function StockDetail() {
       if (typewriterTimer) clearInterval(typewriterTimer);
     };
   }, [code, loading, stockData, twseQuote]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadLiveAnalysis() {
+      if (!code || loading) return;
+
+      const rawName = stockData?.stkname || twseQuote?.Name || tpexQuote?.CompanyName || POPULAR_STOCKS.find(s => s.code === code)?.name || code;
+      const requestKey = [code, rawName, stockData?.subindustry || '', stockData?.status || ''].join('|');
+      const elapsedMs = Date.now() - analysisRequestRef.current.startedAt;
+
+      // 防呆：同一支股票與同一份資料在短時間內不要重複狂打 API
+      if (analysisRetryTick === 0 && analysisRequestRef.current.key === requestKey && elapsedMs < 12000) {
+        return;
+      }
+
+      analysisRequestRef.current = { key: requestKey, startedAt: Date.now() };
+      setAnalysisLoading(true);
+      setLiveAnalysis(null);
+      setAnalysisError(null);
+
+      const result = await getFreshStockAnalysis(
+        code,
+        rawName,
+        stockData?.subindustry || '',
+        stockData?.status || ''
+      );
+
+      if (cancelled) return;
+      setLiveAnalysis(result);
+      if (!result) {
+        setAnalysisError('目前連線較忙或資料來源暫時無回應，請按「重試整理」再試一次。');
+      }
+      setAnalysisLoading(false);
+    }
+
+    void loadLiveAnalysis();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    code,
+    loading,
+    analysisRetryTick,
+    stockData?.stkname,
+    stockData?.subindustry,
+    stockData?.status,
+    twseQuote?.Name,
+    tpexQuote?.CompanyName,
+  ]);
 
   // 價格選擇邏輯：比較官方 API 更新日期與 ifalgo 日期，使用最新的那筆
   // TWSE/TPEx OpenAPI 盤後有 1~3 小時延遲；ifalgo 通常更即時
@@ -221,6 +301,8 @@ export default function StockDetail() {
       setTradeResult({ success: false, message: '❌ 無法取得目前股價，請稍後重試或重新整理頁面。' });
       return;
     }
+    if (isTrading) return;
+    setIsTrading(true);
     setShowWarningModal(false);
     const qty = parseInt(quantity);
 
@@ -240,6 +322,8 @@ export default function StockDetail() {
     } catch (err) {
       console.error('doExecuteTrade error:', err);
       setTradeResult({ success: false, message: '⚠️ 交易時發生錯誤，請檢查網路後再試一次。' });
+    } finally {
+      setIsTrading(false);
     }
   }
 
@@ -370,6 +454,67 @@ export default function StockDetail() {
         )}
       </div>
 
+      <div className="card stock-live-analysis-card">
+        <div className="stock-live-analysis-header">
+          <div>
+            <div className="stock-live-analysis-title">🧠 PPBear 即時整理</div>
+            <div className="stock-live-analysis-subtitle">每次點入個股頁都會重新整理技術面、籌碼面、消息面</div>
+          </div>
+          {liveAnalysis && (
+            <div className="stock-live-analysis-time">
+              更新於 {new Date(liveAnalysis.generatedAt).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' })}
+            </div>
+          )}
+        </div>
+
+        {analysisLoading ? (
+          <div className="stock-live-analysis-loading">
+            <span className="spinner" style={{ width: 14, height: 14, border: '2px solid #ccc', borderTopColor: '#FFA000', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></span>
+            正在重新整理奇摩股市新聞與 AI 三面向解析...
+          </div>
+        ) : liveAnalysis ? (
+          <>
+            <div className="stock-live-analysis-grid">
+              <div className="stock-live-analysis-item">
+                <div className="stock-live-analysis-item-title">📈 技術面</div>
+                <p className="stock-live-analysis-text">{liveAnalysis.technical}</p>
+              </div>
+              <div className="stock-live-analysis-item">
+                <div className="stock-live-analysis-item-title">💰 籌碼面</div>
+                <p className="stock-live-analysis-text">{liveAnalysis.chips}</p>
+              </div>
+              <div className="stock-live-analysis-item stock-live-analysis-item-full">
+                <div className="stock-live-analysis-item-title">📰 消息面</div>
+                <p className="stock-live-analysis-text">{liveAnalysis.news}</p>
+                {liveAnalysis.headlines.length > 0 && (
+                  <div className="stock-live-analysis-headlines">
+                    {liveAnalysis.headlines.slice(0, 3).map((headline, idx) => (
+                      <div key={`${idx}-${headline}`} className="stock-live-analysis-headline">• {headline}</div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="stock-live-analysis-empty-wrap">
+            <div className="stock-live-analysis-empty">
+              {analysisError || '目前暫時無法整理三面向分析，請稍後重新進入頁面再試一次。'}
+            </div>
+            <button
+              type="button"
+              className="stock-live-analysis-retry-btn"
+              onClick={() => {
+                analysisRequestRef.current = { key: '', startedAt: 0 };
+                setAnalysisRetryTick(prev => prev + 1);
+              }}
+            >
+              重新整理
+            </button>
+          </div>
+        )}
+      </div>
+
       {/* AI 建議 */}
       {recommendation && (
         <div className={`ai-card ai-card-${recommendation.advice}`}>
@@ -382,6 +527,88 @@ export default function StockDetail() {
           <div className="ai-card-desc">{recommendation.kidAdvice}</div>
         </div>
       )}
+
+      {/* Simons 量化模型資料（限會員） */}
+      {quantData && hasFeature('ai_stock_picking') && (() => {
+        const pts = quantData.chipStability ? parseFloat(quantData.chipStability.pts) : null;
+        const chipLabel = pts === null ? '--' :
+          pts >= 9 ? '籌碼最乾淨' :
+          pts >= 7 ? '籌碼非常穩定' :
+          pts >= 5 ? '籌碼穩定' :
+          pts >= 3 ? '籌碼普通' : '籌碼凌亂';
+        const chipClass = pts === null ? 'simons-gvi-mid' :
+          pts >= 7 ? 'simons-gvi-high' :
+          pts >= 4 ? 'simons-gvi-mid' : 'simons-gvi-low';
+        const aiRemark = quantData.aiQuanBackDataComment?.remark ?? '--';
+        const cumRet = quantData.aiQuanBackDataComment?.cum_ret ?? '--';
+        const gvi = quantData.stockInfo?.gvi ?? recommendation?.gvi ?? 0;
+        const mediangvi = quantData.stockInfo?.mediangvi ?? recommendation?.mediangvi ?? '--';
+        return (
+          <section>
+            <div className="section-header">
+              <h2 className="section-title">🤖 Simons 量化模型</h2>
+              <span style={{ fontSize: '11px', color: 'var(--text-light)', fontWeight: 600 }}>
+                資料日期：{recommendation?.mdate ?? '--'}
+              </span>
+            </div>
+
+            {/* AI 推薦 + 累積報酬 */}
+            <div className="simons-score-card">
+              <div className="simons-score-left">
+                <div className="simons-score-label">AI 推薦等級</div>
+                <div className="simons-score-value" style={{ fontSize: '22px' }}>{aiRemark}</div>
+                <div className="simons-score-sub">累積報酬 {cumRet}</div>
+              </div>
+              {recommendation && (
+              <div className="simons-score-right">
+                {/* 週 / 月趨勢 */}
+                <div className="simons-trend-row">
+                  <span className="simons-trend-label">週趨勢</span>
+                  <span className={`simons-trend-badge ${recommendation.ret_w === 'rise' ? 'simons-trend-up' : recommendation.ret_w === 'drop' ? 'simons-trend-down' : 'simons-trend-flat'}`}>
+                    {recommendation.ret_w === 'rise' ? '📈 上漲' : recommendation.ret_w === 'drop' ? '📉 下跌' : '➡️ 持平'}
+                  </span>
+                </div>
+                <div className="simons-trend-row">
+                  <span className="simons-trend-label">月趨勢</span>
+                  <span className={`simons-trend-badge ${recommendation.ret_m === 'rise' ? 'simons-trend-up' : recommendation.ret_m === 'drop' ? 'simons-trend-down' : 'simons-trend-flat'}`}>
+                    {recommendation.ret_m === 'rise' ? '📈 上漲' : recommendation.ret_m === 'drop' ? '📉 下跌' : '➡️ 持平'}
+                  </span>
+                </div>
+                {recommendation.unusual && recommendation.unusual !== 'N' && (
+                  <div className="simons-unusual">
+                    ⚡ {recommendation.unusual}
+                  </div>
+                )}
+              </div>
+              )}
+            </div>
+
+            {/* 籌碼穩定度 */}
+            <div className="simons-section-title">🧲 籌碼穩定度</div>
+            <div className="simons-gvi-card">
+              <div className="simons-gvi-header">
+                <span className="simons-gvi-value">{pts !== null ? `${pts.toFixed(0)} 分` : '--'}</span>
+                <span className={`simons-gvi-badge ${chipClass}`}>
+                  🔒 {chipLabel}
+                </span>
+              </div>
+              <div className="simons-gvi-bar-wrap">
+                <div className="simons-gvi-bar-track">
+                  <div
+                    className={`simons-gvi-bar-fill ${chipClass.replace('gvi', 'gvi-bar')}`}
+                    style={{ width: `${pts !== null ? Math.min(pts * 10, 100) : 0}%` }}
+                  />
+                </div>
+                <div className="simons-gvi-labels">
+                  <span>0</span>
+                  <span style={{ opacity: 0.5, fontSize: '10px' }}>GVI: {gvi.toFixed(2)} / 中位數: {mediangvi}</span>
+                  <span>10</span>
+                </div>
+              </div>
+            </div>
+          </section>
+        );
+      })()}
 
       {/* 基本面分析 */}
       <section>
@@ -653,6 +880,7 @@ export default function StockDetail() {
 
                 <button
                   className={`btn ${tradeMode === 'buy' ? 'btn-buy' : 'btn-sell'} btn-lg btn-block`}
+                  disabled={isTrading}
                   onClick={() => {
                     if (!quantity || parseInt(quantity) <= 0) {
                       alert('⚠️ 請輸入大於 0 的正確交易股數！');
@@ -664,8 +892,22 @@ export default function StockDetail() {
                     }
                     handleTrade();
                   }}
+                  style={isTrading ? { opacity: 0.85, cursor: 'not-allowed' } : {}}
                 >
-                  確認{tradeMode === 'buy' ? '買入' : '賣出'}
+                  {isTrading ? (
+                    <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+                      <span style={{
+                        width: 18, height: 18,
+                        border: '3px solid rgba(255,255,255,0.4)',
+                        borderTopColor: '#fff',
+                        borderRadius: '50%',
+                        display: 'inline-block',
+                        animation: 'spin 0.7s linear infinite',
+                        flexShrink: 0,
+                      }} />
+                      交易中，請稍候...
+                    </span>
+                  ) : `確認${tradeMode === 'buy' ? '買入' : '賣出'}`}
                 </button>
               </>
             )}
@@ -702,6 +944,7 @@ export default function StockDetail() {
               <button
                 className="btn"
                 style={{ flex: 1, background: '#f5f5f5', color: '#555', fontWeight: 700 }}
+                disabled={isTrading}
                 onClick={() => setShowWarningModal(false)}
               >
                 再想想🤔
@@ -709,9 +952,23 @@ export default function StockDetail() {
               <button
                 className="btn btn-buy"
                 style={{ flex: 1, background: '#cc4444' }}
+                disabled={isTrading}
                 onClick={doExecuteTrade}
               >
-                我瞭解風险，還是要買
+                {isTrading ? (
+                    <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+                      <span style={{
+                        width: 16, height: 16,
+                        border: '3px solid rgba(255,255,255,0.4)',
+                        borderTopColor: '#fff',
+                        borderRadius: '50%',
+                        display: 'inline-block',
+                        animation: 'spin 0.7s linear infinite',
+                        flexShrink: 0,
+                      }} />
+                      交易中，請稍候...
+                    </span>
+                  ) : '我瞭解風险，還是要買'}
               </button>
             </div>
           </div>

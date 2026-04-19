@@ -1,0 +1,72 @@
+{
+  "lesson_id": "L020",
+  "stage": 1,
+  "level": 4,
+  "domain": "basic",
+  "title": "什麼是股東？",
+  "summary": "認識股東的概念和權利，了解買股票就是成為公司的小老闆。",
+  "cards": [
+    {
+      "type": "text_image",
+      "title": "買股票 = 當小老闆",
+      "body": "當你買了一間公司的股票，你就是這間公司的「股東」了！🎉\n\n股東 = 公司的小老闆之一\n\n雖然你可能只買了很小一部分，但你確實是這間公司的擁有者之一喔。",
+      "image_key": "lesson_020_card_01"
+    },
+    {
+      "type": "text_image",
+      "title": "股東有什麼權利？",
+      "body": "當上股東後，你有幾個權利：\n\n📊 分享獲利 — 公司賺錢可以分紅（叫「股利」）\n🗳️ 投票權 — 可以參加股東會投票\n📈 賺價差 — 股票漲了賣掉可以賺錢\n📋 看報告 — 可以看公司的經營報告",
+      "image_key": "lesson_020_card_02"
+    },
+    {
+      "type": "text_image",
+      "title": "股東也要承擔風險",
+      "body": "但是！當股東不是只有好處 ⚠️\n\n如果公司經營不好：\n• 📉 股價可能下跌，你的股票變不值錢\n• ❌ 公司不賺錢就沒有股利可以分\n• 💸 最壞的情況，公司倒閉你的錢就沒了\n\n所以投資前要好好研究公司！",
+      "image_key": "lesson_020_card_03"
+    },
+    {
+      "type": "text_image",
+      "title": "你願意當哪間公司的股東？",
+      "body": "想一想 🤔：\n\n如果你可以選一間公司當股東，你會選哪一間？\n• 最愛的零食品牌？🍫\n• 最常去的便利商店？🏪\n• 做你最愛手機的公司？📱\n\n選你了解、喜歡又覺得會越來越好的公司！🐻✨",
+      "image_key": "lesson_020_card_04"
+    }
+  ],
+  "preset_questions": [
+    {
+      "question_type": "choice",
+      "question_text": "買了一間公司的股票，你就變成了什麼？",
+      "options": [
+        "公司的員工",
+        "公司的股東",
+        "公司的客人",
+        "公司的經理"
+      ],
+      "correct_answer": 1,
+      "explanation": "答對了！🎉 買了股票就是公司的「股東」，也就是公司的小老闆之一。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "當股東只有好處，完全沒有風險。",
+      "correct_answer": false,
+      "explanation": "不對喔！⚠️ 如果公司經營不好，股價可能下跌，甚至公司倒閉的話投資的錢會損失。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "公司賺錢後分給股東的紅利叫什麼？",
+      "options": [
+        "薪水",
+        "利息",
+        "股利",
+        "罰金"
+      ],
+      "correct_answer": 2,
+      "explanation": "對！💰 公司賺錢後分給股東的紅利叫做「股利」（Dividend），這是股東的權利之一。"
+    }
+  ],
+  "ai_prompt_context": {
+    "topic": "股東的概念、權利與風險",
+    "age_hint": "6-8歲",
+    "vocabulary_level": "simple",
+    "metaphor_suggestions": ["公司的小老闆", "股東會投票", "分紅利", "選喜歡的公司"]
+  }
+}

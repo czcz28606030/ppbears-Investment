@@ -39,11 +39,11 @@
 
 ### Slice 切分（實際執行順序）
 原 Phase 1 工作量過大，實際交付依下列 slice 逐步推進：
-- **Slice 1（地基）**：4 張核心表（learning_profiles / lesson_progress / learning_wallet / wallet_transactions）+ store 擴充 + 路由調整 + LearnHome 骨架 + 1 堂示範課程 JSON ← **目前進行中**
-- **Slice 2（學習流程）**：`LessonView` + 選擇題 + 是非急速題 + XP / 連續登入計算
-- **Slice 3（獎勵地基）**：`reward_rules` / `reward_shop_items` / `redemption_requests` + 預設模板
-- **Slice 4（父母端頁面）**：`/parent/rewards/*`
-- **Slice 5（課程量產）**：補到 50 堂 Lv.1–10 JSON
+- **Slice 1（地基）**：4 張核心表（learning_profiles / lesson_progress / learning_wallet / wallet_transactions）+ store 擴充 + 路由調整 + LearnHome 骨架 + 1 堂示範課程 JSON ← ✅ **已完成**
+- **Slice 2（學習流程）**：`LessonView` + 選擇題 + 是非急速題 + XP / 連續登入計算 ← ✅ **已完成**
+- **Slice 3（獎勵地基）**：`reward_rules` / `reward_shop_items` / `redemption_requests` + 預設模板 ← ✅ **已完成**
+- **Slice 4（父母端頁面）**：`/parent/rewards/*` ← ✅ **已完成**
+- **Slice 5（課程量產）**：補到 50 堂 Lv.1–10 JSON ← ✅ **已完成**
 
 ---
 

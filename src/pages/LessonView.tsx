@@ -9,6 +9,7 @@ import './LessonView.css';
 const XP_PER_CORRECT = 10;
 const COMBO_MULTIPLIER = 1.5;
 const TRUE_FALSE_TIME_LIMIT = 5; // 秒
+const SAVE_WAIT_HINT_MS = 8000; // 儲存超過 8 秒顯示提示
 
 type Phase = 'cards' | 'quiz' | 'results';
 
@@ -54,9 +55,11 @@ export default function LessonView() {
   const [combo, setCombo] = useState(0);
   const [tfTimeLeft, setTfTimeLeft] = useState(TRUE_FALSE_TIME_LIMIT);
   const [saving, setSaving] = useState(false);
+  const [saveSlowHint, setSaveSlowHint] = useState(false);
   const [resultData, setResultData] = useState<{ xpEarned: number; coinsEarned: number; levelUp: boolean; newStreak: number } | null>(null);
   const startTimeRef = useRef(Date.now());
   const tfTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const saveHintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // 404
   if (!lesson) {
@@ -99,6 +102,15 @@ export default function LessonView() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, questionIndex, revealed]);
 
+  useEffect(() => {
+    return () => {
+      if (saveHintTimerRef.current) {
+        clearTimeout(saveHintTimerRef.current);
+        saveHintTimerRef.current = null;
+      }
+    };
+  }, []);
+
   // ── 答題邏輯 ──────────────────────────────
 
   function calcXp(isCorrect: boolean, currentCombo: number): number {
@@ -135,6 +147,8 @@ export default function LessonView() {
   }
 
   async function handleNextQuestion() {
+    if (saving) return;
+
     setRevealed(false);
     setSelectedChoice(null);
 
@@ -142,24 +156,47 @@ export default function LessonView() {
       setQuestionIndex(q => q + 1);
     } else {
       // 全部答完 → 儲存結果
-      setSaving(true);
       const allAnswers = answers; // 已是最新（handleChoiceConfirm/handleTfAnswer 已 push 最後一筆）
       const correct = allAnswers.filter(a => a.isCorrect).length;
       const totalXpFromQ = allAnswers.reduce((s, a) => s + a.xpEarned, 0);
       const elapsed = Math.round((Date.now() - startTimeRef.current) / 1000);
       const score = Math.round((correct / questions.length) * 100);
 
-      const res = await completeLesson(lesson!.lesson_id, {
-        questionsCorrect: correct,
-        questionsTotal: questions.length,
-        xpFromQuestions: totalXpFromQ,
-        timeSpentSeconds: elapsed,
-        score,
-      });
-      await fetchLearningProfile();
-      setResultData({ xpEarned: res.xpEarned, coinsEarned: res.coinsEarned, levelUp: res.levelUp, newStreak: res.newStreak });
-      setSaving(false);
-      setPhase('results');
+      setSaving(true);
+      setSaveSlowHint(false);
+      setResultData({ xpEarned: totalXpFromQ, coinsEarned: 0, levelUp: false, newStreak: 0 });
+      saveHintTimerRef.current = setTimeout(() => {
+        setSaveSlowHint(true);
+      }, SAVE_WAIT_HINT_MS);
+
+      try {
+        const res = await completeLesson(lesson!.lesson_id, {
+          questionsCorrect: correct,
+          questionsTotal: questions.length,
+          xpFromQuestions: totalXpFromQ,
+          timeSpentSeconds: elapsed,
+          score,
+        });
+        // 不阻塞結果頁：背景刷新學習檔案，避免網路抖動導致「儲存中」卡住
+        void fetchLearningProfile().catch(err => {
+          console.error('fetchLearningProfile failed after completeLesson:', err);
+        });
+        setResultData({ xpEarned: res.xpEarned, coinsEarned: res.coinsEarned, levelUp: res.levelUp, newStreak: res.newStreak });
+      } catch (err) {
+        console.error('completeLesson failed:', err);
+        // 即使儲存失敗也讓使用者看到結果，避免卡住
+        const allAnswers = answers;
+        const totalXpFromQ = allAnswers.reduce((s, a) => s + a.xpEarned, 0);
+        setResultData({ xpEarned: totalXpFromQ, coinsEarned: 0, levelUp: false, newStreak: 0 });
+      } finally {
+        if (saveHintTimerRef.current) {
+          clearTimeout(saveHintTimerRef.current);
+          saveHintTimerRef.current = null;
+        }
+        setSaving(false);
+        setSaveSlowHint(false);
+        setPhase('results');
+      }
     }
   }
 
@@ -291,11 +328,26 @@ export default function LessonView() {
             <div className="lesson-feedback-explain">{q.explanation}</div>
             <button
               className="btn-primary lesson-feedback-next"
-              onClick={handleNextQuestion}
-              disabled={saving}
+              onClick={() => {
+                if (saving && saveSlowHint) {
+                  setPhase('results');
+                  return;
+                }
+                void handleNextQuestion();
+              }}
+              disabled={saving && !saveSlowHint}
             >
-              {saving ? '儲存中...' : questionIndex + 1 < questions.length ? '下一題 →' : '查看結果 🏆'}
+              {saving
+                ? (saveSlowHint ? '網路較慢，先看結果 →' : '儲存中...')
+                : questionIndex + 1 < questions.length
+                  ? '下一題 →'
+                  : '查看結果 🏆'}
             </button>
+            {saving && saveSlowHint && (
+              <div className="lesson-saving-hint">
+                仍在背景同步學習進度，稍後會自動更新首頁等級與連續天數。
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -317,6 +369,9 @@ export default function LessonView() {
 
       {resultData && (
         <div className="card lesson-xp-card">
+          {saving && (
+            <div className="lesson-result-syncing">⏳ 正在背景同步資料中...</div>
+          )}
           {resultData.levelUp && (
             <div className="lesson-levelup">🎊 升級了！</div>
           )}

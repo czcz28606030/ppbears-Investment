@@ -148,13 +148,13 @@
 }
 
 .trade-type-badge.buy {
-  background: rgba(138, 201, 38, 0.15);
-  color: #558B2F;
+  background: rgba(255, 89, 94, 0.15);
+  color: #C62828;
 }
 
 .trade-type-badge.sell {
-  background: rgba(255, 89, 94, 0.15);
-  color: #C62828;
+  background: rgba(138, 201, 38, 0.15);
+  color: #558B2F;
 }
 
 .trade-type-badge.deposit {

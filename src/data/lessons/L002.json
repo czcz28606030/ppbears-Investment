@@ -1,0 +1,72 @@
+{
+  "lesson_id": "L002",
+  "stage": 1,
+  "level": 1,
+  "domain": "basic",
+  "title": "錢從哪裡來？",
+  "summary": "了解爸媽的錢是怎麼來的，以及工作和收入的基本概念。",
+  "cards": [
+    {
+      "type": "text_image",
+      "title": "爸媽的錢從哪來？",
+      "body": "你有沒有想過，爸爸媽媽的錢是從哪裡來的呢？是從樹上長出來的嗎？當然不是啦！😄 爸媽每天去上班工作，公司就會付「薪水」給他們。",
+      "image_key": "lesson_002_card_01"
+    },
+    {
+      "type": "text_image",
+      "title": "什麼是工作？",
+      "body": "工作就是用你的時間和能力去幫助別人。醫生幫人看病 🏥、老師教小朋友讀書 📚、廚師做好吃的料理 🍳，每個工作都很重要！",
+      "image_key": "lesson_002_card_02"
+    },
+    {
+      "type": "text_image",
+      "title": "薪水就是報酬",
+      "body": "當你幫忙做事情，別人會給你報酬（也就是錢）。這就像你幫媽媽洗碗 🍽️，媽媽可能會給你零用錢一樣。工作越認真，通常可以賺到越多錢！",
+      "image_key": "lesson_002_card_03"
+    },
+    {
+      "type": "text_image",
+      "title": "錢需要好好管理",
+      "body": "賺到錢之後，不能全部花光光！💸 聰明的做法是：\n• 一部分拿來買需要的東西\n• 一部分存起來\n• 一部分可以拿去投資\n這就是「理財」的開始！🐻",
+      "image_key": "lesson_002_card_04"
+    }
+  ],
+  "preset_questions": [
+    {
+      "question_type": "choice",
+      "question_text": "爸爸媽媽的錢通常是怎麼來的？",
+      "options": [
+        "從樹上摘下來的",
+        "去上班工作賺來的",
+        "在地上撿到的",
+        "從天上掉下來的"
+      ],
+      "correct_answer": 1,
+      "explanation": "答對了！🎉 爸媽去上班工作，公司就會付「薪水」給他們。錢是辛苦工作賺來的喔！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "賺到錢之後，應該全部花光光。",
+      "correct_answer": false,
+      "explanation": "不對喔！💡 聰明的做法是把錢分成幾份：花一些、存一些、投資一些。這就是理財的基本概念！"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "下面哪一個是「工作」的例子？",
+      "options": [
+        "老師教小朋友讀書",
+        "在公園玩溜滑梯",
+        "睡午覺",
+        "看卡通"
+      ],
+      "correct_answer": 0,
+      "explanation": "沒錯！👩‍🏫 老師教書就是一種工作。醫生看病、廚師做菜也都是工作，每一種工作都是用能力幫助別人。"
+    }
+  ],
+  "ai_prompt_context": {
+    "topic": "工作與收入的基本概念",
+    "age_hint": "6-8歲",
+    "vocabulary_level": "simple",
+    "metaphor_suggestions": ["零用錢", "爸媽上班", "薪水", "幫忙做家事"]
+  }
+}

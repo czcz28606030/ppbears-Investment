@@ -1,0 +1,72 @@
+{
+  "lesson_id": "L014",
+  "stage": 1,
+  "level": 3,
+  "domain": "basic",
+  "title": "數位支付好方便",
+  "summary": "認識手機支付和電子錢包，了解無現金支付的便利與注意事項。",
+  "cards": [
+    {
+      "type": "text_image",
+      "title": "不用帶錢也能付錢？",
+      "body": "你有看過爸媽用手機「嗶」一下就付錢嗎？📱✨ 這就是「數位支付」！不用帶現金，只要拿手機掃一下 QR Code 或感應一下，就能完成付款。超方便的！",
+      "image_key": "lesson_014_card_01"
+    },
+    {
+      "type": "text_image",
+      "title": "常見的數位支付",
+      "body": "台灣常見的數位支付工具：\n• LINE Pay 💚 — 用 LINE 就能付款\n• 街口支付 🟡 — 很多夜市都能用\n• Apple Pay / Google Pay 📲\n• 悠遊付 🚌 — 搭公車也能用\n\n越來越多地方都接受手機付款了！",
+      "image_key": "lesson_014_card_02"
+    },
+    {
+      "type": "text_image",
+      "title": "錢去哪裡了？",
+      "body": "用手機付款，錢不是消失了喔！💡\n\n手機付款 → 從你的銀行帳戶扣錢 → 錢轉到商店的帳戶\n\n就像你去銀行轉帳一樣，只是手機幫你做了這件事。錢還是真實地從帳戶裡扣掉的！",
+      "image_key": "lesson_014_card_03"
+    },
+    {
+      "type": "text_image",
+      "title": "數位支付要注意",
+      "body": "數位支付很方便，但也要小心：\n\n⚠️ 「嗶」太方便反而容易花太多\n⚠️ 手機不能借給別人亂買東西\n⚠️ 定期看帳戶紀錄確認花了多少\n\n方便歸方便，還是要控制好花費！🐻💡",
+      "image_key": "lesson_014_card_04"
+    }
+  ],
+  "preset_questions": [
+    {
+      "question_type": "choice",
+      "question_text": "用手機付款叫做什麼？",
+      "options": [
+        "數位支付",
+        "數位遊戲",
+        "數位相機",
+        "數位手錶"
+      ],
+      "correct_answer": 0,
+      "explanation": "答對了！📱 用手機或電子裝置付款就叫做「數位支付」，不需要用到實體的現金鈔票。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "用手機付款的時候，錢會從你的銀行帳戶扣除。",
+      "correct_answer": true,
+      "explanation": "對！💡 手機付款只是把「去銀行轉帳」變得更方便，錢還是真實地從帳戶裡扣掉的喔。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "數位支付要注意什麼？",
+      "options": [
+        "花越多越好",
+        "密碼告訴大家都知道",
+        "太方便容易花太多，要注意控制",
+        "手機借給陌生人用"
+      ],
+      "correct_answer": 2,
+      "explanation": "很棒！⚠️ 數位支付因為太方便了，容易不知不覺花太多。記得要定期檢查花費紀錄！"
+    }
+  ],
+  "ai_prompt_context": {
+    "topic": "數位支付、電子錢包與無現金消費",
+    "age_hint": "6-8歲",
+    "vocabulary_level": "simple",
+    "metaphor_suggestions": ["LINE Pay", "手機嗶一下", "QR Code", "悠遊卡"]
+  }
+}

@@ -1,0 +1,72 @@
+{
+  "lesson_id": "L010",
+  "stage": 1,
+  "level": 2,
+  "domain": "basic",
+  "title": "我的第一個儲蓄計畫",
+  "summary": "動手做一個實際的儲蓄計畫，學習設定目標和執行步驟。",
+  "cards": [
+    {
+      "type": "text_image",
+      "title": "來做儲蓄計畫吧！",
+      "body": "經過前幾堂課的學習，現在你已經知道存錢的重要性了！🎓 今天，小熊老師要教你做一個「儲蓄計畫」，讓你的存錢行動更有目標。",
+      "image_key": "lesson_010_card_01"
+    },
+    {
+      "type": "text_image",
+      "title": "步驟一：設定目標",
+      "body": "先想好你要存錢買什麼 🎯\n\n例如：\n• 我想買一台 Switch 遊戲機 💰8,000 元\n• 我想買一套漫畫 💰600 元\n• 我想存到 1,000 元的緊急備用金 💰\n\n目標要明確：什麼東西、多少錢、什麼時候要存到。",
+      "image_key": "lesson_010_card_02"
+    },
+    {
+      "type": "text_image",
+      "title": "步驟二：計算時間",
+      "body": "假設你每週零用錢 100 元，目標存 600 元買漫畫：\n• 每週存 50 元（花 50 元 + 存 50 元）\n• 600 ÷ 50 = 12 週\n• 大約 3 個月就能達成！📅\n\n把大目標拆成小步驟，就不會覺得遙不可及了！",
+      "image_key": "lesson_010_card_03"
+    },
+    {
+      "type": "text_image",
+      "title": "步驟三：記錄進度",
+      "body": "每週存完錢後，在一張紙上記錄你的進度 📝：\n\n第1週：50 / 600 ████░░░░░░\n第4週：200 / 600 ██████░░░░\n第8週：400 / 600 ████████░░\n第12週：600 / 600 ██████████ 🎉\n\n看著進度條越來越滿，超有成就感的！🐻✨",
+      "image_key": "lesson_010_card_04"
+    }
+  ],
+  "preset_questions": [
+    {
+      "question_type": "choice",
+      "question_text": "做儲蓄計畫的第一步是什麼？",
+      "options": [
+        "馬上開始存錢",
+        "先設定一個明確的目標",
+        "把錢全部花掉",
+        "跟別人借錢"
+      ],
+      "correct_answer": 1,
+      "explanation": "對！🎯 第一步是設定明確的目標：要存什麼、多少錢、什麼時候達成。有了目標才有方向！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "每週存 50 元，大約 12 週可以存到 600 元。",
+      "correct_answer": true,
+      "explanation": "沒錯！50 × 12 = 600 元 ✅ 把大目標拆成每週的小額儲蓄，更容易達成！"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "記錄儲蓄進度有什麼好處？",
+      "options": [
+        "浪費時間",
+        "讓爸媽看到可以加零用錢",
+        "看到進度增加會更有動力繼續存",
+        "這樣老師會加分"
+      ],
+      "correct_answer": 2,
+      "explanation": "太棒了！📊 記錄進度可以看到自己離目標越來越近，這會讓你更有動力堅持存錢！"
+    }
+  ],
+  "ai_prompt_context": {
+    "topic": "實際制定儲蓄計畫的方法",
+    "age_hint": "6-8歲",
+    "vocabulary_level": "simple",
+    "metaphor_suggestions": ["進度條", "零用錢分配", "存錢買遊戲機", "12週挑戰"]
+  }
+}

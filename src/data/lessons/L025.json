@@ -1,0 +1,72 @@
+{
+  "lesson_id": "L025",
+  "stage": 1,
+  "level": 5,
+  "domain": "basic",
+  "title": "投資 vs 存錢",
+  "summary": "比較投資和存錢的差異，了解各自的優缺點和適用場景。",
+  "cards": [
+    {
+      "type": "text_image",
+      "title": "同樣是放錢，有什麼不同？",
+      "body": "存錢和投資都是把錢放著讓它增加，但方式很不一樣：\n\n🏦 存錢 = 穩穩慢慢長\n📈 投資 = 可能跑很快，但也可能跌倒\n\n就像走路 vs 跑步 🚶‍♂️🏃‍♂️：\n走路安全但慢，跑步快但可能摔倒。",
+      "image_key": "lesson_025_card_01"
+    },
+    {
+      "type": "text_image",
+      "title": "存錢的好處和壞處",
+      "body": "✅ 好處：\n• 幾乎不會虧錢\n• 隨時可以拿出來\n• 有政府保障（存款保險）\n\n❌ 壞處：\n• 利息很低（大約 1~2%）\n• 可能跑不贏通膨\n• 錢的增長很慢",
+      "image_key": "lesson_025_card_02"
+    },
+    {
+      "type": "text_image",
+      "title": "投資的好處和壞處",
+      "body": "✅ 好處：\n• 報酬可能比較高（5~10% 甚至更多）\n• 可以對抗通膨\n• 長期累積效果驚人\n\n❌ 壞處：\n• 可能虧錢\n• 需要學知識和做功課\n• 短期波動會讓人緊張",
+      "image_key": "lesson_025_card_03"
+    },
+    {
+      "type": "text_image",
+      "title": "最聰明的做法：兩個都要！",
+      "body": "其實最聰明的做法是兩個都做 🎯：\n\n1️⃣ 先存一筆「緊急備用金」（約 3~6 個月生活費）\n2️⃣ 多出來的「閒錢」再拿去投資\n\n這樣既有安全感，又能讓錢成長 🐻✨\n\n恭喜你完成小種子階段！接下來進入小芽苗！🌱→🌿",
+      "image_key": "lesson_025_card_04"
+    }
+  ],
+  "preset_questions": [
+    {
+      "question_type": "choice",
+      "question_text": "存錢和投資，哪一個的報酬率通常比較高？",
+      "options": [
+        "銀行存款",
+        "放在存錢筒",
+        "投資股票",
+        "都一樣"
+      ],
+      "correct_answer": 2,
+      "explanation": "對！📈 投資股票的長期報酬通常比銀行存款高，但相對的風險也比較大。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "最好的理財方法是存錢和投資兩個都做。",
+      "correct_answer": true,
+      "explanation": "沒錯！🎯 先存緊急備用金確保安全，多出來的閒錢再拿去投資，兩者搭配才是最聰明的！"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "什麼是「緊急備用金」？",
+      "options": [
+        "拿去買股票的錢",
+        "預留3~6個月生活費，以備不時之需",
+        "每天的零用錢",
+        "銀行給的利息"
+      ],
+      "correct_answer": 1,
+      "explanation": "答對了！🛟 緊急備用金是預留 3~6 個月的生活費，以防突然需要用錢時有保障。"
+    }
+  ],
+  "ai_prompt_context": {
+    "topic": "投資與存錢的比較、各自優缺點",
+    "age_hint": "6-8歲",
+    "vocabulary_level": "simple",
+    "metaphor_suggestions": ["走路vs跑步", "緊急備用金", "兩個都做", "閒錢投資"]
+  }
+}

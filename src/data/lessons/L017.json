@@ -1,0 +1,72 @@
+{
+  "lesson_id": "L017",
+  "stage": 1,
+  "level": 4,
+  "domain": "basic",
+  "title": "公司怎麼賺錢？",
+  "summary": "了解公司的營收和成本概念，知道公司賺錢的基本道理。",
+  "cards": [
+    {
+      "type": "text_image",
+      "title": "小明的雞排店",
+      "body": "小明開了一間雞排店 🍗。每片雞排賣 60 元，一天賣了 100 片。\n\n60 元 × 100 片 = 6,000 元\n\n這 6,000 元就是小明一天的「營收」（Revenue）！營收就是公司賣東西收到的總金額。",
+      "image_key": "lesson_017_card_01"
+    },
+    {
+      "type": "text_image",
+      "title": "但賺到的不是全部！",
+      "body": "等等，小明這 6,000 元不能全部放進口袋 😯！\n\n他還要扣掉「成本」：\n• 買雞肉 💰 3,000 元\n• 油和調味料 💰 500 元\n• 租金 💰 1,000 元\n• 水電 💰 500 元\n\n成本合計 = 5,000 元",
+      "image_key": "lesson_017_card_02"
+    },
+    {
+      "type": "text_image",
+      "title": "利潤 = 營收 - 成本",
+      "body": "營收 6,000 元 - 成本 5,000 元 = 利潤 1,000 元 💰\n\n「利潤」就是公司真正賺到的錢。也叫做「盈餘」或「淨利」。\n\n如果成本比營收還多呢？那公司就「虧損」了（賺不夠花）😢",
+      "image_key": "lesson_017_card_03"
+    },
+    {
+      "type": "text_image",
+      "title": "好公司要穩穩地賺",
+      "body": "一間好的公司不只是賺很多，更重要的是：\n• 📈 持續賺錢（不是只賺一天）\n• 💪 成本控制得好\n• 🌱 營收越來越多\n\n就像小明的雞排店，如果人氣越來越旺，那就是一間好公司！🐻✨",
+      "image_key": "lesson_017_card_04"
+    }
+  ],
+  "preset_questions": [
+    {
+      "question_type": "choice",
+      "question_text": "小明的雞排店一天營收 6,000 元、成本 5,000 元，利潤是多少？",
+      "options": [
+        "6,000 元",
+        "5,000 元",
+        "1,000 元",
+        "11,000 元"
+      ],
+      "correct_answer": 2,
+      "explanation": "太棒了！🎉 利潤 = 營收 - 成本 = 6,000 - 5,000 = 1,000 元。這才是小明真正賺到的錢。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "營收就是公司賣東西收到的全部金額。",
+      "correct_answer": true,
+      "explanation": "對！💰 營收是公司賣商品或服務收到的總金額，但還要扣掉成本才是真正的利潤。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "如果公司的成本比營收還多，會怎樣？",
+      "options": [
+        "公司賺大錢",
+        "公司虧損（賺不夠花）",
+        "不會怎樣",
+        "公司會變更大"
+      ],
+      "correct_answer": 1,
+      "explanation": "對！😢 如果成本 > 營收，公司就會虧損，賺的錢不夠付成本。長期虧損的公司可能會倒閉。"
+    }
+  ],
+  "ai_prompt_context": {
+    "topic": "公司的營收、成本與利潤",
+    "age_hint": "6-8歲",
+    "vocabulary_level": "simple",
+    "metaphor_suggestions": ["雞排店", "營收=賣東西的錢", "成本=花出去的錢", "利潤=真正賺到的"]
+  }
+}

@@ -1,0 +1,72 @@
+{
+  "lesson_id": "L024",
+  "stage": 1,
+  "level": 5,
+  "domain": "basic",
+  "title": "什麼是投資？",
+  "summary": "全面認識投資的概念，了解不同的投資方式和基本原則。",
+  "cards": [
+    {
+      "type": "text_image",
+      "title": "投資就是種一棵樹",
+      "body": "投資就像種樹 🌱：\n\n你種下一顆種子（投入一些錢），\n慢慢澆水（等待時間），\n有天它長成大樹（你的錢變多了）！🌳\n\n但不是每棵樹都能長大，有些可能養不活（投資可能虧錢）。",
+      "image_key": "lesson_024_card_01"
+    },
+    {
+      "type": "text_image",
+      "title": "投資有很多種",
+      "body": "投資的方式不只買股票喔：\n\n📈 股票 — 買公司的一小部分\n🏠 房地產 — 買房子出租收租金\n💰 債券 — 借錢給政府或公司，收利息\n🥇 黃金 — 買金子保值\n🏦 基金 — 把錢交給專家幫你投資\n\n每種都有不同的特色！",
+      "image_key": "lesson_024_card_02"
+    },
+    {
+      "type": "text_image",
+      "title": "投資的兩大原則",
+      "body": "🎯 原則一：高報酬 = 高風險\n賺越多的投資，虧錢的風險也越大。\n就像坐雲霄飛車，越刺激就越可怕！🎢\n\n🎯 原則二：不要把雞蛋放在同一個籃子\n如果你把錢全部買同一檔股票，萬一那間公司出問題，你就全部虧光 🥚",
+      "image_key": "lesson_024_card_03"
+    },
+    {
+      "type": "text_image",
+      "title": "時間是你最好的朋友",
+      "body": "投資最重要的祕密就是「時間」⏰：\n\n越早開始、越有耐心，你的投資就越有機會增長。\n\n就像種樹，10 年後的大樹比 1 年後的小苗值錢多了 🌿→🌳\n\n所以你現在就開始學投資知識，是非常棒的！🐻✨",
+      "image_key": "lesson_024_card_04"
+    }
+  ],
+  "preset_questions": [
+    {
+      "question_type": "choice",
+      "question_text": "「不要把雞蛋放在同一個籃子」在投資裡是什麼意思？",
+      "options": [
+        "不要養太多雞",
+        "不要把所有的錢投在同一個地方",
+        "籃子太小裝不下",
+        "雞蛋要放冰箱"
+      ],
+      "correct_answer": 1,
+      "explanation": "答對了！🥚 這句話的意思是要「分散投資」，不要把所有的錢都投在同一個地方，這樣風險比較小。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "高報酬的投資通常也伴隨著高風險。",
+      "correct_answer": true,
+      "explanation": "對！🎢 這是投資的基本原則。想賺越多，可能虧越多。所以要根據自己能承受的風險來選擇投資。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "下面哪一個「不是」投資的方式？",
+      "options": [
+        "買股票",
+        "買房子出租",
+        "買彩券",
+        "買債券"
+      ],
+      "correct_answer": 2,
+      "explanation": "💡 買彩券是靠運氣的「賭博」，不是投資。投資是根據分析和判斷來做決策，不靠運氣。"
+    }
+  ],
+  "ai_prompt_context": {
+    "topic": "投資的定義、種類和基本原則",
+    "age_hint": "6-8歲",
+    "vocabulary_level": "simple",
+    "metaphor_suggestions": ["種樹", "雲霄飛車", "雞蛋和籃子", "時間是好朋友"]
+  }
+}

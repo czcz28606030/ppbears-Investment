@@ -1,0 +1,72 @@
+{
+  "lesson_id": "L005",
+  "stage": 1,
+  "level": 1,
+  "domain": "basic",
+  "title": "錢可以做什麼？",
+  "summary": "認識錢的三個用途：消費、儲蓄、投資，為後續學習打地基。",
+  "cards": [
+    {
+      "type": "text_image",
+      "title": "錢的三種超能力",
+      "body": "錢有三種超能力 💪：\n1️⃣ 花掉它 — 買你需要的東西\n2️⃣ 存起來 — 留著以後用\n3️⃣ 讓它長大 — 這就是投資！\n\n今天我們來認識這三種超能力！",
+      "image_key": "lesson_005_card_01"
+    },
+    {
+      "type": "text_image",
+      "title": "超能力一：消費",
+      "body": "「消費」就是用錢買東西 🛒。買便當、買衣服、付公車票都是消費。消費讓我們的生活更方便、更舒服。但要記得：只買「需要」和「真的想要」的東西！",
+      "image_key": "lesson_005_card_02"
+    },
+    {
+      "type": "text_image",
+      "title": "超能力二：儲蓄",
+      "body": "「儲蓄」就是把錢存起來 🐷。就像松鼠在秋天存堅果過冬一樣 🐿️，我們存錢是為了：\n• 買更貴的東西（如腳踏車）\n• 以備不時之需\n• 讓自己更安心",
+      "image_key": "lesson_005_card_03"
+    },
+    {
+      "type": "text_image",
+      "title": "超能力三：投資",
+      "body": "「投資」就是讓錢去幫你賺更多錢 📈。就像種一棵蘋果樹 🌳，你花錢買種子（投資），等它長大後就會結出很多蘋果（報酬）！不過，有時候樹也可能長不好，這就是「風險」。",
+      "image_key": "lesson_005_card_04"
+    }
+  ],
+  "preset_questions": [
+    {
+      "question_type": "choice",
+      "question_text": "錢的三種用途是什麼？",
+      "options": [
+        "吃飯、睡覺、玩耍",
+        "消費、儲蓄、投資",
+        "跑步、游泳、打球",
+        "唱歌、跳舞、畫畫"
+      ],
+      "correct_answer": 1,
+      "explanation": "完美！🎉 錢的三種用途就是：消費（買東西）、儲蓄（存起來）、投資（讓錢變多）。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "投資就像種蘋果樹，花錢買種子，等它長大結果實。",
+      "correct_answer": true,
+      "explanation": "對！🌳 投資就是用錢去獲得更多回報。但就像種樹也可能失敗，投資也有風險喔。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "把錢存在存錢筒裡，這屬於錢的哪種超能力？",
+      "options": [
+        "消費",
+        "儲蓄",
+        "投資",
+        "浪費"
+      ],
+      "correct_answer": 1,
+      "explanation": "對！🐷 把錢存起來就是「儲蓄」。儲蓄讓你以後可以買更大的東西！"
+    }
+  ],
+  "ai_prompt_context": {
+    "topic": "錢的三種用途：消費、儲蓄、投資",
+    "age_hint": "6-8歲",
+    "vocabulary_level": "simple",
+    "metaphor_suggestions": ["蘋果樹", "松鼠存堅果", "超能力", "存錢筒"]
+  }
+}

@@ -1,0 +1,72 @@
+{
+  "lesson_id": "L018",
+  "stage": 1,
+  "level": 4,
+  "domain": "basic",
+  "title": "生活中到處都是公司",
+  "summary": "從日常生活出發，認識不同類型的台灣知名公司和產業。",
+  "cards": [
+    {
+      "type": "text_image",
+      "title": "早上起床就遇到公司",
+      "body": "一起來看看一天之中你會遇到多少公司 🌅：\n\n刷牙 → 高露潔（牙膏公司）\n喝牛奶 → 味全（食品公司）🥛\n穿衣服 → Nike（運動品牌）👕\n搭公車 → 客運公司 🚌\n\n我們每天都在和公司打交道！",
+      "image_key": "lesson_018_card_01"
+    },
+    {
+      "type": "text_image",
+      "title": "不同種類的公司",
+      "body": "公司有很多不同的種類：\n\n🏭 製造業 — 做東西的（如台積電做晶片）\n🛒 零售業 — 賣東西的（如全聯福利中心）\n🍔 餐飲業 — 賣吃的（如麥當勞）\n📱 科技業 — 做手機、APP（如蘋果公司）\n🏥 醫療業 — 醫院和藥廠",
+      "image_key": "lesson_018_card_02"
+    },
+    {
+      "type": "text_image",
+      "title": "台灣之光：台積電",
+      "body": "你聽過「台積電」嗎？🏭 它是全世界最厲害的晶片製造公司！\n\n手機、電腦、遊戲機裡面都有晶片，很多都是台積電做的。它是台灣最有名的公司，全世界的人都知道 🇹🇼✨",
+      "image_key": "lesson_018_card_03"
+    },
+    {
+      "type": "text_image",
+      "title": "找找身邊的公司",
+      "body": "小挑戰 🐻：今天回家的路上，注意看看你會經過多少公司的招牌？\n\n便利商店 🏪、加油站 ⛽、餐廳 🍜、銀行 🏦...\n\n你會發現到處都是公司。而這些公司，很多都是你以後可以「投資」的對象喔！",
+      "image_key": "lesson_018_card_04"
+    }
+  ],
+  "preset_questions": [
+    {
+      "question_type": "choice",
+      "question_text": "台積電是做什麼的公司？",
+      "options": [
+        "賣雞排",
+        "製造晶片",
+        "開便利商店",
+        "做飛機"
+      ],
+      "correct_answer": 1,
+      "explanation": "對！🏭 台積電（TSMC）是全球最大的半導體晶片製造公司，手機和電腦裡的晶片很多都是它做的。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "賣東西的商店（如全聯）也算是一種公司。",
+      "correct_answer": true,
+      "explanation": "沒錯！🛒 全聯福利中心是零售業的公司，專門採購商品再賣給消費者。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "麥當勞賣漢堡和薯條，它屬於哪一種產業？",
+      "options": [
+        "科技業",
+        "製造業",
+        "餐飲業",
+        "醫療業"
+      ],
+      "correct_answer": 2,
+      "explanation": "答對了！🍔 麥當勞是餐飲業的公司，專門提供速食餐飲服務。"
+    }
+  ],
+  "ai_prompt_context": {
+    "topic": "日常生活中的各種公司與產業類別",
+    "age_hint": "6-8歲",
+    "vocabulary_level": "simple",
+    "metaphor_suggestions": ["台積電", "便利商店", "麥當勞", "Nike", "上學途中經過的店"]
+  }
+}

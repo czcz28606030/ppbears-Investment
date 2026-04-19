@@ -33,6 +33,8 @@ export default function ShopView() {
 
   if (!user) return null;
 
+  const isParent = user.role === 'parent';
+
   const balance    = learningWallet?.balance ?? 0;
   const activeItems = shopItems.filter(i => i.isActive);
 
@@ -87,7 +89,11 @@ export default function ShopView() {
               <div
                 key={item.id}
                 className={`card shop-item ${!canAfford ? 'unaffordable' : ''} ${isPending ? 'pending' : ''}`}
-                onClick={() => { if (!isPending) { setSelected(item); setConfirming(true); } }}
+                onClick={() => {
+                  if (isParent || isPending || !canAfford) return;
+                  setSelected(item);
+                  setConfirming(true);
+                }}
               >
                 <div className="shop-item-icon">{item.icon ?? '🎁'}</div>
                 <div className="shop-item-name">{item.name}</div>
@@ -109,7 +115,7 @@ export default function ShopView() {
       {/* 我的申請快捷 */}
       {redemptions.length > 0 && (
         <div className="card shop-my-requests" onClick={() => navigate('/learn/requests')}>
-          <span>📋 我的兌換申請</span>
+          <span>📋 {isParent ? '待審兌換申請' : '我的兌換申請'}</span>
           {pendingItemIds.size > 0 && <span className="shop-pending-count">{pendingItemIds.size} 筆待審核</span>}
           <span style={{ color: 'var(--text-light)' }}>▶</span>
         </div>

@@ -1,0 +1,72 @@
+{
+  "lesson_id": "L019",
+  "stage": 1,
+  "level": 4,
+  "domain": "basic",
+  "title": "公司為什麼需要更多錢？",
+  "summary": "了解公司需要資金成長的原因，為「股票」概念打下基礎。",
+  "cards": [
+    {
+      "type": "text_image",
+      "title": "小明的雞排店想長大",
+      "body": "還記得小明的雞排店嗎？🍗 生意好到不行！每天都大排長龍。小明想：「如果我能開第二間店，就能賣給更多人！」\n\n但開新店需要很多錢 💰：租金、裝潢、買設備...至少要 100 萬！",
+      "image_key": "lesson_019_card_01"
+    },
+    {
+      "type": "text_image",
+      "title": "錢不夠怎麼辦？",
+      "body": "小明只有 50 萬，還差 50 萬 😰。他有三個選擇：\n\n1️⃣ 繼續存錢 — 但等好久\n2️⃣ 跟銀行借 — 要付利息\n3️⃣ 找人一起出錢 — 大家合力開店！\n\n第三個選擇就是「找投資人」的概念！",
+      "image_key": "lesson_019_card_02"
+    },
+    {
+      "type": "text_image",
+      "title": "找人一起出錢",
+      "body": "小明跟小華說：「你出 50 萬，我出 50 萬，我們一起開新店。賺到的錢，我們一人分一半！」🤝\n\n小華同意了！這就是最基本的「投資」：出錢幫公司成長，將來一起分享獲利。",
+      "image_key": "lesson_019_card_03"
+    },
+    {
+      "type": "text_image",
+      "title": "股票的雛形",
+      "body": "如果是一間很大的公司，需要好幾億的資金，不可能只找一兩個人。\n\n所以公司會把「出資的權利」拆成很多很多小份，每一小份就是一張「股票」📜。\n\n買了股票，你就成了公司的小老闆之一喔！🐻✨ 下堂課我們來認識股票和股東！",
+      "image_key": "lesson_019_card_04"
+    }
+  ],
+  "preset_questions": [
+    {
+      "question_type": "choice",
+      "question_text": "小明開新店差 50 萬，他找小華出錢一起開店。這叫什麼？",
+      "options": [
+        "借錢",
+        "投資",
+        "捐錢",
+        "偷錢"
+      ],
+      "correct_answer": 1,
+      "explanation": "對！🤝 小華出錢幫小明的公司成長，將來一起分享獲利，這就是「投資」的概念。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "公司想要成長變大，通常需要更多的資金。",
+      "correct_answer": true,
+      "explanation": "沒錯！💰 不管是開新店、買設備、請更多員工，公司要成長就需要更多資金。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "公司把「出資權利」拆成很多小份來賣給大眾，每一小份叫什麼？",
+      "options": [
+        "存摺",
+        "提款卡",
+        "股票",
+        "保險"
+      ],
+      "correct_answer": 2,
+      "explanation": "太棒了！📜 公司把出資權利拆成很多小份賣給大眾，每一份就是一張「股票」！"
+    }
+  ],
+  "ai_prompt_context": {
+    "topic": "公司為什麼需要募集資金，股票的起源概念",
+    "age_hint": "6-8歲",
+    "vocabulary_level": "simple",
+    "metaphor_suggestions": ["雞排店擴張", "合夥開店", "出資的權利拆成小份", "一起當老闆"]
+  }
+}

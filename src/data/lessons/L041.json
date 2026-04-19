@@ -1,0 +1,72 @@
+{
+  "lesson_id": "L041",
+  "stage": 2,
+  "level": 9,
+  "domain": "basic",
+  "title": "什麼是 EPS？",
+  "summary": "認識每股盈餘（EPS），了解用它來衡量公司賺不賺錢。",
+  "cards": [
+    {
+      "type": "text_image",
+      "title": "EPS = 每股盈餘",
+      "body": "EPS 的全名是 Earnings Per Share，中文叫「每股盈餘」💰：\n\n簡單說就是：\n公司賺的錢 ÷ 所有的股數 = EPS\n\n例如：公司今年賺了 100 億，總共有 10 億股\nEPS = 100 億 ÷ 10 億 = 10 元\n\n代表你持有的每一股，幫你「賺」了 10 元！",
+      "image_key": "lesson_041_card_01"
+    },
+    {
+      "type": "text_image",
+      "title": "用比喻來理解",
+      "body": "想像你和朋友一起賣檸檬汁 🍋：\n\n• 5 個人合資開攤\n• 一天賺了 500 元\n• 每個人分到 500 ÷ 5 = 100 元\n\n這個「每人分到 100 元」就像 EPS！\n\n如果另一攤也是 5 個人，但只賺 250 元：\n每人分到 50 元 → EPS 比較低\n\nEPS 越高，代表每股賺越多 📈",
+      "image_key": "lesson_041_card_02"
+    },
+    {
+      "type": "text_image",
+      "title": "EPS 怎麼用？",
+      "body": "EPS 可以幫我們比較公司 🏢：\n\n比較同一家公司不同年：\n• 2023 年 EPS = 8 元\n• 2024 年 EPS = 12 元\n→ 代表公司越來越會賺錢 📈\n\n比較不同公司：\n• A 公司 EPS = 15 元\n• B 公司 EPS = 3 元\n→ A 公司每股賺得比較多\n\n但要注意：EPS 高不一定代表股價便宜，還要看其他指標！",
+      "image_key": "lesson_041_card_03"
+    },
+    {
+      "type": "text_image",
+      "title": "EPS 也可能是負的",
+      "body": "如果公司今年虧損了呢 😥？\n\n• 公司虧了 50 億，共 10 億股\n• EPS = -50 ÷ 10 = -5 元\n\n負的 EPS 代表每股「虧」了 5 元！\n\n所以看到 EPS：\n✅ 正數 → 公司有賺錢\n❌ 負數 → 公司在虧損\n📈 逐年增加 → 公司越來越好\n📉 逐年減少 → 要注意了！",
+      "image_key": "lesson_041_card_04"
+    }
+  ],
+  "preset_questions": [
+    {
+      "question_type": "choice",
+      "question_text": "EPS 的中文是什麼？",
+      "options": [
+        "每日盈餘",
+        "每股盈餘",
+        "每月營收",
+        "每年股利"
+      ],
+      "correct_answer": 1,
+      "explanation": "答對！💰 EPS = Earnings Per Share = 每股盈餘，表示公司賺的錢分到每一股有多少。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "EPS 有可能是負數。",
+      "correct_answer": true,
+      "explanation": "正確！😥 當公司虧損時，EPS 就會是負數，代表公司每股在虧錢。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "一家公司今年賺了 200 億，共有 20 億股，EPS 是多少？",
+      "options": [
+        "5 元",
+        "10 元",
+        "20 元",
+        "100 元"
+      ],
+      "correct_answer": 1,
+      "explanation": "對！🧮 EPS = 200 億 ÷ 20 億股 = 10 元。每一股幫你賺了 10 元！"
+    }
+  ],
+  "ai_prompt_context": {
+    "topic": "每股盈餘 EPS 的意義與計算方式",
+    "age_hint": "7-9歲",
+    "vocabulary_level": "simple",
+    "metaphor_suggestions": ["檸檬汁攤分錢", "EPS=每股賺多少", "公司成績單"]
+  }
+}

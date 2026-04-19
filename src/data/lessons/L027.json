@@ -1,0 +1,72 @@
+{
+  "lesson_id": "L027",
+  "stage": 2,
+  "level": 6,
+  "domain": "basic",
+  "title": "營收是什麼？",
+  "summary": "深入了解公司營收的概念，學會判斷公司的賺錢能力。",
+  "cards": [
+    {
+      "type": "text_image",
+      "title": "營收 = 賣東西收到的錢",
+      "body": "還記得嗎？「營收」就是公司賣東西收到的總金額 💰\n\n假設一間飲料店：\n• 一杯珍奶 55 元\n• 今天賣了 200 杯\n• 今日營收 = 55 × 200 = 11,000 元\n\n營收越高，代表公司賣得越好！",
+      "image_key": "lesson_027_card_01"
+    },
+    {
+      "type": "text_image",
+      "title": "月營收和年營收",
+      "body": "公司的營收可以用不同時間來看：\n\n📅 月營收 — 一個月賣了多少錢\n📆 季營收 — 三個月的合計\n🗓️ 年營收 — 一整年的合計\n\n台灣的上市公司每個月都會公佈月營收，大家都可以在網路上查得到！",
+      "image_key": "lesson_027_card_02"
+    },
+    {
+      "type": "text_image",
+      "title": "營收成長 vs 衰退",
+      "body": "看營收最重要的是跟「去年同期」比較：\n\n📈 營收成長 = 比去年同月賣更多 → 好消息！\n📉 營收衰退 = 比去年同月賣更少 → 要注意！\n\n例如：今年 3 月營收 100 萬，去年 3 月 80 萬\n成長率 = (100-80)/80 = 25% 🎉 成長了！",
+      "image_key": "lesson_027_card_03"
+    },
+    {
+      "type": "text_image",
+      "title": "營收高不一定賺錢",
+      "body": "⚠️ 注意：營收高不等於賺錢！\n\n如果一間公司營收 1 億，但成本花了 1.2 億...\n它反而虧了 2,000 萬！😱\n\n所以除了看營收，還要看「利潤」（營收 - 成本）。\n營收是判斷公司好壞的第一步，但不是唯一的指標 🐻",
+      "image_key": "lesson_027_card_04"
+    }
+  ],
+  "preset_questions": [
+    {
+      "question_type": "choice",
+      "question_text": "飲料店一杯 55 元，今天賣了 200 杯，今日營收是多少？",
+      "options": [
+        "255 元",
+        "4,000 元",
+        "11,000 元",
+        "55,000 元"
+      ],
+      "correct_answer": 2,
+      "explanation": "答對了！🧮 55 × 200 = 11,000 元。營收就是價格 × 賣出數量的總和。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "營收很高的公司一定賺錢。",
+      "correct_answer": false,
+      "explanation": "不一定！⚠️ 如果成本比營收還高，公司反而會虧錢。所以要看營收也要看利潤。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "今年 3 月營收比去年 3 月多，這叫什麼？",
+      "options": [
+        "營收衰退",
+        "營收持平",
+        "營收成長",
+        "營收消失"
+      ],
+      "correct_answer": 2,
+      "explanation": "對！📈 今年比去年同期賣更多，就是「營收成長」，這通常是好消息！"
+    }
+  ],
+  "ai_prompt_context": {
+    "topic": "營收的概念、成長衰退與營收不等於利潤",
+    "age_hint": "7-9歲",
+    "vocabulary_level": "simple",
+    "metaphor_suggestions": ["飲料店營收", "月營收公佈", "跟去年比較", "營收高不一定賺錢"]
+  }
+}

@@ -1,0 +1,72 @@
+{
+  "lesson_id": "L034",
+  "stage": 2,
+  "level": 7,
+  "domain": "basic",
+  "title": "漲停與跌停",
+  "summary": "認識台灣股市的漲跌幅限制與漲停跌停的意義。",
+  "cards": [
+    {
+      "type": "text_image",
+      "title": "有限制的漲跌",
+      "body": "在台灣，股票每天的漲跌是有限制的 🚦！\n\n📏 漲跌幅限制 = 10%\n\n意思是：一檔股票一天之內最多漲 10%，也最多跌 10%。\n\n如果昨天收盤 100 元：\n• 最多漲到 110 元 📈\n• 最多跌到 90 元 📉",
+      "image_key": "lesson_034_card_01"
+    },
+    {
+      "type": "text_image",
+      "title": "什麼是漲停？",
+      "body": "當股票漲到當天的最高限制，就叫做「漲停」🔴！\n\n漲停代表：\n• 想買的人非常多！\n• 價格已經到頂了，今天不能再漲\n• 買不到的人只能明天再來排隊\n\n漲停板就像是交通號誌的「紅燈」🚦 — 到這裡就停！",
+      "image_key": "lesson_034_card_02"
+    },
+    {
+      "type": "text_image",
+      "title": "什麼是跌停？",
+      "body": "反過來，當股票跌到最低限制，就叫做「跌停」🟢！\n\n跌停代表：\n• 想賣的人非常多！\n• 價格已經跌到底了，今天不能再跌\n• 賣不掉的人只能繼續等\n\n⚠️ 連續跌停板是很可怕的事，代表公司出大問題了！",
+      "image_key": "lesson_034_card_03"
+    },
+    {
+      "type": "text_image",
+      "title": "為什麼要有限制？",
+      "body": "漲跌幅限制的目的是「保護投資人」🛡️\n\n如果沒有限制：\n• 股票可能一天暴漲 100% 又暴跌 90%\n• 投資人的錢可能一天就不見了 😱\n\n有了 10% 的限制，就算遇到壞消息，你還有時間冷靜思考要不要賣 🐻💡",
+      "image_key": "lesson_034_card_04"
+    }
+  ],
+  "preset_questions": [
+    {
+      "question_type": "choice",
+      "question_text": "台灣股票一天最多可以漲或跌多少？",
+      "options": [
+        "5%",
+        "10%",
+        "20%",
+        "沒有限制"
+      ],
+      "correct_answer": 1,
+      "explanation": "對！🚦 台股的漲跌幅限制是 10%。例如 100 元的股票，最多漲到 110 元或跌到 90 元。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "漲停板代表今天這檔股票有非常多人想買。",
+      "correct_answer": true,
+      "explanation": "沒錯！🔴 漲停表示買盤非常強勁，想買的人多到價格已經漲到當天上限了。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "漲跌幅限制的主要目的是什麼？",
+      "options": [
+        "讓股票不能漲",
+        "保護投資人，避免價格劇烈波動",
+        "讓政府賺更多錢",
+        "讓大家不要買股票"
+      ],
+      "correct_answer": 1,
+      "explanation": "答對了！🛡️ 漲跌幅限制是為了保護投資人，避免股價一天之內暴漲暴跌造成重大損失。"
+    }
+  ],
+  "ai_prompt_context": {
+    "topic": "台灣股市的漲跌幅限制、漲停板與跌停板",
+    "age_hint": "7-9歲",
+    "vocabulary_level": "simple",
+    "metaphor_suggestions": ["紅綠燈", "交通號誌停止", "10%限制", "保護投資人"]
+  }
+}

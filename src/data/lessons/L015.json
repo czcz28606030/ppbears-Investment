@@ -1,0 +1,72 @@
+{
+  "lesson_id": "L015",
+  "stage": 1,
+  "level": 3,
+  "domain": "basic",
+  "title": "認識新台幣",
+  "summary": "認識新台幣的各種面額，學習基本的金額計算。",
+  "cards": [
+    {
+      "type": "text_image",
+      "title": "硬幣家族",
+      "body": "新台幣的硬幣有好幾種：\n• 1 元 — 最小的銀色硬幣 🪙\n• 5 元 — 稍微大一點\n• 10 元 — 銀色中間金色\n• 20 元 — 比較少見\n• 50 元 — 金色的大硬幣\n\n你認識幾種呢？",
+      "image_key": "lesson_015_card_01"
+    },
+    {
+      "type": "text_image",
+      "title": "鈔票家族",
+      "body": "新台幣的紙鈔也有好幾種：\n• 100 元 — 紅色 🔴\n• 200 元 — 綠色 🟢（很少見！）\n• 500 元 — 棕色 🟤\n• 1,000 元 — 藍色 🔵\n• 2,000 元 — 紫色 🟣（也很少見！）\n\n你最常看到哪種？",
+      "image_key": "lesson_015_card_02"
+    },
+    {
+      "type": "text_image",
+      "title": "換算小練習",
+      "body": "來做個小練習 🧮：\n• 1 張 100 元 = 10 個 10 元硬幣\n• 1 張 500 元 = 5 張 100 元\n• 1 張 1,000 元 = 2 張 500 元\n• 1 張 1,000 元 = 100 個 10 元\n\n學會換算，買東西找零就不怕算錯了！",
+      "image_key": "lesson_015_card_03"
+    },
+    {
+      "type": "text_image",
+      "title": "保護好你的錢",
+      "body": "幾個小提醒 🐻：\n• 💰 硬幣放口袋容易掉，最好用零錢包裝\n• 💵 紙鈔不要揉成一團\n• 🔍 拿到錢要看清楚面額\n• ❌ 絕對不要把錢放在桌上就走開\n\n愛護金錢是理財的第一步！",
+      "image_key": "lesson_015_card_04"
+    }
+  ],
+  "preset_questions": [
+    {
+      "question_type": "choice",
+      "question_text": "新台幣 1,000 元的紙鈔是什麼顏色？",
+      "options": [
+        "紅色",
+        "綠色",
+        "藍色",
+        "紫色"
+      ],
+      "correct_answer": 2,
+      "explanation": "答對了！🔵 1,000 元是藍色的。100 元是紅色、500 元是棕色、2,000 元是紫色。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "1 張 500 元等於 5 張 100 元。",
+      "correct_answer": true,
+      "explanation": "沒錯！✅ 500 ÷ 100 = 5，所以 1 張 500 元等於 5 張 100 元。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "下面哪一種新台幣紙鈔最少見？",
+      "options": [
+        "100 元",
+        "200 元",
+        "500 元",
+        "1,000 元"
+      ],
+      "correct_answer": 1,
+      "explanation": "對！🟢 新台幣 200 元鈔票是最少見的面額之一，很多人都沒看過呢！"
+    }
+  ],
+  "ai_prompt_context": {
+    "topic": "新台幣面額認識與基本換算",
+    "age_hint": "6-8歲",
+    "vocabulary_level": "simple",
+    "metaphor_suggestions": ["硬幣家族", "鈔票顏色", "便利商店找零", "零錢包"]
+  }
+}

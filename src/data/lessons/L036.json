@@ -1,0 +1,72 @@
+{
+  "lesson_id": "L036",
+  "stage": 2,
+  "level": 8,
+  "domain": "technical",
+  "title": "股票代號是什麼？",
+  "summary": "認識台灣股票的代號系統，學會用代號尋找股票。",
+  "cards": [
+    {
+      "type": "text_image",
+      "title": "每檔股票都有代號",
+      "body": "就像每個人都有名字，每檔股票也有自己的「代號」🔢：\n\n• 台積電 = 2330\n• 鴻海 = 2317\n• 統一超 = 2912\n• 聯發科 = 2454\n\n在台灣，上市公司的代號通常是 4 位數字。比起記全名，記代號更方便！",
+      "image_key": "lesson_036_card_01"
+    },
+    {
+      "type": "text_image",
+      "title": "代號有什麼規律？",
+      "body": "台股代號其實有一些規律喔 🧐：\n\n• 1xxx — 水泥、食品、紡織等傳統產業\n• 2xxx — 電子業（佔台股最多）\n• 3xxx — 通信、光電\n• 5xxx — 化學、生技\n• 6xxx — 上櫃公司\n• 9xxx — 油電燃氣\n\n不用背，大概知道就好！",
+      "image_key": "lesson_036_card_02"
+    },
+    {
+      "type": "text_image",
+      "title": "怎麼查股票代號？",
+      "body": "要查一檔股票的代號很簡單 🔍：\n\n1️⃣ 用 Google 搜尋「台積電 股票」\n2️⃣ 用股票 APP 搜尋公司名稱\n3️⃣ 到台灣證券交易所網站查詢\n\n反過來，知道代號也能查到公司名稱和所有資訊！",
+      "image_key": "lesson_036_card_03"
+    },
+    {
+      "type": "text_image",
+      "title": "試試看！",
+      "body": "小挑戰 🐻：下次看到新聞提到「2330 今天漲了」，你就知道它在說台積電！\n\n常見的代號可以慢慢記：\n• 2330 台積電\n• 2317 鴻海\n• 2412 中華電\n• 2454 聯發科\n• 2882 國泰金\n\n就像記朋友的暱稱一樣 📱✨",
+      "image_key": "lesson_036_card_04"
+    }
+  ],
+  "preset_questions": [
+    {
+      "question_type": "choice",
+      "question_text": "台積電的股票代號是什麼？",
+      "options": [
+        "2317",
+        "2330",
+        "2454",
+        "2912"
+      ],
+      "correct_answer": 1,
+      "explanation": "答對了！📱 台積電的股票代號是 2330，這是台股最知名的代號之一。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "台灣上市公司的股票代號通常是 4 位數字。",
+      "correct_answer": true,
+      "explanation": "對！🔢 台灣上市公司的代號通常是 4 位數字，如 2330（台積電）、2317（鴻海）。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "代號開頭是 2 的股票，通常屬於什麼產業？",
+      "options": [
+        "食品業",
+        "電子業",
+        "金融業",
+        "營建業"
+      ],
+      "correct_answer": 1,
+      "explanation": "對！💻 台股代號 2xxx 開頭的大多是電子業公司，這是台股最大的產業類別。"
+    }
+  ],
+  "ai_prompt_context": {
+    "topic": "台灣股票代號系統與查詢方式",
+    "age_hint": "7-9歲",
+    "vocabulary_level": "simple",
+    "metaphor_suggestions": ["像朋友的暱稱", "4位數字代號", "2330台積電", "Google搜尋"]
+  }
+}

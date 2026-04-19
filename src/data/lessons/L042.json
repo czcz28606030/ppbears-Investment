@@ -1,0 +1,72 @@
+{
+  "lesson_id": "L042",
+  "stage": 2,
+  "level": 9,
+  "domain": "basic",
+  "title": "本益比是什麼？",
+  "summary": "認識本益比（P/E Ratio），學習判斷股票是「貴」還是「便宜」的基礎方法。",
+  "cards": [
+    {
+      "type": "text_image",
+      "title": "本益比 = 股價 ÷ EPS",
+      "body": "本益比（P/E Ratio）是投資人最常用的指標之一 📊：\n\n本益比 = 股價 ÷ EPS\n\n例如：\n• 股價 = 200 元\n• EPS = 10 元\n• 本益比 = 200 ÷ 10 = 20 倍\n\n代表什麼？你花 200 元買這張股票，公司每年幫你賺 10 元，要 20 年才賺回來！",
+      "image_key": "lesson_042_card_01"
+    },
+    {
+      "type": "text_image",
+      "title": "用買雞的比喻來理解",
+      "body": "想像你要買一隻會下蛋的雞 🐔：\n\n🐔 A 雞：賣 200 元，每天下 1 顆蛋（值 10 元）\n→ 要 20 天才賺回 200 元（本益比 = 20）\n\n🐔 B 雞：賣 100 元，每天下 1 顆蛋（值 10 元）\n→ 只要 10 天就賺回 100 元（本益比 = 10）\n\nB 雞比較「划算」！本益比越低，通常代表越快回本 💡",
+      "image_key": "lesson_042_card_02"
+    },
+    {
+      "type": "text_image",
+      "title": "本益比多少算合理？",
+      "body": "一般台股的參考範圍 🇹🇼：\n\n📗 10-15 倍 → 偏便宜\n📘 15-20 倍 → 普通（合理）\n📕 20-30 倍 → 偏貴\n📙 30 倍以上 → 很貴（但不一定不好）\n\n注意：不同產業的「合理」本益比不同！\n• 傳統產業：10-15 倍\n• 科技成長股：20-30 倍或更高\n\n不能只看數字，要跟同行比 🤔",
+      "image_key": "lesson_042_card_03"
+    },
+    {
+      "type": "text_image",
+      "title": "本益比的小陷阱",
+      "body": "看本益比時要注意 ⚠️：\n\n❌ 本益比低 ≠ 一定要買\n（可能是公司在走下坡，大家不看好）\n\n❌ 本益比高 ≠ 一定不好\n（可能是公司在快速成長，大家很看好）\n\n✅ 要搭配其他指標一起看\n✅ 同行業的公司互相比較才有意義\n\n本益比只是參考之一，不是唯一答案 📖",
+      "image_key": "lesson_042_card_04"
+    }
+  ],
+  "preset_questions": [
+    {
+      "question_type": "choice",
+      "question_text": "本益比的公式是什麼？",
+      "options": [
+        "EPS ÷ 股價",
+        "股價 ÷ EPS",
+        "股價 × EPS",
+        "EPS × 股數"
+      ],
+      "correct_answer": 1,
+      "explanation": "答對！📊 本益比 = 股價 ÷ EPS。代表你要花多少倍的 EPS 才能買到一股。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "本益比越低，就一定是越好的投資。",
+      "correct_answer": false,
+      "explanation": "不一定！⚠️ 本益比低可能是因為公司前景不佳。要配合其他指標一起看才準確。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "A 股票股價 300 元、EPS 15 元，B 股票股價 200 元、EPS 20 元。哪個本益比比較低？",
+      "options": [
+        "A 股票（本益比 20）",
+        "B 股票（本益比 10）",
+        "一樣",
+        "無法比較"
+      ],
+      "correct_answer": 1,
+      "explanation": "對！🧮 A 的本益比 = 300÷15 = 20 倍，B 的本益比 = 200÷20 = 10 倍。B 的本益比比較低。"
+    }
+  ],
+  "ai_prompt_context": {
+    "topic": "本益比 P/E Ratio 的計算與判斷方式",
+    "age_hint": "7-9歲",
+    "vocabulary_level": "simple",
+    "metaphor_suggestions": ["買會下蛋的雞", "幾年賺回來", "同行比較才有意義"]
+  }
+}

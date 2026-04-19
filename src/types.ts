@@ -32,6 +32,7 @@ export interface SimonsItem {
   status: string | null;
   unusual: string;
   category: string;
+  value: string;
   ret_w: string;
   ret_m: string;
   wtcost: string;
@@ -39,6 +40,8 @@ export interface SimonsItem {
   tcost: string | null;
   dcost: string;
   gvi: number;
+  mediangvi: string;
+  yflow: string;
   tcr_today: string;
   fcr_today: string;
 }
@@ -130,6 +133,14 @@ export interface StockRecommendation extends SimonsItem {
   adviceText: string;
   kidAdvice: string;
   score: number;
+}
+
+export interface StockLiveAnalysis {
+  technical: string;
+  chips: string;
+  news: string;
+  headlines: string[];
+  generatedAt: string;
 }
 
 export interface PortfolioSnapshot {

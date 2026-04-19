@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fetchSimonsData, toRecommendation, fetchTWSEAllStocks, fetchTPEXAllStocks } from '../api';
 import type { StockRecommendation } from '../types';
@@ -16,10 +16,12 @@ export default function Explore() {
   const [activeStrategy, setActiveStrategy] = useState(hasAiFeature ? 'ai' : 'A');
   const [error, setError] = useState('');
   const [twsePriceMap, setTwsePriceMap] = useState<Record<string, { close: string; change: string; name: string; volume: number; date: string }>>({});
+  const resultRef = useRef<HTMLDivElement>(null);
 
   async function loadData() {
     setLoading(true);
     setError('');
+    setRecommendations([]);
     try {
       // 同時抓 TWSE（上市）+ TPEX（上櫃）全市場資料
       const [twseAll, tpexAll] = await Promise.all([fetchTWSEAllStocks(), fetchTPEXAllStocks()]);
@@ -63,13 +65,15 @@ export default function Explore() {
 
       // Try today first, then yesterday, then last few days
       const today = new Date();
+      const pad = (n: number) => String(n).padStart(2, '0');
       for (let i = 0; i < 7; i++) {
         const date = new Date(today);
         date.setDate(date.getDate() - i);
         // Skip weekends
         if (date.getDay() === 0 || date.getDay() === 6) continue;
         
-        const dateStr = date.toISOString().split('T')[0];
+        // 使用本地時間格式，避免 toISOString() 轉 UTC 造成日期差一天
+        const dateStr = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
         const items = await fetchSimonsData(dateStr);
         if (items.length > 0) {
           const recs = items.map(toRecommendation);
@@ -263,7 +267,10 @@ export default function Explore() {
               <div
                 key={card.id}
                 className={`strategy-card ${card.className} ${activeStrategy === card.id ? 'active' : ''}`}
-                onClick={() => setActiveStrategy(card.id)}
+                onClick={() => {
+                setActiveStrategy(card.id);
+                setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+              }}
               >
                 <div className="strategy-icon">{card.icon}</div>
                 <div className="strategy-title">{card.title}</div>
@@ -279,7 +286,7 @@ export default function Explore() {
 
       {/* 篩選結果列表 */}
       <section>
-        <div className="filtered-result-header" style={{ marginBottom: 4 }}>
+        <div ref={resultRef} className="filtered-result-header" style={{ marginBottom: 4 }}>
           {activeStrategy === 'ai' ? '🤖 AI 每日推薦結果' : `🎯 「${STRATEGY_CARDS.find(c => c.id === activeStrategy)?.title}」策略篩選結果`}
           {activeStrategy === 'ai' && <span className="section-action" onClick={loadData} style={{ marginLeft: 'auto', fontWeight: 600 }}>重新整理</span>}
         </div>
@@ -292,10 +299,12 @@ export default function Explore() {
           )}
         </div>
 
-        {loading && activeStrategy === 'ai' && (
+        {loading && (
           <div className="loading-spinner">
             <div className="spinner"></div>
-            <div className="loading-text">PPBear 正在分析股票... 🐻</div>
+            <div className="loading-text">
+              {activeStrategy === 'ai' ? 'PPBear 正在分析股票... 🐻' : '資料載入中... 🐻'}
+            </div>
           </div>
         )}
 

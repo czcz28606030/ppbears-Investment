@@ -1,0 +1,72 @@
+{
+  "lesson_id": "L023",
+  "stage": 1,
+  "level": 5,
+  "domain": "basic",
+  "title": "為什麼要買股票？",
+  "summary": "了解買股票的目的和好處：讓錢為你工作，對抗通膨。",
+  "cards": [
+    {
+      "type": "text_image",
+      "title": "讓錢為你工作",
+      "body": "如果你只是把錢放在存錢筒裡，它不會自己變多 🐷。但如果你把錢拿去投資（買好公司的股票），公司用你的錢去做生意、賺更多錢，然後分一些給你 💰\n\n這就是「讓錢為你工作」！",
+      "image_key": "lesson_023_card_01"
+    },
+    {
+      "type": "text_image",
+      "title": "錢會偷偷變薄？",
+      "body": "你知道嗎？錢會偷偷變「不值錢」😱\n\n10 年前一杯珍奶 35 元，現在要 55 元！\n同樣的 100 元，能買的東西越來越少。\n\n這就叫做「通貨膨脹」（通膨）📈\n東西越來越貴 = 你的錢變得不夠用。",
+      "image_key": "lesson_023_card_02"
+    },
+    {
+      "type": "text_image",
+      "title": "投資可以對抗通膨",
+      "body": "銀行利息通常很低（1~2%），但通膨可能有 2~3% 😟\n\n放銀行：你的錢慢慢被通膨吃掉\n做投資：好的投資每年可能賺 5~10%\n\n投資的目的之一，就是讓你的錢跑得比物價上漲還快！🏃‍♂️💨",
+      "image_key": "lesson_023_card_03"
+    },
+    {
+      "type": "text_image",
+      "title": "不是每個人都適合",
+      "body": "但要注意 ⚠️：\n• 投資可能賺錢，也可能虧錢\n• 要用「閒錢」投資，不是生活費\n• 要先學會基本知識再開始\n• 不懂的東西不要亂買\n\n所以你現在一步步學投資知識，就是最棒的準備！🐻💪",
+      "image_key": "lesson_023_card_04"
+    }
+  ],
+  "preset_questions": [
+    {
+      "question_type": "choice",
+      "question_text": "「通貨膨脹」是什麼意思？",
+      "options": [
+        "錢變得越來越多",
+        "東西越來越便宜",
+        "物價上漲，同樣的錢能買的東西變少",
+        "銀行利息變很高"
+      ],
+      "correct_answer": 2,
+      "explanation": "答對了！📈 通貨膨脹就是物價上漲，同樣的 100 元能買的東西越來越少。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "投資應該用生活費和吃飯的錢。",
+      "correct_answer": false,
+      "explanation": "不行！⚠️ 投資要用「閒錢」（暫時不需要用的錢），絕對不能拿生活費來投資。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "為什麼人們要買股票？",
+      "options": [
+        "因為股票很好看",
+        "因為想當公司老闆管員工",
+        "讓錢為自己工作，對抗通膨",
+        "因為這是規定"
+      ],
+      "correct_answer": 2,
+      "explanation": "沒錯！💡 買股票最主要的目的是讓閒置的錢為你工作，獲得比存銀行更好的報酬，對抗通膨。"
+    }
+  ],
+  "ai_prompt_context": {
+    "topic": "投資股票的理由：讓錢工作、對抗通膨",
+    "age_hint": "6-8歲",
+    "vocabulary_level": "simple",
+    "metaphor_suggestions": ["珍奶漲價", "錢變薄", "讓錢去工作", "閒錢vs生活費"]
+  }
+}

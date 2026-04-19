@@ -1,0 +1,72 @@
+{
+  "lesson_id": "L032",
+  "stage": 2,
+  "level": 7,
+  "domain": "basic",
+  "title": "為什麼股票會漲？",
+  "summary": "了解股票上漲的各種原因和投資人的心理。",
+  "cards": [
+    {
+      "type": "text_image",
+      "title": "好消息讓股票漲",
+      "body": "股票上漲的最常見原因就是「好消息」📰：\n\n• 🏆 公司賺大錢 — 獲利超出大家預期\n• 🆕 新產品大賣 — 像 iPhone 剛推出時\n• 📈 營收創新高 — 賣得比以前更多\n• 🤝 拿到大訂單 — 有大客戶下單",
+      "image_key": "lesson_032_card_01"
+    },
+    {
+      "type": "text_image",
+      "title": "大環境也有影響",
+      "body": "不只是公司自己的消息，大環境也會影響股價 🌍：\n\n• 央行降低利率 → 大家把銀行的錢拿去買股票 📈\n• 景氣好、經濟成長 → 公司賺更多 💰\n• 政府推出刺激政策 → 股市一起漲\n\n這些讓整個市場一起上漲的力量叫做「多頭市場」🐂",
+      "image_key": "lesson_032_card_02"
+    },
+    {
+      "type": "text_image",
+      "title": "期待的力量",
+      "body": "很有趣的一件事：股票有時候會在「好事還沒發生」的時候就先漲 🔮！\n\n為什麼呢？因為投資人買的不只是現在，更是「對未來的期待」。\n\n如果大家覺得一間公司未來會賺很多錢，現在就會搶著買，股價就先漲了！",
+      "image_key": "lesson_032_card_03"
+    },
+    {
+      "type": "text_image",
+      "title": "漲多了要小心",
+      "body": "⚠️ 連續漲很多的股票要特別小心！\n\n就像氣球吹太大可能爆破 🎈\n股票漲太快、太高也可能會回跌。\n\n「別人貪婪時要恐懼」— 巴菲特 🧙‍♂️\n\n意思是大家瘋狂搶買的時候，你反而要冷靜思考 🐻",
+      "image_key": "lesson_032_card_04"
+    }
+  ],
+  "preset_questions": [
+    {
+      "question_type": "choice",
+      "question_text": "下面哪個不是股票上漲的原因？",
+      "options": [
+        "公司賺大錢",
+        "營收創新高",
+        "公司工廠發生火災",
+        "拿到大訂單"
+      ],
+      "correct_answer": 2,
+      "explanation": "對！🔥 工廠火災是壞消息，通常會讓股價下跌。賺大錢、營收高、拿到大訂單才是漲的原因。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "股票有時候在好事還沒發生前就會先漲。",
+      "correct_answer": true,
+      "explanation": "對！🔮 投資人買的是「對未來的期待」，如果大家看好一間公司的未來，股價就會提前反映上漲。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "巴菲特說「別人貪婪時你要？」",
+      "options": [
+        "更貪婪",
+        "恐懼（冷靜思考）",
+        "跟著買",
+        "不關心"
+      ],
+      "correct_answer": 1,
+      "explanation": "🧙‍♂️ 巴菲特名言：「別人貪婪時要恐懼，別人恐懼時要貪婪。」意思是不要隨著群眾衝動行事。"
+    }
+  ],
+  "ai_prompt_context": {
+    "topic": "股票上漲的原因與期待心理",
+    "age_hint": "7-9歲",
+    "vocabulary_level": "simple",
+    "metaphor_suggestions": ["好消息推動", "氣球吹太大", "多頭市場", "巴菲特名言"]
+  }
+}

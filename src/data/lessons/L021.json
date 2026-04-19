@@ -1,0 +1,72 @@
+{
+  "lesson_id": "L021",
+  "stage": 1,
+  "level": 5,
+  "domain": "basic",
+  "title": "什麼是股票？",
+  "summary": "正式認識股票的定義，了解股票就是公司的一小部分所有權。",
+  "cards": [
+    {
+      "type": "text_image",
+      "title": "股票是一張證明書",
+      "body": "股票就是一張「證明書」📜，證明你擁有一間公司的一小部分。\n\n想像一個比薩 🍕 被切成 1000 片，每一片就像一張股票。你買了 1 片，你就擁有這個比薩的千分之一！",
+      "image_key": "lesson_021_card_01"
+    },
+    {
+      "type": "text_image",
+      "title": "台灣的股票",
+      "body": "在台灣，股票的基本單位是「股」。\n\n通常買賣是以「張」為單位：\n1 張 = 1,000 股\n\n如果一檔股票每股 50 元：\n1 張 = 50 × 1,000 = 50,000 元 💰\n\n不過現在也可以買「零股」（不到一張），門檻低很多！",
+      "image_key": "lesson_021_card_02"
+    },
+    {
+      "type": "text_image",
+      "title": "股票怎麼賺錢？",
+      "body": "持有股票可以賺兩種錢：\n\n1️⃣ 賺價差 📈\n便宜買、貴的時候賣\n買 50 元，漲到 60 元賣 → 賺 10 元\n\n2️⃣ 領股利 💰\n公司賺錢會分紅給股東\n就像當包租公收房租一樣！",
+      "image_key": "lesson_021_card_03"
+    },
+    {
+      "type": "text_image",
+      "title": "現在的股票長什麼樣？",
+      "body": "以前的股票是一張真正的紙 📄，但現在都是電子化的了！你在手機或電腦上就能看到自己擁有哪些股票。\n\n就像你的銀行帳戶餘額是電子的，股票也是存在電腦裡的數字記錄 💻🐻",
+      "image_key": "lesson_021_card_04"
+    }
+  ],
+  "preset_questions": [
+    {
+      "question_type": "choice",
+      "question_text": "在台灣，買股票 1 張等於多少股？",
+      "options": [
+        "1 股",
+        "100 股",
+        "1,000 股",
+        "10,000 股"
+      ],
+      "correct_answer": 2,
+      "explanation": "答對了！📜 在台灣股市，1 張股票 = 1,000 股。這是台股的基本交易單位。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "買股票只能靠賣掉賺價差，不可能有其他收入。",
+      "correct_answer": false,
+      "explanation": "不對喔！💰 除了賺價差，公司還會把賺的錢分一部分給股東，這叫做「股利」。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "股票可以用什麼比喻？",
+      "options": [
+        "一整塊比薩",
+        "比薩的其中一小片",
+        "做比薩的烤箱",
+        "比薩的外送員"
+      ],
+      "correct_answer": 1,
+      "explanation": "對！🍕 股票就像比薩的一小片 — 你買了一張股票，就擁有公司的一小部分。"
+    }
+  ],
+  "ai_prompt_context": {
+    "topic": "股票的定義、基本單位與獲利方式",
+    "age_hint": "6-8歲",
+    "vocabulary_level": "simple",
+    "metaphor_suggestions": ["比薩切片", "1張=1000股", "賺價差", "領股利"]
+  }
+}

@@ -1,0 +1,72 @@
+{
+  "lesson_id": "L008",
+  "stage": 1,
+  "level": 2,
+  "domain": "basic",
+  "title": "聰明花錢小達人",
+  "summary": "學習比價、等待特價和避免衝動消費的實用技巧。",
+  "cards": [
+    {
+      "type": "text_image",
+      "title": "同樣的東西，不同的價錢",
+      "body": "你知道嗎？同樣一瓶飲料：\n• 便利商店賣 25 元 🏪\n• 超市可能只要 18 元 🛒\n• 量販店更便宜：15 元 🏬\n\n一樣的飲料為什麼價錢不同？因為每個地方的成本不一樣。學會比價，就能省下不少錢！",
+      "image_key": "lesson_008_card_01"
+    },
+    {
+      "type": "text_image",
+      "title": "等等再買更划算",
+      "body": "很多東西都有「特價」的時候 🏷️：\n• 百貨公司週年慶\n• 雙11購物節\n• 季節換季大拍賣\n\n如果不是很急著用，等到特價再買就能省下很多錢。耐心等待也是一種理財能力！",
+      "image_key": "lesson_008_card_02"
+    },
+    {
+      "type": "text_image",
+      "title": "小心衝動購物！",
+      "body": "「衝動購物」就是看到什麼就馬上想買 😱，結果買回家才發現根本不需要！\n\n小技巧：看到想買的東西，先等 3 天。如果 3 天後還是很想要，那再考慮買。這叫做「3 天冷靜法」！",
+      "image_key": "lesson_008_card_03"
+    },
+    {
+      "type": "text_image",
+      "title": "省下的錢就是賺到的",
+      "body": "比價省了 10 元 = 你賺到了 10 元 💰\n等特價省了 100 元 = 你賺到了 100 元 💸\n\n成功避免買不需要的東西 = 你省下了全部的錢！🐻\n\n聰明花錢，就是最簡單的理財方法！",
+      "image_key": "lesson_008_card_04"
+    }
+  ],
+  "preset_questions": [
+    {
+      "question_type": "choice",
+      "question_text": "看到想買的東西，「3天冷靜法」是什麼意思？",
+      "options": [
+        "把東西冰在冰箱3天",
+        "先等3天，還想要再考慮買",
+        "只能花3天的零用錢",
+        "每天買3個"
+      ],
+      "correct_answer": 1,
+      "explanation": "對！💡 3天冷靜法就是看到想買的東西先等3天，如果3天後還是很想要再買，避免衝動購物。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "同樣一個東西，不同的商店可能賣不同的價錢。",
+      "correct_answer": true,
+      "explanation": "沒錯！🏪 同樣的飲料在便利商店和超市可能價錢不同。學會比價就能省錢！"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "下面哪個是聰明的花錢方法？",
+      "options": [
+        "看到喜歡的馬上買",
+        "比較不同商店的價格再買",
+        "別人買我也要買",
+        "把零用錢一天花光"
+      ],
+      "correct_answer": 1,
+      "explanation": "太棒了！🌟 比價再買是聰明的花錢方法。省下的錢，就是你賺到的！"
+    }
+  ],
+  "ai_prompt_context": {
+    "topic": "聰明消費技巧：比價、等特價、避免衝動購物",
+    "age_hint": "6-8歲",
+    "vocabulary_level": "simple",
+    "metaphor_suggestions": ["便利商店vs超市", "週年慶", "3天冷靜法", "比價"]
+  }
+}

@@ -1,0 +1,72 @@
+{
+  "lesson_id": "L030",
+  "stage": 2,
+  "level": 6,
+  "domain": "basic",
+  "title": "生活中的上市公司",
+  "summary": "認識更多台灣知名上市公司和產業分類。",
+  "cards": [
+    {
+      "type": "text_image",
+      "title": "台股的產業分類",
+      "body": "台灣的上市公司分成很多產業：\n\n💻 電子業 — 台積電、鴻海、聯發科\n🏦 金融業 — 國泰金、富邦金\n🍜 食品業 — 統一、味全、大成\n🏗️ 營建業 — 蓋房子的公司\n🚢 航運業 — 長榮、陽明\n\n每個產業有不同的特性！",
+      "image_key": "lesson_030_card_01"
+    },
+    {
+      "type": "text_image",
+      "title": "電子業：台灣最強",
+      "body": "台灣的電子業是全世界知名的！🇹🇼\n\n• 台積電 (2330) — 全球最大晶片代工\n• 鴻海 (2317) — 幫蘋果組裝 iPhone\n• 聯發科 (2454) — 手機晶片設計\n• 華碩 (2357) — 筆電和主機板\n\n電子業佔台股很大的比例！",
+      "image_key": "lesson_030_card_02"
+    },
+    {
+      "type": "text_image",
+      "title": "生活消費類",
+      "body": "這些是你每天都會接觸到的公司：\n\n🏪 統一超 (2912) — 7-ELEVEN\n☕ 全家 (5903) — 全家便利商店\n🥛 統一 (1216) — 瑞穗鮮乳、統一布丁\n🍝 味全 (1201) — 林鳳營鮮乳\n🚗 裕隆 (2201) — Luxgen汽車\n\n這些公司的商品你一定有用過！",
+      "image_key": "lesson_030_card_03"
+    },
+    {
+      "type": "text_image",
+      "title": "產業也有輪替",
+      "body": "有趣的是，不同時期會有不同的「主流產業」🔄：\n\n• 以前紡織業很強\n• 後來變成電子業\n• 航運業有時候突然大漲\n• AI 時代讓半導體更熱門\n\n了解不同產業，能幫你做更好的投資選擇 🐻📊",
+      "image_key": "lesson_030_card_04"
+    }
+  ],
+  "preset_questions": [
+    {
+      "question_type": "choice",
+      "question_text": "下面哪一間公司屬於「食品業」？",
+      "options": [
+        "台積電",
+        "統一",
+        "國泰金",
+        "長榮"
+      ],
+      "correct_answer": 1,
+      "explanation": "對！🥛 統一企業是食品業的大公司，生產牛奶、布丁、泡麵等各種食品。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "台灣的電子業在全世界非常有名。",
+      "correct_answer": true,
+      "explanation": "沒錯！🇹🇼 台灣的半導體和電子產業像台積電、鴻海等都是世界頂尖！"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "鴻海 (2317) 主要做什麼？",
+      "options": [
+        "賣便當",
+        "幫蘋果公司組裝iPhone等電子產品",
+        "開便利商店",
+        "蓋房子"
+      ],
+      "correct_answer": 1,
+      "explanation": "答對了！📱 鴻海是全球最大的電子代工廠，幫蘋果等品牌組裝手機和電腦等產品。"
+    }
+  ],
+  "ai_prompt_context": {
+    "topic": "台灣上市公司的產業分類與知名企業",
+    "age_hint": "7-9歲",
+    "vocabulary_level": "simple",
+    "metaphor_suggestions": ["台積電", "統一超和全家", "電子業vs食品業", "產業輪替"]
+  }
+}

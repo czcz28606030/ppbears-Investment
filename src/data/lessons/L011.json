@@ -1,0 +1,72 @@
+{
+  "lesson_id": "L011",
+  "stage": 1,
+  "level": 3,
+  "domain": "basic",
+  "title": "銀行是什麼？",
+  "summary": "認識銀行的功能和角色，了解銀行如何幫助我們管理錢。",
+  "cards": [
+    {
+      "type": "text_image",
+      "title": "大家的錢管家",
+      "body": "銀行就像一個超大的保險箱 🏦，專門幫大家保管錢。比存錢筒安全多了！因為銀行有厚厚的金庫門、保全系統和監視器，你的錢放在裡面非常安全 🔒",
+      "image_key": "lesson_011_card_01"
+    },
+    {
+      "type": "text_image",
+      "title": "銀行做什麼事？",
+      "body": "銀行有很多功能：\n• 📥 收存款 — 幫你保管錢，還會給利息\n• 💳 轉帳 — 幫你把錢寄給別人\n• 💰 借錢 — 借錢給需要的人（如買房子）\n• 🪙 換零錢 — 幫你換不同面額的錢",
+      "image_key": "lesson_011_card_02"
+    },
+    {
+      "type": "text_image",
+      "title": "銀行怎麼賺錢？",
+      "body": "銀行的生意其實很簡單：\n1. 用比較低的利率跟你借錢（你的存款）💰\n2. 用比較高的利率把錢借給別人 📤\n3. 中間的差額就是銀行賺的錢 🎯\n\n所以銀行很希望你來存錢！",
+      "image_key": "lesson_011_card_03"
+    },
+    {
+      "type": "text_image",
+      "title": "台灣有哪些銀行？",
+      "body": "台灣有很多銀行喔：\n• 中華郵政（郵局）📮\n• 台灣銀行 🏛️\n• 國泰世華銀行 🐈\n• 玉山銀行 🏔️\n• 還有更多！\n\n你有看過爸媽去銀行嗎？下次可以一起去認識一下 🐻",
+      "image_key": "lesson_011_card_04"
+    }
+  ],
+  "preset_questions": [
+    {
+      "question_type": "choice",
+      "question_text": "銀行最主要的功能是什麼？",
+      "options": [
+        "賣玩具",
+        "幫大家保管錢",
+        "賣食物",
+        "幫忙打掃"
+      ],
+      "correct_answer": 1,
+      "explanation": "答對了！🏦 銀行最主要的功能就是幫大家安全地保管錢，還會給存款利息呢！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "銀行會把你存的錢借給其他人，用來賺取利息差額。",
+      "correct_answer": true,
+      "explanation": "對！💡 銀行用低利率收你的存款，再用高利率借出去，中間的差額就是銀行的收入。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "下面哪一個「不是」銀行會做的事？",
+      "options": [
+        "幫你保管存款",
+        "幫你轉帳給別人",
+        "幫你做作業",
+        "借錢給需要的人"
+      ],
+      "correct_answer": 2,
+      "explanation": "銀行不會幫你做作業啦 📝😂 但是銀行會幫你保管存款、轉帳、借貸，是很重要的金融機構喔！"
+    }
+  ],
+  "ai_prompt_context": {
+    "topic": "銀行的基本功能與運作方式",
+    "age_hint": "6-8歲",
+    "vocabulary_level": "simple",
+    "metaphor_suggestions": ["保險箱", "錢管家", "郵局", "利息差額"]
+  }
+}

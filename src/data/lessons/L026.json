@@ -1,0 +1,72 @@
+{
+  "lesson_id": "L026",
+  "stage": 2,
+  "level": 6,
+  "domain": "basic",
+  "title": "你最愛的品牌是公司",
+  "summary": "從日常生活的品牌出發，認識品牌背後的上市公司。",
+  "cards": [
+    {
+      "type": "text_image",
+      "title": "品牌的背後是公司",
+      "body": "你喜歡的很多品牌，其實都是可以投資的上市公司喔！\n\n🏪 7-ELEVEN → 統一超（股票代號 2912）\n🧴 全聯 → 目前還沒上市\n👟 Nike → 美國上市公司 NKE\n📱 蘋果 → 美國上市公司 AAPL\n\n上市 = 一般人也可以買它的股票！",
+      "image_key": "lesson_026_card_01"
+    },
+    {
+      "type": "text_image",
+      "title": "台股的知名品牌公司",
+      "body": "台灣有很多你認識的品牌可以投資：\n\n🔧 台積電 (2330) — 做晶片\n🥛 統一 (1216) — 飲料、泡麵\n🏪 全家 (5903) — 便利商店\n🍵 天仁 (1233) — 茶飲\n📺 宏達電 (2498) — HTC 手機\n\n是不是感覺投資離你很近？",
+      "image_key": "lesson_026_card_02"
+    },
+    {
+      "type": "text_image",
+      "title": "從顧客變股東",
+      "body": "以前你只是這些公司的「客人」🛒\n現在你知道了：你也可以成為它們的「股東」！📜\n\n客人 → 花錢買它的商品\n股東 → 出錢投資它，分享它的獲利\n\n你不只是在花錢，你還可以從中賺錢！",
+      "image_key": "lesson_026_card_03"
+    },
+    {
+      "type": "text_image",
+      "title": "投資你了解的公司",
+      "body": "投資大師巴菲特說過：「不要投資你不了解的東西」🧙‍♂️\n\n你每天喝的飲料、去的便利商店、用的手機，這些都是你很了解的！\n\n先從你熟悉的品牌開始研究，這就是學投資最好的起點 🐻💡",
+      "image_key": "lesson_026_card_04"
+    }
+  ],
+  "preset_questions": [
+    {
+      "question_type": "choice",
+      "question_text": "7-ELEVEN 的母公司在台股的名字是什麼？",
+      "options": [
+        "台積電",
+        "統一超",
+        "全家",
+        "鴻海"
+      ],
+      "correct_answer": 1,
+      "explanation": "答對了！🏪 7-ELEVEN 在台灣是由「統一超商」（股票代號 2912）經營的。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "巴菲特建議投資自己不了解的公司。",
+      "correct_answer": false,
+      "explanation": "相反喔！🧙‍♂️ 巴菲特的名言是「不要投資你不了解的東西」。先了解再投資才是正確的。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "「上市公司」是什麼意思？",
+      "options": [
+        "公司在網路上賣東西",
+        "公司的股票可以在股票市場買賣",
+        "公司開在高樓的頂樓",
+        "公司很有名的意思"
+      ],
+      "correct_answer": 1,
+      "explanation": "對！📈 上市公司就是它的股票可以在台灣證券交易所公開買賣，任何人都能投資。"
+    }
+  ],
+  "ai_prompt_context": {
+    "topic": "日常品牌與背後的上市公司",
+    "age_hint": "7-9歲",
+    "vocabulary_level": "simple",
+    "metaphor_suggestions": ["7-ELEVEN統一超", "從客人變股東", "巴菲特名言", "台積電晶片"]
+  }
+}

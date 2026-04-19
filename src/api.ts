@@ -1,4 +1,4 @@
-import type { StockData, SimonsItem, StockQuote, StockRecommendation, AIAdvice } from './types';
+import type { StockData, SimonsItem, StockQuote, StockRecommendation, AIAdvice, StockLiveAnalysis } from './types';
 
 const IFALGO_BASE = '/api/ifalgo';
 
@@ -374,6 +374,44 @@ export async function getOrGenerateKidFriendlyDesc(
   }
 }
 
+export async function getFreshStockAnalysis(
+  code: string,
+  name: string,
+  industry: string,
+  status: string
+): Promise<StockLiveAnalysis | null> {
+  try {
+    const response = await fetch('/api/stock-analysis', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-store',
+      },
+      cache: 'no-store',
+      body: JSON.stringify({ code, name, industry, status }),
+    });
+
+    if (!response.ok) {
+      console.error('stock-analysis HTTP error:', response.status);
+      return null;
+    }
+
+    const data = await response.json();
+    if (!data?.technical || !data?.chips || !data?.news) return null;
+
+    return {
+      technical: data.technical,
+      chips: data.chips,
+      news: data.news,
+      headlines: Array.isArray(data.headlines) ? data.headlines : [],
+      generatedAt: data.generatedAt || new Date().toISOString(),
+    };
+  } catch (err) {
+    console.error('getFreshStockAnalysis error:', err);
+    return null;
+  }
+}
+
 
 // 取得個股資料
 export async function fetchStockData(coid: string): Promise<StockData | null> {
@@ -391,12 +429,52 @@ export async function fetchStockData(coid: string): Promise<StockData | null> {
   }
 }
 
+export interface StockQuantData {
+  aiQuanBackDataComment: {
+    remark: string;    // AI推薦等級，例：超高度、高度、中度、低度
+    cum_ret: string;   // 累積報酬，例：27.4%
+    freq: number;
+  } | null;
+  chipStability: {
+    pts: string;       // 籌碼穩定度分數 0-10，8 = 最乾淨
+  } | null;
+  stockInfo: {
+    gvi: number;
+    mediangvi: string;
+  } | null;
+}
+
+export async function fetchStockQuantData(coid: string): Promise<StockQuantData> {
+  const empty: StockQuantData = { aiQuanBackDataComment: null, chipStability: null, stockInfo: null };
+  try {
+    const url = `${IFALGO_BASE}/stock?coid=${coid}`;
+    const res = await fetch(url, { cache: 'no-store' });
+    const json = await res.json();
+    const stock = json.data?.stock;  // aiQuanBackDataComment 在此層
+    const pos = stock?.position;     // chipStability, stockInfo 在 position 下
+    if (!stock) return empty;
+    return {
+      aiQuanBackDataComment: stock.aiQuanBackDataComment ?? null,
+      chipStability: pos?.chipStability ?? null,
+      stockInfo: pos?.stockInfo ?? null,
+    };
+  } catch (err) {
+    console.error('fetchStockQuantData error:', err);
+    return empty;
+  }
+}
+
 // 取得 Simons 每日推薦
 export async function fetchSimonsData(date?: string): Promise<SimonsItem[]> {
   try {
-    const d = date || new Date().toISOString().split('T')[0];
-    const url = `${IFALGO_BASE}/common/getSimonsData?searchDate=${d}`;
-    const res = await fetch(url);
+    const d = date || (() => {
+      const now = new Date();
+      const pad = (n: number) => String(n).padStart(2, '0');
+      return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+    })();
+    // 加 _t 時間戳破除 Vercel edge cache
+    const url = `${IFALGO_BASE}/common/getSimonsData?searchDate=${d}&_t=${Date.now()}`;
+    const res = await fetch(url, { cache: 'no-store' });
     const json = await res.json();
     return json.data?.dataItems || [];
   } catch (err) {

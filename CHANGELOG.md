@@ -1,4 +1,74 @@
-﻿## [v1.6.26] - 2026-04-15
+﻿
+## [v1.7.0] - 2026-04-19
+### Fixed
+- **PPBear 即時整理本地開發無法運作**：`vite.config.ts` 新增 `/api/stock-analysis` proxy 配置，使本地開發時能正確轉發到 Vercel production 環境
+- **Simons 量化模型資料顯示缺失**：修改 `StockDetail.tsx` 條件邏輯，改為只需 `quantData` 即可顯示 Simons 區塊（移除對 `recommendation` 的強制依賴），使不在近期推薦清單的股票也能看到 AI 等級、累積報酬、籌碼穩定度等資料
+- **買賣交易延遲視覺反饋缺失**：為「確認買入」與「確認賣出」按鈕加入旋轉 spinner 動畫與「交易中，請稍候...」提示文字，避免使用者誤認為頁面當機
+
+### Changed
+- **探索頁策略切換體驗優化**：
+  - 所有策略的 loading spinner 改為統一顯示，非 AI 策略不再無回應
+  - 切換策略卡片時自動平滑滾動至結果標題，避免使用者看不到新篩選結果
+
+### Added
+- **`fetchStockQuantData()` 非同步最佳化**：`StockDetail.tsx` 的 Simons 量化模型詳細資料改為非同步載入（不阻塞主流程），確保 `loading` 狀態能及時設為 false，`loadLiveAnalysis` 可立即觸發
+
+## [v1.6.37] - 2026-04-17
+### Changed
+- **個股頁移除最佳建議**：`PPBear 即時整理` 改回只顯示技術面、籌碼面、消息面，移除重複性高且建設性不足的「最佳建議」區塊，連同後端 AI prompt 與回傳欄位一併精簡
+
+## [v1.6.36] - 2026-04-17
+### Fixed
+- **即時整理前端防呆**：`StockDetail` 新增請求節流、錯誤提示與「重新整理」按鈕，避免同一資料短時間重複呼叫 `/api/stock-analysis` 並提升失敗時可恢復性
+- **下單卡住補強**：`executeSell` 補上與買入流程一致的父帳號券商設定查詢 timeout，降低子帳號下單偶發停留「處理中...」的風險
+
+## [v1.6.35] - 2026-04-17
+### Fixed
+- **發版與部署更新**：同步更新應用程式版本號至 `1.6.35`，準備部署目前包含登出防重點、下單防重複送出與 Premium 電子報 fallback 修復的版本
+
+## [v1.6.34] - 2026-04-15
+### Changed
+- **看庫存頁總資產卡改為首頁同版型**：`Portfolio` 頁面上方總資產卡已由舊的雙列/摘要式布局，改成與首頁完全相同的三欄卡片布局（可用現金 / 股票市值 / 未平倉損益）
+
+## [v1.6.33] - 2026-04-15
+### Changed
+- **看庫存頁總資產樣式同步首頁**：`Portfolio` 頁面上方的總資產標題改為「我的總資產 💰」，並同步首頁的 `NT$` 縮小與數字排列樣式，讓兩頁的資產卡視覺一致
+
+## [v1.6.32] - 2026-04-15
+### Changed
+- **首頁總資產卡手機版整理**：移除右下角小熊浮水印，縮小 `NT$` 幣別字級，並為三欄資訊加入欄位分隔線，優先提升手機版閱讀整齊度
+
+## [v1.6.31] - 2026-04-15
+### Changed
+- **首頁總資產卡版面調整**：移除「今日損益」，並將「可用現金 / 股票市值 / 未平倉損益」改為同一列三欄顯示
+- **未平倉損益色彩規則**：損益顯示改為賺錢紅字（`--profit`）、賠錢綠字（`--loss-color`），符合台股慣例
+
+## [v1.6.30] - 2026-04-15
+### Added
+- **完課儲存逾時提示 UX**：答題結束後若儲存超過 8 秒，按鈕會改為「網路較慢，先看結果」，使用者可先進入結果頁，不再被等待狀態綁住
+- **背景同步提示**：結果頁新增「背景同步中」提示，讓使用者知道學習資料仍在更新，避免誤判為故障
+
+## [v1.6.29] - 2026-04-15
+### Fixed
+- **完課儲存第二次卡住熱修復**：`LessonView` 在完課後改為背景刷新 `fetchLearningProfile`，不再阻塞結果頁顯示，避免查詢卡住時按鈕長時間停留在「儲存中...」
+- **學習資料讀寫 timeout 強化**：`fetchLearningProfile` 新增 timeout 與錯誤防護，避免 `learning_profiles` 查詢或初始化卡住造成流程連鎖阻塞
+- **完課寫入重試機制**：`completeLesson` 的 `lesson_progress` / `learning_profiles` / `grant_learning_coins` 加入較寬 timeout（12s）與一次重試，降低行動網路抖動時誤判 timeout 的機率
+
+## [v1.6.28] - 2026-04-15
+### Fixed
+- **學習流程卡住修復**：`LessonView` 的完課儲存流程補上 `try/catch/finally`，避免 Supabase 回應失敗時按鈕永遠停在「儲存中...」
+- **今日課程進度修復**：`LearnHome` 不再寫死顯示 `L001`，改為依已完成課程自動指向下一堂未完成課程
+- **完課寫入容錯強化**：`store.ts` 為 `lesson_progress`、`learning_profiles` 與發幣 RPC 補上 timeout 與錯誤保護，即使後端暫時無回應也不阻塞前端流程
+
+## [v1.6.27] - 2026-04-15
+### Fixed
+- **即時股價改用 TWSE MIS API**：舊的 `tpex_mainboard_daily_close_quotes` 只有昨日收盤，無法反映盤中漲跌停。改用 `mis.twse.com.tw/stock/api/getStockInfo.jsp`，上市股票查 `tse_{code}.tw`、上櫃查 `otc_{code}.tw`，直接取得今日即時報價。`z`（最新成交）有值時優先使用，成交為 `-`（如鎖漲停）則改用 `h`（今日最高），修正 6274 台耀整日漲停仍顯示昨收 860 而非 946 的問題
+
+### Changed
+- `fetchOfficialClosePrice` 重寫：優先呼叫 MIS 即時 API（`fetchMISRealtime`），失敗時再 fallback 至 TWSE/TPEx OpenAPI 昨日收盤
+- `vite.config.ts` 及 `vercel.json` 各新增 `/api/mis` → `https://mis.twse.com.tw/stock/api` proxy/rewrite 路由
+
+## [v1.6.26] - 2026-04-15
 ### Added
 - **出金紀錄頁面整合**：子帳號在「出金紀錄」頁面上方，新增申請出金表單（金額、原因），下方繼續顯示出金紀錄，一次體驗完整出金流程而無需跳頁
 

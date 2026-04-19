@@ -1,0 +1,72 @@
+{
+  "lesson_id": "L013",
+  "stage": 1,
+  "level": 3,
+  "domain": "basic",
+  "title": "ATM 的秘密",
+  "summary": "認識自動提款機的功能，了解提款卡和密碼的安全概念。",
+  "cards": [
+    {
+      "type": "text_image",
+      "title": "24小時的迷你銀行",
+      "body": "ATM 就是那個在便利商店門口、銀行外面的機器 🏧。它的全名是「自動提款機」。就像一個 24 小時不休息的迷你銀行，隨時都可以去領錢！",
+      "image_key": "lesson_013_card_01"
+    },
+    {
+      "type": "text_image",
+      "title": "ATM 能做什麼？",
+      "body": "ATM 可以做很多事：\n• 💵 提款 — 從帳戶領現金出來\n• 💳 存款 — 把現金存進帳戶\n• 📊 查餘額 — 看看帳戶還有多少錢\n• 📤 轉帳 — 把錢轉到別人的帳戶\n\n不用排隊等銀行開門，超方便！",
+      "image_key": "lesson_013_card_02"
+    },
+    {
+      "type": "text_image",
+      "title": "什麼是提款卡？",
+      "body": "要使用 ATM 需要一張「提款卡」💳。提款卡就像進入你帳戶的鑰匙🔑。把卡片插進 ATM，輸入密碼，就能操作你的帳戶。\n\n⚠️ 提款卡很重要，不能弄丟，也不能借給別人！",
+      "image_key": "lesson_013_card_03"
+    },
+    {
+      "type": "text_image",
+      "title": "密碼要保密！",
+      "body": "提款卡的密碼只有你和爸媽知道就好 🤫\n\n🔒 安全守則：\n• 密碼絕對不告訴陌生人\n• 在 ATM 輸入密碼時用手遮住\n• 如果卡片弄丟了馬上告訴爸媽\n\n保護好你的密碼，就是保護你的錢！🐻",
+      "image_key": "lesson_013_card_04"
+    }
+  ],
+  "preset_questions": [
+    {
+      "question_type": "choice",
+      "question_text": "ATM 是什麼的縮寫？",
+      "options": [
+        "自動洗衣機",
+        "自動提款機",
+        "自動販賣機",
+        "自動掃地機"
+      ],
+      "correct_answer": 1,
+      "explanation": "對！🏧 ATM 是「自動提款機」（Automated Teller Machine），可以存款、提款、查餘額、轉帳。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "提款卡的密碼可以告訴好朋友。",
+      "correct_answer": false,
+      "explanation": "不行！🔒 密碼只有自己和爸媽知道就好。絕對不能告訴其他人，即使是好朋友也不行喔。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "使用 ATM 需要什麼東西？",
+      "options": [
+        "身分證和印章",
+        "提款卡和密碼",
+        "存摺和印章",
+        "護照和機票"
+      ],
+      "correct_answer": 1,
+      "explanation": "沒錯！💳 使用 ATM 需要提款卡（插卡）和密碼（輸入），這兩個缺一不可！"
+    }
+  ],
+  "ai_prompt_context": {
+    "topic": "ATM自動提款機的功能與安全使用",
+    "age_hint": "6-8歲",
+    "vocabulary_level": "simple",
+    "metaphor_suggestions": ["迷你銀行", "帳戶的鑰匙", "便利商店前的機器", "密碼保護"]
+  }
+}

@@ -7,7 +7,7 @@ import type { UserAccount, FeatureOverride, Trade } from '../types';
 import './AdminDashboard.css';
 
 const FEATURE_KEYS = [
-  { key: 'ai_stock_picking', label: '🤖 AI 聰明選股', desc: '' },
+  { key: 'ai_stock_picking', label: '🤖 AI 聰明選股 + Simons 量化模型', desc: '找股票 AI 分頁、個股 AI 推薦等級、累積報酬、籌碼穩定度' },
   { key: 'ai_portfolio_advice', label: '📊 庫存 AI 建議', desc: '' },
 ];
 

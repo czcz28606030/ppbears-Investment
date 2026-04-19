@@ -8,48 +8,132 @@
 .portfolio-summary-card {
   border-radius: var(--radius-xl) !important;
   padding: var(--space-xl) !important;
+  position: relative;
+  overflow: hidden;
 }
 
-.ps-row {
+.portfolio-asset-label {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.card-primary .portfolio-asset-label {
+  color: rgba(43, 33, 24, 0.65);
+}
+
+.portfolio-asset-value {
+  font-size: 38px;
+  font-weight: 900;
+  color: var(--text-primary);
+  margin-bottom: 16px;
+  letter-spacing: -1px;
+  line-height: 1.1;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.portfolio-asset-details {
   display: flex;
   gap: var(--space-lg);
-  margin-bottom: var(--space-md);
+  padding-top: 14px;
+  border-top: 2px solid rgba(43, 33, 24, 0.08);
 }
 
-.ps-item {
-  flex: 1;
-}
-
-.ps-label {
-  font-size: var(--font-size-xs);
-  opacity: 0.75;
-  font-weight: 600;
-  margin-bottom: 2px;
-}
-
-.ps-value {
-  font-size: var(--font-size-lg);
-  font-weight: 800;
-}
-
-.ps-total {
-  font-size: var(--font-size-2xl);
-  font-weight: 900;
-}
-
-.ps-profit-row {
+.portfolio-asset-detail {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--space-sm) var(--space-md);
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: var(--radius-full);
-  font-size: var(--font-size-sm);
-  font-weight: 700;
+  flex-direction: column;
+  gap: 2px;
 }
 
-.ps-profit-value {
+.portfolio-asset-detail-label {
+  font-size: 11px;
+  color: rgba(43, 33, 24, 0.55);
   font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.portfolio-asset-detail-value {
+  font-size: 16px;
+  font-weight: 900;
+  color: var(--text-primary);
+  line-height: 1.2;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.portfolio-asset-number-row {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 2px;
+}
+
+.portfolio-asset-currency {
+  font-size: 0.72em;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  opacity: 0.9;
+}
+
+.portfolio-asset-number {
+  font-variant-numeric: tabular-nums;
+}
+
+.portfolio-asset-pct {
+  font-size: 0.82em;
+  font-weight: 800;
+}
+
+.portfolio-asset-details-three {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
+}
+
+.portfolio-asset-details-three .portfolio-asset-detail {
+  padding: 0 10px;
+  min-width: 0;
+}
+
+.portfolio-asset-details-three .portfolio-asset-detail:not(:first-child) {
+  border-left: 1px solid rgba(43, 33, 24, 0.14);
+}
+
+.portfolio-asset-pnl-profit {
+  color: var(--profit) !important;
+}
+
+.portfolio-asset-pnl-loss {
+  color: var(--loss-color) !important;
+}
+
+@media (max-width: 640px) {
+  .portfolio-asset-value {
+    font-size: 34px;
+    gap: 6px;
+  }
+
+  .portfolio-asset-details-three .portfolio-asset-detail {
+    padding: 0 8px;
+  }
+
+  .portfolio-asset-detail-value {
+    font-size: 15px;
+  }
+
+  .portfolio-asset-currency {
+    font-size: 0.68em;
+  }
+
+  .portfolio-asset-pct {
+    font-size: 0.78em;
+  }
 }
 
 /* Budget Card */
@@ -118,6 +202,63 @@
   cursor: pointer;
   transition: var(--transition-normal);
 }
+
+/* 加碼：紅色左邊框 + 淡紅底 */
+.holding-item.signal-buy {
+  background: linear-gradient(to right, rgba(220, 38, 38, 0.07) 0%, var(--bg-card) 60%);
+}
+
+/* 出場：綠色左邊框 + 淡綠底 */
+.holding-item.signal-sell {
+  background: linear-gradient(to right, rgba(22, 163, 74, 0.07) 0%, var(--bg-card) 60%);
+}
+
+/* Signal badge（取代舊 holding-emoji） */
+.signal-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 12px;
+  flex-shrink: 0;
+  text-align: center;
+  gap: 2px;
+}
+
+.signal-badge-buy {
+  background: #dc2626;
+  box-shadow: 0 2px 8px rgba(220, 38, 38, 0.35);
+}
+
+.signal-badge-sell {
+  background: #16a34a;
+  box-shadow: 0 2px 8px rgba(22, 163, 74, 0.35);
+}
+
+.signal-badge-neutral {
+  background: #f0f0f0;
+}
+
+.signal-badge-icon {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.signal-badge-text {
+  font-size: 9px;
+  font-weight: 800;
+  color: #ffffff;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.signal-badge-neutral .signal-badge-text {
+  color: #666666;
+}
+
+
 
 .holding-item:hover {
   box-shadow: var(--shadow-md);

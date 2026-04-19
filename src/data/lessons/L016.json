@@ -1,0 +1,72 @@
+{
+  "lesson_id": "L016",
+  "stage": 1,
+  "level": 4,
+  "domain": "basic",
+  "title": "什麼是公司？",
+  "summary": "認識公司的基本概念，了解公司是如何提供商品和服務的。",
+  "cards": [
+    {
+      "type": "text_image",
+      "title": "公司就在你身邊",
+      "body": "你每天都在跟「公司」打交道喔！🏢\n\n早上用的牙膏？有一間公司做的。\n上學背的書包？也是公司做的。\n喝的牛奶 🥛、穿的鞋子 👟、看的卡通 📺...\n全部都是不同的公司提供的！",
+      "image_key": "lesson_016_card_01"
+    },
+    {
+      "type": "text_image",
+      "title": "公司的工作",
+      "body": "公司的工作是什麼呢？\n\n就是：做出大家需要的東西（或服務），然後賣給大家 📦💰\n\n例如：\n• 統一超商 → 經營便利商店 🏪\n• 鴻海 → 製造手機和電腦 📱\n• 長榮航空 → 提供飛機載客服務 ✈️",
+      "image_key": "lesson_016_card_02"
+    },
+    {
+      "type": "text_image",
+      "title": "公司需要什麼？",
+      "body": "開一間公司需要很多東西：\n• 💰 資金 — 租辦公室、買材料\n• 👥 員工 — 幫忙做事的人\n• 💡 好點子 — 要賣什麼、怎麼賣\n• 🏠 地方 — 辦公室、工廠、店面\n\n就像蓋一棟房子，需要很多不同的材料！",
+      "image_key": "lesson_016_card_03"
+    },
+    {
+      "type": "text_image",
+      "title": "有趣的比喻",
+      "body": "你可以把公司想成一間「雞排店」🍗：\n\n老闆 = 公司的負責人\n廚師 = 員工\n雞排 = 公司賣的商品\n客人付的錢 = 公司的營收\n買雞肉的成本 = 公司的支出\n\n賺的比花的多，公司就賺錢了！🐻✨",
+      "image_key": "lesson_016_card_04"
+    }
+  ],
+  "preset_questions": [
+    {
+      "question_type": "choice",
+      "question_text": "公司最主要的工作是什麼？",
+      "options": [
+        "幫小朋友寫作業",
+        "做出大家需要的東西或服務來賣",
+        "負責打掃街道",
+        "幫每個人存錢"
+      ],
+      "correct_answer": 1,
+      "explanation": "答對了！🏢 公司的主要工作就是提供商品或服務給大家，並從中賺取收入。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "開一間公司只需要一個好點子就夠了。",
+      "correct_answer": false,
+      "explanation": "不夠喔！💡 開公司除了好點子，還需要資金、員工、辦公場所等等，缺一不可。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "統一超商的公司主要做什麼？",
+      "options": [
+        "製造飛機",
+        "經營便利商店",
+        "蓋房子",
+        "種稻米"
+      ],
+      "correct_answer": 1,
+      "explanation": "對！🏪 統一超商（7-ELEVEN）的公司主要是經營便利商店，提供各種生活商品和服務。"
+    }
+  ],
+  "ai_prompt_context": {
+    "topic": "公司的基本概念與運作方式",
+    "age_hint": "6-8歲",
+    "vocabulary_level": "simple",
+    "metaphor_suggestions": ["雞排店", "便利商店", "書包工廠", "牛奶公司"]
+  }
+}

@@ -30,6 +30,7 @@ export default function ProfileSettings() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const currentAvatar = user?.avatar || '🐻';
@@ -111,8 +112,14 @@ export default function ProfileSettings() {
   };
 
   const handleLogout = async () => {
+    if (isLoggingOut) return;
     if (window.confirm('確定要登出嗎？')) {
-      await logout();
+      setIsLoggingOut(true);
+      try {
+        await logout();
+      } finally {
+        setIsLoggingOut(false);
+      }
     }
   };
 
@@ -288,8 +295,8 @@ export default function ProfileSettings() {
       {/* 登出 */}
       <div className="settings-card danger-zone">
         <div className="settings-section-title">帳號操作</div>
-        <button className="logout-btn" onClick={handleLogout}>
-          🚪 登出帳號
+        <button className="logout-btn" onClick={handleLogout} disabled={isLoggingOut}>
+          {isLoggingOut ? '登出中...' : '🚪 登出帳號'}
         </button>
       </div>
     </div>

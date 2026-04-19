@@ -1,0 +1,72 @@
+{
+  "lesson_id": "L003",
+  "stage": 1,
+  "level": 1,
+  "domain": "basic",
+  "title": "不同國家的錢",
+  "summary": "認識世界上不同國家使用不同的貨幣，以及匯率的簡單概念。",
+  "cards": [
+    {
+      "type": "text_image",
+      "title": "我們用的是新台幣",
+      "body": "在台灣，我們用的錢叫做「新台幣」，上面會寫著 NT$。去便利商店買飲料、去夜市吃雞排，都是用新台幣付錢的！🧋🍗",
+      "image_key": "lesson_003_card_01"
+    },
+    {
+      "type": "text_image",
+      "title": "其他國家用不同的錢",
+      "body": "每個國家都有自己的錢：\n• 美國 🇺🇸 用「美元」 $\n• 日本 🇯🇵 用「日圓」 ¥\n• 歐洲 🇪🇺 用「歐元」 €\n• 中國 🇨🇳 用「人民幣」 ¥\n就像每個國家有自己的語言一樣！",
+      "image_key": "lesson_003_card_02"
+    },
+    {
+      "type": "text_image",
+      "title": "出國要換錢",
+      "body": "如果你去日本玩 ✈️，不能直接用新台幣買東西，要先去銀行把新台幣「換」成日圓。這個「換」的過程就叫做「換匯」！",
+      "image_key": "lesson_003_card_03"
+    },
+    {
+      "type": "text_image",
+      "title": "有趣的匯率",
+      "body": "1 塊美元大約可以換 30 多塊新台幣呢！💰 這個「換算的比例」就叫做「匯率」。匯率每天都在變動，就像股票的價格一樣喔！",
+      "image_key": "lesson_003_card_04"
+    }
+  ],
+  "preset_questions": [
+    {
+      "question_type": "choice",
+      "question_text": "在台灣，我們使用的貨幣叫什麼？",
+      "options": [
+        "美元",
+        "日圓",
+        "新台幣",
+        "歐元"
+      ],
+      "correct_answer": 2,
+      "explanation": "答對了！🎉 台灣使用的貨幣是「新台幣」，英文縮寫是 NT$ 或 TWD。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "去日本旅遊可以直接用新台幣買東西。",
+      "correct_answer": false,
+      "explanation": "不行喔！🙅 去日本要先把新台幣換成日圓才能買東西，這個過程叫做「換匯」。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "把新台幣換成其他國家的錢，這個動作叫什麼？",
+      "options": [
+        "換匯",
+        "換季",
+        "換衣服",
+        "換座位"
+      ],
+      "correct_answer": 0,
+      "explanation": "對！✨ 把一種貨幣換成另一種貨幣叫做「換匯」，而換算的比例叫做「匯率」。"
+    }
+  ],
+  "ai_prompt_context": {
+    "topic": "不同國家的貨幣與匯率概念",
+    "age_hint": "6-8歲",
+    "vocabulary_level": "simple",
+    "metaphor_suggestions": ["出國旅遊", "便利商店", "新台幣硬幣", "各國國旗"]
+  }
+}

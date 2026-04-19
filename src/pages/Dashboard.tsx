@@ -16,14 +16,12 @@ export default function Dashboard() {
   const [wError, setWError] = useState('');
   const [wLoading, setWLoading] = useState(false);
   
-  const [livePnL, setLivePnL] = useState<{ todayPnL: number, todayPnLPct: number } | null>(null);
   const [liveQuotes, setLiveQuotes] = useState<Record<string, any>>({});
   const [exDivCalendar, setExDivCalendar] = useState<Map<string, ExDividendInfo>>(new Map());
 
   useEffect(() => {
     async function fetchLive() {
       if (holdings.length === 0) {
-        setLivePnL({ todayPnL: 0, todayPnLPct: 0 });
         setLiveQuotes({});
         return;
       }
@@ -43,8 +41,6 @@ export default function Dashboard() {
       setExDivCalendar(exDivMap);
       
       const quotesMap: Record<string, any> = {};
-      let todayPnL = 0;
-      let totalYesterdayValue = 0;
       
       holdings.forEach((h, idx) => {
         const stockRes = stockDatas[idx];
@@ -69,11 +65,6 @@ export default function Dashboard() {
              ClosingPrice: latest.close_d,
              Change: changeAmount.toString()
            };
-           
-           if (isMarketDataFromToday) {
-             todayPnL += changeAmount * h.totalShares;
-             totalYesterdayValue += prevClose * h.totalShares;
-           }
         } else if (stockRes && stockRes.prices && stockRes.prices.length === 1) {
            // 新上市掛牌等極端狀況只有一天資料
            const latest = stockRes.prices[0];
@@ -83,8 +74,6 @@ export default function Dashboard() {
            };
         }
       });
-      const todayPnLPct = totalYesterdayValue > 0 ? (todayPnL / totalYesterdayValue) * 100 : 0;
-      setLivePnL({ todayPnL, todayPnLPct });
       setLiveQuotes(quotesMap);
     }
     fetchLive();
@@ -126,35 +115,35 @@ export default function Dashboard() {
       {/* 總資產卡片 */}
       <div className={`card asset-card ${summary.totalCost > 0 ? (profitClass === 'profit' ? 'card-profit' : 'card-loss') : 'card-primary'}`}>
         <div className="asset-label">我的總資產 💰</div>
-        <div className="asset-value">NT$ {formatMoney(summary.totalAssets)}</div>
+        <div className="asset-value">
+          <span className="asset-currency">NT$</span>
+          <span className="asset-number">{formatMoney(summary.totalAssets)}</span>
+        </div>
         
-        <div className="asset-details" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+        <div className="asset-details asset-details-three">
           <div className="asset-detail">
             <span className="asset-detail-label">💵 可用現金</span>
-            <span className="asset-detail-value">NT$ {formatMoney(summary.cashBalance)}</span>
-          </div>
-          <div className="asset-detail">
-            <span className="asset-detail-label">📈 股票市值</span>
-            <span className="asset-detail-value">NT$ {formatMoney(summary.totalMarketValue)}</span>
-          </div>
-          <div className="asset-detail">
-            <span className="asset-detail-label">📊 未平倉損益</span>
-            <span className={`asset-detail-value ${summary.totalProfitLoss > 0 ? 'text-profit' : summary.totalProfitLoss < 0 ? 'text-loss' : ''}`}>
-              {summary.totalProfitLoss > 0 ? '+' : ''}NT$ {formatMoney(summary.totalProfitLoss)}
-              <span style={{ fontSize: '0.8em', marginLeft: 4 }}>({summary.profitLossPct > 0 ? '+' : ''}{summary.profitLossPct.toFixed(1)}%)</span>
+            <span className="asset-detail-value">
+              <span className="asset-currency">NT$</span>
+              <span className="asset-number">{formatMoney(summary.cashBalance)}</span>
             </span>
           </div>
           <div className="asset-detail">
-            <span className="asset-detail-label">⚡ 今日損益</span>
-            <span className={`asset-detail-value ${livePnL && livePnL.todayPnL > 0 ? 'text-profit' : (livePnL && livePnL.todayPnL < 0 ? 'text-loss' : '')}`}>
-              {livePnL ? (
-                <>
-                  {livePnL.todayPnL > 0 ? '+' : ''}NT$ {formatMoney(livePnL.todayPnL)}
-                  <span style={{ fontSize: '0.8em', marginLeft: 4 }}>({livePnL.todayPnLPct > 0 ? '+' : ''}{livePnL.todayPnLPct.toFixed(1)}%)</span>
-                </>
-              ) : (
-                <span style={{ fontSize: '0.9em', opacity: 0.7 }}>計算中...</span>
-              )}
+            <span className="asset-detail-label">📈 股票市值</span>
+            <span className="asset-detail-value">
+              <span className="asset-currency">NT$</span>
+              <span className="asset-number">{formatMoney(summary.totalMarketValue)}</span>
+            </span>
+          </div>
+          <div className="asset-detail">
+            <span className="asset-detail-label">📊 未平倉損益</span>
+            <span className={`asset-detail-value ${summary.totalProfitLoss > 0 ? 'asset-pnl-profit' : summary.totalProfitLoss < 0 ? 'asset-pnl-loss' : ''}`}>
+              <span className="asset-number-row">
+                <span>{summary.totalProfitLoss > 0 ? '+' : ''}</span>
+                <span className="asset-currency">NT$</span>
+                <span className="asset-number">{formatMoney(summary.totalProfitLoss)}</span>
+              </span>
+              <span className="asset-pct">({summary.profitLossPct > 0 ? '+' : ''}{summary.profitLossPct.toFixed(1)}%)</span>
             </span>
           </div>
         </div>

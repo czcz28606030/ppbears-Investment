@@ -1,4 +1,11 @@
 .crv-page { display: flex; flex-direction: column; gap: var(--space-lg); }
+.crv-toast {
+  position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%);
+  background: var(--text-primary); color: #fff;
+  font-size: var(--font-size-sm); font-weight: 800;
+  padding: 10px 20px; border-radius: var(--radius-full); z-index: 999;
+  white-space: nowrap;
+}
 
 .crv-empty {
   display: flex; flex-direction: column; align-items: center;
@@ -18,6 +25,7 @@
 .crv-card-head { display: flex; align-items: center; gap: var(--space-md); }
 .crv-icon { font-size: 32px; }
 .crv-info { flex: 1; }
+.crv-child-name { font-size: var(--font-size-xs); color: var(--text-secondary); font-weight: 800; }
 .crv-item-name { font-weight: 900; font-size: var(--font-size-base); color: var(--text-primary); }
 .crv-date { font-size: var(--font-size-xs); color: var(--text-light); margin-top: 2px; }
 
@@ -38,3 +46,21 @@
   background: var(--bg-page); border-radius: var(--radius-md);
 }
 .crv-resolved { font-size: var(--font-size-xs); color: var(--text-light); }
+
+.crv-actions {
+  display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-sm); margin-top: 4px;
+}
+
+.crv-btn {
+  padding: 10px; border-radius: var(--radius-md); border: none;
+  font-size: var(--font-size-sm); font-weight: 900; cursor: pointer;
+}
+
+.crv-btn:disabled {
+  opacity: 0.7; cursor: not-allowed;
+}
+
+.crv-btn-approve { background: rgba(0,184,148,0.15); color: #007A63; }
+.crv-btn-approve:hover:not(:disabled) { background: rgba(0,184,148,0.25); }
+.crv-btn-reject { background: rgba(255,89,94,0.12); color: var(--action); }
+.crv-btn-reject:hover:not(:disabled) { background: rgba(255,89,94,0.2); }

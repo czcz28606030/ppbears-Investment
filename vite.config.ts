@@ -13,6 +13,10 @@ export default defineConfig({
   server: {
     proxy: {
       // Vercel serverless functions — 轉發到已部署的 production 環境
+      '/api/stock-analysis': {
+        target: 'https://ppbears-investment.vercel.app',
+        changeOrigin: true,
+      },
       '/api/send-newsletter-single': {
         target: 'https://ppbears-investment.vercel.app',
         changeOrigin: true,

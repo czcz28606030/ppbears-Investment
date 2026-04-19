@@ -1,0 +1,72 @@
+{
+  "lesson_id": "L050",
+  "stage": 2,
+  "level": 10,
+  "domain": "psychology",
+  "title": "認識風險：不要把雞蛋放同一個籃子",
+  "summary": "學習投資風險的概念與分散投資的重要性，為 Stage 2 畫下完美句點。",
+  "cards": [
+    {
+      "type": "text_image",
+      "title": "什麼是風險？",
+      "body": "投資的「風險」就是：事情可能不如你想的發展 🎲\n\n生活中的風險：\n• 出門可能下雨 → 帶傘就好 ☔\n• 考試可能考不好 → 多準備就好 📖\n\n投資中的風險：\n• 股價可能會跌\n• 公司可能經營不好\n• 整體經濟可能不景氣\n\n風險不代表「一定會出事」，而是「有可能會出事」。我們要學會管理它！",
+      "image_key": "lesson_050_card_01"
+    },
+    {
+      "type": "text_image",
+      "title": "不要把雞蛋放同一個籃子",
+      "body": "這是投資最經典的比喻 🥚🧺：\n\n如果你把所有雞蛋放在同一個籃子：\n→ 籃子掉了 = 全部的蛋都破了 💔\n\n如果你分成好幾個籃子放：\n→ 一個籃子掉了 = 只破幾顆，其他安全 ✅\n\n投資也一樣：\n• ❌ 全部的錢只買一檔股票 → 風險很大\n• ✅ 分散買好幾檔不同的股票 → 風險分散",
+      "image_key": "lesson_050_card_02"
+    },
+    {
+      "type": "text_image",
+      "title": "ETF：自動分散的好工具",
+      "body": "ETF（指數型基金）就像「一個便當裡有很多道菜」🍱：\n\n例如台灣最有名的 0050 ETF：\n• 裡面包含台灣前 50 大公司的股票\n• 買一張就等於同時投資 50 家公司\n• 台積電、鴻海、聯發科…通通在裡面\n\n好處：\n✅ 自動分散風險\n✅ 不用自己一家一家挑\n✅ 適合新手和長期投資",
+      "image_key": "lesson_050_card_03"
+    },
+    {
+      "type": "text_image",
+      "title": "恭喜你完成 Stage 2！🎉",
+      "body": "你已經學會了很多了不起的投資知識 🐻🎓：\n\nStage 1（Lv.1-5）：基礎理財觀念\nStage 2（Lv.6-10）：股票進階知識 + 投資心理學\n\n你現在知道了：\n✅ 公司與商品的關係\n✅ 股票代號、股價圖、漲跌顏色\n✅ EPS、本益比、殖利率、毛利率\n✅ 從眾心理、損失趨避、耐心、風險分散\n\n繼續在 PPBears 裡練習，你會變成小小投資達人！💪🌟",
+      "image_key": "lesson_050_card_04"
+    }
+  ],
+  "preset_questions": [
+    {
+      "question_type": "choice",
+      "question_text": "「不要把雞蛋放在同一個籃子」，在投資裡代表什麼意思？",
+      "options": [
+        "不要買雞蛋公司的股票",
+        "要把錢分散投資在不同的標的",
+        "只買最好的那一檔股票",
+        "每天都要買不同的股票"
+      ],
+      "correct_answer": 1,
+      "explanation": "答對！🥚 分散投資可以降低風險。即使某一檔股票跌了，其他的可能不受影響。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "買 ETF 就等於同時投資很多家公司。",
+      "correct_answer": true,
+      "explanation": "正確！🍱 ETF 裡面包含很多公司的股票，買一張就等於分散投資，是新手很好的選擇。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "台灣最有名的 0050 ETF 裡面包含大約幾家公司？",
+      "options": [
+        "5 家",
+        "10 家",
+        "50 家",
+        "500 家"
+      ],
+      "correct_answer": 2,
+      "explanation": "對！📊 0050 全名是「元大台灣50」，包含台灣前 50 大公司的股票，是經典的分散投資工具。"
+    }
+  ],
+  "ai_prompt_context": {
+    "topic": "投資風險概念、分散投資與 ETF 入門",
+    "age_hint": "7-9歲",
+    "vocabulary_level": "simple",
+    "metaphor_suggestions": ["雞蛋籃子比喻", "ETF像便當", "0050台灣50大公司", "Stage 2 總結"]
+  }
+}

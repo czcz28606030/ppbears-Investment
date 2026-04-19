@@ -1,0 +1,72 @@
+{
+  "lesson_id": "L037",
+  "stage": 2,
+  "level": 8,
+  "domain": "technical",
+  "title": "認識股價圖",
+  "summary": "學習看懂最基本的股價走勢圖，了解價格變化的視覺呈現。",
+  "cards": [
+    {
+      "type": "text_image",
+      "title": "什麼是股價圖？",
+      "body": "股價圖就是把股票的價格變化，畫成一條線或圖形 📈：\n\n• 橫軸 = 時間（一天、一週、一個月…）\n• 縱軸 = 價格（股價多少元）\n\n看圖就能一眼看出股票是漲了還是跌了，不用一個一個數字比較！",
+      "image_key": "lesson_037_card_01"
+    },
+    {
+      "type": "text_image",
+      "title": "線往上走 = 漲！",
+      "body": "如果股價圖的線從左下走到右上 📈，代表價格在上漲：\n\n• 一個月前 100 元\n• 現在 120 元\n• 線就會往上走 ↗️\n\n反過來，線從左上走到右下 📉，代表價格在下跌。\n\n觀察線的方向，就能快速判斷趨勢！",
+      "image_key": "lesson_037_card_02"
+    },
+    {
+      "type": "text_image",
+      "title": "常見的圖有哪些？",
+      "body": "股價圖有好幾種：\n\n📊 折線圖 — 最簡單，一條線就能看趨勢\n📊 K 線圖 — 每天用一根「蠟燭」表示漲跌（進階版）\n📊 長條圖 — 顯示成交量多少\n\n初學者先會看折線圖就夠了，K 線以後再學 😊",
+      "image_key": "lesson_037_card_03"
+    },
+    {
+      "type": "text_image",
+      "title": "看圖不等於預測未來",
+      "body": "重要觀念 🧠：\n\n股價圖告訴我們「過去發生了什麼」，但不能保證「未來會怎麼走」。\n\n• ❌ 過去一直漲 → 未來一定漲\n• ✅ 過去一直漲 → 了解它最近表現不錯\n\n看圖是參考，不是算命 🔮！投資還要看其他資訊才能做好決定。",
+      "image_key": "lesson_037_card_04"
+    }
+  ],
+  "preset_questions": [
+    {
+      "question_type": "choice",
+      "question_text": "股價圖的橫軸通常代表什麼？",
+      "options": [
+        "公司名稱",
+        "股票價格",
+        "時間",
+        "成交量"
+      ],
+      "correct_answer": 2,
+      "explanation": "答對！⏰ 股價圖的橫軸代表時間，縱軸代表價格。從左到右看，就能知道價格隨時間怎麼變化。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "股價圖上的線往上走，代表股票價格在上漲。",
+      "correct_answer": true,
+      "explanation": "正確！📈 圖上的線往上走表示價格越來越高（上漲），往下走表示越來越低（下跌）。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "如果股價圖顯示過去一個月一直在漲，代表什麼？",
+      "options": [
+        "未來一定還會漲",
+        "這檔股票最近表現不錯",
+        "現在一定要趕快買",
+        "這檔股票永遠不會跌"
+      ],
+      "correct_answer": 1,
+      "explanation": "對！🧠 股價圖告訴我們過去的表現，不能保證未來。說「最近表現不錯」是正確的理解態度。"
+    }
+  ],
+  "ai_prompt_context": {
+    "topic": "股價走勢圖的基本閱讀方式",
+    "age_hint": "7-9歲",
+    "vocabulary_level": "simple",
+    "metaphor_suggestions": ["線往上走=漲", "折線圖最簡單", "看圖是參考不是算命"]
+  }
+}

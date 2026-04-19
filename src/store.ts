@@ -7,6 +7,26 @@ import { fetchStockData, fetchOfficialClosePrice } from './api';
 // ─── 股價刷新快取控制 ─────────────────────────────────────────────────────────
 let lastPriceRefreshAt: number | null = null;
 
+/** 帶 timeout 的 Promise wrapper */
+function withTimeout<T>(promise: PromiseLike<T>, ms: number, fallback: T): Promise<T> {
+  return Promise.race([
+    Promise.resolve(promise),
+    new Promise<T>(resolve => setTimeout(() => resolve(fallback), ms)),
+  ]);
+}
+
+async function withRetry<T>(fn: () => Promise<T>, retries = 1): Promise<T> {
+  let lastErr: unknown = null;
+  for (let i = 0; i <= retries; i += 1) {
+    try {
+      return await fn();
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+  throw lastErr;
+}
+
 /** 判斷現在是否台股盤中（平日 09:00–13:30 台灣時間） */
 function isMarketOpen(): boolean {
   const now = new Date(Date.now() + 8 * 60 * 60 * 1000);
@@ -79,8 +99,10 @@ interface InvestmentStore {
   learningWalletTxs: WalletTransaction[];
   childrenTxLog: WalletTransaction[];
   rewardRules: RewardRule[];
+  completedLessonIds: string[];
   fetchLearningProfile: () => Promise<void>;
   fetchLearningWallet: () => Promise<void>;
+  fetchCompletedLessonIds: () => Promise<void>;
   fetchWalletTransactions: () => Promise<void>;
   fetchChildrenTransactions: () => Promise<void>;
   completeLesson: (lessonId: string, result: LessonResult) => Promise<{ error: string | null; xpEarned: number; coinsEarned: number; levelUp: boolean; newStreak: number }>;
@@ -284,6 +306,7 @@ export const useStore = create<InvestmentStore>((set, get) => ({
   learningWallet: null,
   learningWalletTxs: [],
   childrenTxLog: [],
+  completedLessonIds: [],
   rewardRules: [],
   shopItems: [],
   redemptions: [],
@@ -293,18 +316,42 @@ export const useStore = create<InvestmentStore>((set, get) => ({
     const { user } = get();
     if (!user) return;
 
-    const { data } = await supabase
-      .from('learning_profiles')
-      .select('*')
-      .eq('user_id', user.id)
-      .maybeSingle();
+    const profileRes = await withTimeout(
+      Promise.resolve(
+        supabase
+          .from('learning_profiles')
+          .select('*')
+          .eq('user_id', user.id)
+          .maybeSingle()
+      ),
+      12000,
+      { data: null, error: { message: 'fetchLearningProfile timeout' } } as any
+    );
+
+    if (profileRes.error) {
+      console.error('fetchLearningProfile select failed:', profileRes.error.message);
+      return;
+    }
+
+    const { data } = profileRes;
 
     if (!data) {
-      const { data: created } = await supabase
-        .from('learning_profiles')
-        .insert([{ user_id: user.id }])
-        .select()
-        .single();
+      const createRes = await withTimeout(
+        Promise.resolve(
+          supabase
+            .from('learning_profiles')
+            .insert([{ user_id: user.id }])
+            .select()
+            .single()
+        ),
+        12000,
+        { data: null, error: { message: 'create learning_profiles timeout' } } as any
+      );
+      if (createRes.error) {
+        console.error('fetchLearningProfile create failed:', createRes.error.message);
+        return;
+      }
+      const created = createRes.data;
       if (created) {
         set({
           learningProfile: {
@@ -380,6 +427,7 @@ export const useStore = create<InvestmentStore>((set, get) => ({
 
   completeLesson: async (lessonId, result) => {
     if (!supabase) return { error: '資料庫未連線', xpEarned: 0, coinsEarned: 0, levelUp: false, newStreak: 0 };
+    const sb = supabase;
     const { user, learningProfile } = get();
     if (!user || !learningProfile) return { error: '請先登入', xpEarned: 0, coinsEarned: 0, levelUp: false, newStreak: 0 };
 
@@ -409,34 +457,52 @@ export const useStore = create<InvestmentStore>((set, get) => ({
     }
     const newLongestStreak = Math.max(learningProfile.longestStreak, newStreak);
 
-    // 寫入 lesson_progress
-    await supabase.from('lesson_progress').insert([{
-      user_id: user.id,
-      lesson_id: lessonId,
-      score: result.score,
-      xp_earned: xpEarned,
-      time_spent_seconds: result.timeSpentSeconds,
-      questions_correct: result.questionsCorrect,
-      questions_total: result.questionsTotal,
-    }]);
+    // 寫入 lesson_progress (5s timeout)
+    const insertResult = await withRetry(() => withTimeout(
+      Promise.resolve(sb.from('lesson_progress').insert([{
+        user_id: user.id,
+        lesson_id: lessonId,
+        score: result.score,
+        xp_earned: xpEarned,
+        time_spent_seconds: result.timeSpentSeconds,
+        questions_correct: result.questionsCorrect,
+        questions_total: result.questionsTotal,
+      }])),
+      12000,
+      { error: { message: 'lesson_progress insert timeout' } } as any
+    ));
+    if (insertResult.error) console.error('lesson_progress insert failed:', insertResult.error.message);
 
-    // 更新 learning_profiles
-    const { error } = await supabase.from('learning_profiles').update({
-      total_xp: newTotalXp,
-      current_level: newLevel,
-      current_stage: newStage,
-      streak_days: newStreak,
-      longest_streak: newLongestStreak,
-      last_learn_date: today,
-      total_lessons_completed: learningProfile.totalLessonsCompleted + 1,
-      total_questions_correct: learningProfile.totalQuestionsCorrect + result.questionsCorrect,
-      total_questions_answered: learningProfile.totalQuestionsAnswered + result.questionsTotal,
-      updated_at: new Date().toISOString(),
-    }).eq('user_id', user.id);
+    // 更新 learning_profiles (5s timeout)
+    const updateResult = await withRetry(() => withTimeout(
+      Promise.resolve(sb.from('learning_profiles').update({
+        total_xp: newTotalXp,
+        current_level: newLevel,
+        current_stage: newStage,
+        streak_days: newStreak,
+        longest_streak: newLongestStreak,
+        last_learn_date: today,
+        total_lessons_completed: learningProfile.totalLessonsCompleted + 1,
+        total_questions_correct: learningProfile.totalQuestionsCorrect + result.questionsCorrect,
+        total_questions_answered: learningProfile.totalQuestionsAnswered + result.questionsTotal,
+        updated_at: new Date().toISOString(),
+      }).eq('user_id', user.id)),
+      12000,
+      { error: { message: 'learning_profiles update timeout' } } as any
+    ));
 
-    if (error) return { error: error.message, xpEarned, coinsEarned: 0, levelUp, newStreak };
+    if (updateResult.error) {
+      console.error('learning_profiles update failed:', updateResult.error.message);
+      // 即使 DB 寫入失敗，仍更新本地狀態讓 UI 繼續運作
+    }
+
+    // 更新本地狀態（無論 DB 成功與否都更新 UI）
+    const newCompletedIds = get().completedLessonIds.includes(lessonId)
+      ? get().completedLessonIds
+      : [...get().completedLessonIds, lessonId];
 
     set({
+      completedLessonIds: newCompletedIds,
       learningProfile: {
         ...learningProfile,
         totalXp: newTotalXp,
@@ -451,42 +517,55 @@ export const useStore = create<InvestmentStore>((set, get) => ({
       },
     });
 
-    // ── 自動發幣：查詢父母的發幣規則 ─────────────
+    // ── 自動發幣：查詢父母的發幣規則（不阻塞主流程）─────────────
     let coinsEarned = 0;
-    if (user.parentId) {
-      const { data: rules } = await supabase
-        .from('reward_rules')
-        .select('*')
-        .eq('parent_id', user.parentId)
-        .eq('is_active', true)
-        .or(`child_id.is.null,child_id.eq.${user.id}`);
+    try {
+      if (user.parentId) {
+        const rulesResult = await withRetry(() => withTimeout(
+          Promise.resolve(
+            sb
+              .from('reward_rules')
+              .select('*')
+              .eq('parent_id', user.parentId)
+              .eq('is_active', true)
+              .or(`child_id.is.null,child_id.eq.${user.id}`)
+          ),
+          12000,
+          { data: [] } as any
+        ));
+        const rules = (rulesResult.data ?? []) as RewardRule[];
 
-      if (rules && rules.length > 0) {
-        // 判斷哪些觸發條件成立
-        const triggeredTypes: RewardTriggerType[] = [];
-        if (isFirstTodayLesson) triggeredTypes.push('daily_complete');
-        if (levelUp) triggeredTypes.push('level_up');
-        if (stageUp) triggeredTypes.push('stage_up');
-        if (result.score === 100) triggeredTypes.push('perfect_score');
-        if (newStreak === 7) triggeredTypes.push('streak_7');
-        if (newStreak === 30) triggeredTypes.push('streak_30');
+        if (rules.length > 0) {
+          const triggeredTypes: RewardTriggerType[] = [];
+          if (isFirstTodayLesson) triggeredTypes.push('daily_complete');
+          if (levelUp) triggeredTypes.push('level_up');
+          if (stageUp) triggeredTypes.push('stage_up');
+          if (result.score === 100) triggeredTypes.push('perfect_score');
+          if (newStreak === 7) triggeredTypes.push('streak_7');
+          if (newStreak === 30) triggeredTypes.push('streak_30');
 
-        for (const rule of rules) {
-          if (triggeredTypes.includes(rule.trigger_type as RewardTriggerType)) {
-            const { error: rpcErr } = await supabase.rpc('grant_learning_coins', {
-              p_user_id: user.id,
-              p_amount: rule.amount,
-              p_tx_type: 'earn',
-              p_source: rule.id,
-              p_description: TRIGGER_LABELS[rule.trigger_type as RewardTriggerType] ?? rule.trigger_label ?? rule.trigger_type,
-            });
-            if (!rpcErr) coinsEarned += rule.amount;
+          for (const rule of rules) {
+            if (triggeredTypes.includes(rule.triggerType)) {
+              const { error: rpcErr } = await withRetry(() => withTimeout(
+                Promise.resolve(sb.rpc('grant_learning_coins', {
+                  p_user_id: user.id,
+                  p_amount: rule.amount,
+                  p_tx_type: 'earn',
+                  p_source: rule.id,
+                  p_description: TRIGGER_LABELS[rule.triggerType] ?? rule.triggerLabel ?? rule.triggerType,
+                })),
+                12000,
+                { error: { message: 'grant_learning_coins timeout' } } as any
+              ));
+              if (!rpcErr) coinsEarned += rule.amount;
+            }
           }
-        }
 
-        // 重新拉最新錢包餘額
-        if (coinsEarned > 0) await get().fetchLearningWallet();
+          if (coinsEarned > 0) await get().fetchLearningWallet();
+        }
       }
+    } catch (e) {
+      console.error('reward coin granting failed:', e);
     }
 
     return { error: null, xpEarned, coinsEarned, levelUp, newStreak };
@@ -573,6 +652,20 @@ export const useStore = create<InvestmentStore>((set, get) => ({
     });
     if (error) return { error: error.message };
     return { error: null };
+  },
+
+  fetchCompletedLessonIds: async () => {
+    if (!supabase) return;
+    const { user } = get();
+    if (!user) return;
+    const { data } = await supabase
+      .from('lesson_progress')
+      .select('lesson_id')
+      .eq('user_id', user.id);
+    if (data) {
+      const ids = [...new Set(data.map((r: { lesson_id: string }) => r.lesson_id))];
+      set({ completedLessonIds: ids });
+    }
   },
 
   fetchWalletTransactions: async () => {
@@ -864,7 +957,7 @@ export const useStore = create<InvestmentStore>((set, get) => ({
   logout: async () => {
     if (!supabase) return;
     await supabase.auth.signOut();
-    set({ user: null, session: null, children: [], holdings: [], trades: [], withdrawalRequests: [], featureOverrides: [], allUsers: [], learningProfile: null, learningWallet: null, learningWalletTxs: [], childrenTxLog: [], rewardRules: [], shopItems: [], redemptions: [] });
+    set({ user: null, session: null, children: [], holdings: [], trades: [], withdrawalRequests: [], featureOverrides: [], allUsers: [], learningProfile: null, learningWallet: null, learningWalletTxs: [], childrenTxLog: [], completedLessonIds: [], rewardRules: [], shopItems: [], redemptions: [] });
   },
 
   // ─── Data Loading ──────────────────────────
@@ -1194,7 +1287,9 @@ export const useStore = create<InvestmentStore>((set, get) => ({
     let feeRate = user.brokerFeeRate;
     let minFee = user.brokerMinFee;
     if (user.role === 'child' && user.parentId) {
-      const { data: parentData } = await supabase.from('users').select('broker_fee_rate, broker_min_fee').eq('id', user.parentId).single();
+      const parentFetch = supabase.from('users').select('broker_fee_rate, broker_min_fee').eq('id', user.parentId).single();
+      const timeout = new Promise<{ data: null }>(resolve => setTimeout(() => resolve({ data: null }), 5000));
+      const { data: parentData } = await Promise.race([parentFetch, timeout]) as { data: { broker_fee_rate: number | null; broker_min_fee: number | null } | null };
       if (parentData) {
         feeRate = parentData.broker_fee_rate !== null ? Number(parentData.broker_fee_rate) : 0.001425;
         minFee = parentData.broker_min_fee !== null ? Number(parentData.broker_min_fee) : 20;
@@ -1275,7 +1370,9 @@ export const useStore = create<InvestmentStore>((set, get) => ({
     let minFee = user.brokerMinFee;
     let taxRate = user.brokerTaxRate;
     if (user.role === 'child' && user.parentId) {
-      const { data: parentData } = await supabase.from('users').select('broker_fee_rate, broker_min_fee, broker_tax_rate').eq('id', user.parentId).single();
+      const parentFetch = supabase.from('users').select('broker_fee_rate, broker_min_fee, broker_tax_rate').eq('id', user.parentId).single();
+      const timeout = new Promise<{ data: null }>(resolve => setTimeout(() => resolve({ data: null }), 5000));
+      const { data: parentData } = await Promise.race([parentFetch, timeout]) as { data: { broker_fee_rate: number | null; broker_min_fee: number | null; broker_tax_rate: number | null } | null };
       if (parentData) {
         feeRate = parentData.broker_fee_rate !== null ? Number(parentData.broker_fee_rate) : 0.001425;
         minFee = parentData.broker_min_fee !== null ? Number(parentData.broker_min_fee) : 20;

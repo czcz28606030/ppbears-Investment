@@ -1,0 +1,72 @@
+{
+  "lesson_id": "L035",
+  "stage": 2,
+  "level": 7,
+  "domain": "basic",
+  "title": "一張股票 = 1000 股",
+  "summary": "了解台灣股票的交易單位、整張與零股的差異。",
+  "cards": [
+    {
+      "type": "text_image",
+      "title": "張和股",
+      "body": "在台灣買股票，最基本的單位是「張」📜：\n\n1 張 = 1,000 股\n\n如果台積電一股 800 元：\n買 1 張 = 800 × 1,000 = 800,000 元 😱\n\n哇！要 80 萬才能買一張呢！太貴了嗎？別擔心，有更便宜的方法！",
+      "image_key": "lesson_035_card_01"
+    },
+    {
+      "type": "text_image",
+      "title": "零股交易",
+      "body": "「零股」就是不到 1 張（不到 1,000 股）的股票 🔢\n\n你可以只買 1 股、10 股、100 股！\n\n如果台積電一股 800 元：\n• 買 1 股 = 800 元 💰\n• 買 10 股 = 8,000 元\n• 買 100 股 = 80,000 元\n\n零股讓小資族也能輕鬆投資！",
+      "image_key": "lesson_035_card_02"
+    },
+    {
+      "type": "text_image",
+      "title": "整張 vs 零股",
+      "body": "兩者的差別：\n\n📦 整張（1,000 股）：\n• 普通交易時間都能買賣\n• 買賣速度快\n• 需要較多資金\n\n🧩 零股（1~999 股）：\n• 盤後也能交易\n• 適合資金不多的人\n• 可以慢慢存股",
+      "image_key": "lesson_035_card_03"
+    },
+    {
+      "type": "text_image",
+      "title": "存股的概念",
+      "body": "「存股」就像存錢一樣，不過存的是股票 📊：\n\n每個月固定買一點零股，慢慢累積。\n\n例如每月存 3,000 元買某檔股票：\n• 第 1 個月：買了 5 股\n• 第 2 個月：又買了 5 股\n• 一年後：存了 60 股！\n\n這種方法叫做「定期定額」🐻✨",
+      "image_key": "lesson_035_card_04"
+    }
+  ],
+  "preset_questions": [
+    {
+      "question_type": "choice",
+      "question_text": "在台灣，1 張股票等於多少股？",
+      "options": [
+        "1 股",
+        "100 股",
+        "1,000 股",
+        "10,000 股"
+      ],
+      "correct_answer": 2,
+      "explanation": "答對了！📜 在台股，1 張 = 1,000 股。這是台灣股市的基本交易單位。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "零股交易讓小資族也能買到台積電的股票。",
+      "correct_answer": true,
+      "explanation": "對！🧩 透過零股交易，即使只有幾百元也能買到 1 股台積電，不用湊到一整張的錢。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "每個月固定買一點股票，慢慢累積，這種方法叫什麼？",
+      "options": [
+        "衝動購物",
+        "定期定額",
+        "一次買光",
+        "借錢投資"
+      ],
+      "correct_answer": 1,
+      "explanation": "沒錯！📊 定期定額就是每個月固定投入一筆錢買股票，不管股價高低，是穩健投資的好方法！"
+    }
+  ],
+  "ai_prompt_context": {
+    "topic": "台灣股票的交易單位：整張、零股與定期定額",
+    "age_hint": "7-9歲",
+    "vocabulary_level": "simple",
+    "metaphor_suggestions": ["1張=1000股", "零股像零食", "存股像存錢", "定期定額"]
+  }
+}
