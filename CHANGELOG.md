@@ -1,4 +1,19 @@
 ﻿
+## [v1.8.0] - 2026-04-20
+### Fixed
+- **Session 過期後下單卡住**：`initAuth` 改用 `getSession()` 快速讀取本機 session（~50ms），`onAuthStateChange` 僅負責後續 token 刷新，解決 token 過期時操作無回應問題
+- **下單使用舊餘額計算**：`executeBuy` / `executeSell` 下單前先即時查詢 DB 最新 `available_balance`（5 秒 timeout），不再依賴 store 快取值，避免多裝置或長時間閒置後餘額計算錯誤
+- **下單永遠轉圈不停**：所有 Supabase `update`/`insert`/`delete` 操作加上 `withWriteTimeout`（20 秒），逾時後回傳明確錯誤訊息而非永遠等待
+- **登出卡住無回應**：`logout()` 改為先立即清除本地 state（UI 瞬間回應），`signOut()` 在背景執行不阻塞
+
+### Added
+- **切回 Tab 自動刷新資料**：`initAuth` 新增 `visibilitychange` 監聽，用戶切回頁面時自動重新載入最新餘額與持倉
+- **閒置 120 分鐘自動登出**：偵測 `mousedown`/`mousemove`/`keydown`/`touchstart`/`scroll`/`click` 6 種事件，120 分鐘無操作自動登出保護帳號安全
+- **AI 聰明選股量化三指標**：Explore 頁面 AI 模式下，每支股票小卡新增顯示「AI 推薦等級」「累積報酬」「籌碼穩定度」三個即時標籤，資料來源 ifalgo API
+
+### Changed
+- **登入速度大幅提升**：`authLoading` 解除時機從「所有資料載入完成」改為「session 確認後立即解除」，資料在背景繼續載入，首頁出現速度從 1–3 秒縮短至 ~50ms
+
 ## [v1.7.0] - 2026-04-19
 ### Fixed
 - **PPBear 即時整理本地開發無法運作**：`vite.config.ts` 新增 `/api/stock-analysis` proxy 配置，使本地開發時能正確轉發到 Vercel production 環境

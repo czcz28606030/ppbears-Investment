@@ -7,11 +7,25 @@ import { fetchStockData, fetchOfficialClosePrice } from './api';
 // ─── 股價刷新快取控制 ─────────────────────────────────────────────────────────
 let lastPriceRefreshAt: number | null = null;
 
-/** 帶 timeout 的 Promise wrapper */
+// ─── 閒置自動登出控制 ─────────────────────────────────────────────────────────
+let idleTimer: ReturnType<typeof setTimeout> | null = null;
+const IDLE_TIMEOUT_MS = 120 * 60 * 1000; // 120 分鐘無操作自動登出
+
+/** 帶 timeout 的 Promise wrapper（逾時回傳 fallback） */
 function withTimeout<T>(promise: PromiseLike<T>, ms: number, fallback: T): Promise<T> {
   return Promise.race([
     Promise.resolve(promise),
     new Promise<T>(resolve => setTimeout(() => resolve(fallback), ms)),
+  ]);
+}
+
+/** DB 寫入 timeout wrapper（逾時拋出錯誤，讓 catch 捕捉） */
+function withWriteTimeout<T>(promise: PromiseLike<T>, ms = 20000): Promise<T> {
+  return Promise.race([
+    Promise.resolve(promise),
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('資料庫操作逾時，請檢查網路後再試')), ms)
+    ),
   ]);
 }
 
@@ -866,17 +880,24 @@ export const useStore = create<InvestmentStore>((set, get) => ({
   initAuth: async () => {
     if (!supabase) { set({ authLoading: false }); return; }
 
+    // ── Step 1：getSession() 讀 localStorage（~50ms，無網路請求）──────────
+    // 立即判斷登入狀態，解除 authLoading，讓頁面馬上顯示
     const { data: { session } } = await supabase.auth.getSession();
-    set({ session });
+    set({ session, authLoading: false });
+    if (session?.user) {
+      get().loadUserData(session.user.id); // 背景載入，不 await
+    }
 
-    if (session?.user) await get().loadUserData(session.user.id);
-    set({ authLoading: false });
-
+    // ── Step 2：onAuthStateChange 處理後續 token 刷新 / 登入 / 登出 ────────
     supabase.auth.onAuthStateChange(async (event, newSession) => {
+      // INITIAL_SESSION 已在 getSession() 處理，跳過避免重複載入
+      if (event === 'INITIAL_SESSION') return;
+
       set({ session: newSession });
-      
+
       if (event === 'PASSWORD_RECOVERY') {
         set({ isRecoveryMode: true });
+        return;
       }
 
       if (newSession?.user) {
@@ -885,6 +906,30 @@ export const useStore = create<InvestmentStore>((set, get) => ({
         set({ user: null, children: [], holdings: [], trades: [], withdrawalRequests: [] });
       }
     });
+
+    // ── 切回 Tab 時自動刷新資料 ─────────────────────────────────────────────
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        const { user } = get();
+        if (user) get().loadUserData(user.id);
+      }
+    });
+
+    // ── 閒置 120 分鐘自動登出 ────────────────────────────────────────────────
+    const doIdleLogout = () => {
+      if (get().user) get().logout();
+    };
+    const resetIdle = () => {
+      if (idleTimer) clearTimeout(idleTimer);
+      idleTimer = setTimeout(doIdleLogout, IDLE_TIMEOUT_MS);
+    };
+    const idleEvents: (keyof DocumentEventMap)[] = [
+      'mousedown', 'mousemove', 'keydown', 'touchstart', 'scroll', 'click',
+    ];
+    idleEvents.forEach(e =>
+      document.addEventListener(e, resetIdle, { passive: true } as EventListenerOptions)
+    );
+    resetIdle(); // 啟動計時器
   },
 
   registerParent: async (email, password, displayName, avatar) => {
@@ -955,9 +1000,10 @@ export const useStore = create<InvestmentStore>((set, get) => ({
   },
 
   logout: async () => {
-    if (!supabase) return;
-    await supabase.auth.signOut();
+    // 先立即清除本地狀態（UI 立即回應），signOut 網路請求在背景執行不阻塞
     set({ user: null, session: null, children: [], holdings: [], trades: [], withdrawalRequests: [], featureOverrides: [], allUsers: [], learningProfile: null, learningWallet: null, learningWalletTxs: [], childrenTxLog: [], completedLessonIds: [], rewardRules: [], shopItems: [], redemptions: [] });
+    if (supabase) supabase.auth.signOut().catch(() => {}); // 背景執行，失敗不影響 UI
+    if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; }
   },
 
   // ─── Data Loading ──────────────────────────
@@ -1300,7 +1346,17 @@ export const useStore = create<InvestmentStore>((set, get) => ({
     const fee = Math.max(minFee, Math.round(baseCost * feeRate));
     const totalCost = baseCost + fee;
 
-    if (totalCost > user.availableBalance) return { success: false, message: `餘額不足！需要更多零用錢才能買喔 💰\n(預估總金額含手續費: NT$ ${formatMoney(totalCost)})` };
+    // ── 即時讀取最新餘額，避免 Tab 閒置後使用舊快取值 ─────────────────────
+    let currentBalance = user.availableBalance;
+    const balRes = await Promise.race([
+      supabase.from('users').select('available_balance').eq('id', user.id).single(),
+      new Promise<{ data: null; error: null }>(r => setTimeout(() => r({ data: null, error: null }), 5000)),
+    ]);
+    if (balRes.data) {
+      currentBalance = Number((balRes.data as any).available_balance ?? user.availableBalance);
+    }
+
+    if (totalCost > currentBalance) return { success: false, message: `餘額不足！需要更多零用錢才能買喔 💰\n(預估總金額含手續費: NT$ ${formatMoney(totalCost)})` };
     if (quantity <= 0) return { success: false, message: '至少要買 1 股喔！' };
 
     // ─ Paywall: 持股上限檢查 ─
@@ -1320,32 +1376,32 @@ export const useStore = create<InvestmentStore>((set, get) => ({
     }
 
     try {
-      await supabase.from('users').update({ available_balance: user.availableBalance - totalCost }).eq('id', user.id);
-      await supabase.from('trades').insert([{
+      await withWriteTimeout(supabase.from('users').update({ available_balance: currentBalance - totalCost }).eq('id', user.id));
+      await withWriteTimeout(supabase.from('trades').insert([{
         user_id: user.id, stock_code: stockCode, stock_name: stockName,
         trade_type: 'buy', quantity, price, total_amount: totalCost, reason: reason || null, timestamp: Date.now(),
-      }]);
+      }]));
 
       const existing = holdings.find(h => h.stockCode === stockCode);
       if (existing) {
         const newShares = existing.totalShares + quantity;
         // 加總總花費 / 總股數
         const newAvgCost = parseFloat(((existing.avgCost * existing.totalShares + totalCost) / newShares).toFixed(2));
-        await supabase.from('holdings').update({
+        await withWriteTimeout(supabase.from('holdings').update({
           total_shares: newShares, avg_cost: newAvgCost, current_price: price,
           updated_at: new Date().toISOString(),
-        }).eq('user_id', user.id).eq('stock_code', stockCode);
+        }).eq('user_id', user.id).eq('stock_code', stockCode));
       } else {
-        await supabase.from('holdings').insert([{
+        await withWriteTimeout(supabase.from('holdings').insert([{
           user_id: user.id, stock_code: stockCode, stock_name: stockName,
           total_shares: quantity, avg_cost: price, current_price: price, industry: industry || '',
-        }]);
+        }]));
       }
       await get().loadUserData(user.id);
       return { success: true, message: `成功買入 ${stockName} ${quantity} 股 🎉` };
     } catch (err) {
       console.error('executeBuy error:', err);
-      return { success: false, message: '⚠️ 買入時發生網路或資料庫錯誤，請稍後再試。' };
+      return { success: false, message: `⚠️ 買入失敗：${err instanceof Error ? err.message : '請檢查網路後再試。'}` };
     }
   },
 
@@ -1384,25 +1440,35 @@ export const useStore = create<InvestmentStore>((set, get) => ({
     const fee = Math.max(minFee, Math.round(baseValue * feeRate));
     const tax = Math.round(baseValue * taxRate);
     const totalReceived = baseValue - fee - tax;
-    
+
     // profit 計算: 實收金額 - (當初買這些股票的總成本)
     const profit = totalReceived - (holding.avgCost * quantity);
-    
+
+    // ── 即時讀取最新餘額，避免 Tab 閒置後使用舊快取值 ─────────────────────
+    let currentSellBalance = user.availableBalance;
+    const sellBalRes = await Promise.race([
+      supabase.from('users').select('available_balance').eq('id', user.id).single(),
+      new Promise<{ data: null; error: null }>(r => setTimeout(() => r({ data: null, error: null }), 5000)),
+    ]);
+    if (sellBalRes.data) {
+      currentSellBalance = Number((sellBalRes.data as any).available_balance ?? user.availableBalance);
+    }
+
     try {
-      await supabase.from('users').update({ available_balance: user.availableBalance + totalReceived }).eq('id', user.id);
-      await supabase.from('trades').insert([{
+      await withWriteTimeout(supabase.from('users').update({ available_balance: currentSellBalance + totalReceived }).eq('id', user.id));
+      await withWriteTimeout(supabase.from('trades').insert([{
         user_id: user.id, stock_code: stockCode, stock_name: holding.stockName,
         trade_type: 'sell', quantity, price, total_amount: totalReceived,
         reason: reason || null, profit: profit, timestamp: Date.now(),
-      }]);
+      }]));
 
       const remaining = holding.totalShares - quantity;
       if (remaining <= 0) {
-        await supabase.from('holdings').delete().eq('user_id', user.id).eq('stock_code', stockCode);
+        await withWriteTimeout(supabase.from('holdings').delete().eq('user_id', user.id).eq('stock_code', stockCode));
       } else {
-        await supabase.from('holdings').update({
+        await withWriteTimeout(supabase.from('holdings').update({
           total_shares: remaining, current_price: price, updated_at: new Date().toISOString(),
-        }).eq('user_id', user.id).eq('stock_code', stockCode);
+        }).eq('user_id', user.id).eq('stock_code', stockCode));
       }
 
       await get().loadUserData(user.id);
@@ -1413,7 +1479,7 @@ export const useStore = create<InvestmentStore>((set, get) => ({
       };
     } catch (err) {
       console.error('executeSell error:', err);
-      return { success: false, message: '⚠️ 賣出時發生網路或資料庫錯誤，請稍後再試。' };
+      return { success: false, message: `⚠️ 賣出失敗：${err instanceof Error ? err.message : '請檢查網路後再試。'}` };
     }
   },
 

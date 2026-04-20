@@ -1,7 +1,8 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { fetchSimonsData, toRecommendation, fetchTWSEAllStocks, fetchTPEXAllStocks } from '../api';
+import { fetchSimonsData, toRecommendation, fetchTWSEAllStocks, fetchTPEXAllStocks, fetchStockQuantData } from '../api';
 import type { StockRecommendation } from '../types';
+import type { StockQuantData } from '../api';
 import { useStore } from '../store';
 import AdBanner from '../components/AdBanner';
 import './Explore.css';
@@ -16,6 +17,8 @@ export default function Explore() {
   const [activeStrategy, setActiveStrategy] = useState(hasAiFeature ? 'ai' : 'A');
   const [error, setError] = useState('');
   const [twsePriceMap, setTwsePriceMap] = useState<Record<string, { close: string; change: string; name: string; volume: number; date: string }>>({});
+  const [quantDataMap, setQuantDataMap] = useState<Record<string, StockQuantData>>({});
+  const [quantLoading, setQuantLoading] = useState(false);
   const resultRef = useRef<HTMLDivElement>(null);
 
   async function loadData() {
@@ -93,6 +96,22 @@ export default function Explore() {
   useEffect(() => {
     loadData();
   }, []);
+
+  // AI 策略啟用時，批次抓取所有推薦股票的量化三指標
+  useEffect(() => {
+    if (activeStrategy !== 'ai' || recommendations.length === 0) return;
+    let cancelled = false;
+    setQuantLoading(true);
+    const targets = recommendations.slice(0, 25); // 最多 25 支
+    Promise.all(targets.map(r => fetchStockQuantData(r.coid))).then(results => {
+      if (cancelled) return;
+      const map: Record<string, StockQuantData> = {};
+      targets.forEach((r, i) => { map[r.coid] = results[i]; });
+      setQuantDataMap(map);
+      setQuantLoading(false);
+    }).catch(() => { if (!cancelled) setQuantLoading(false); });
+    return () => { cancelled = true; };
+  }, [activeStrategy, recommendations]);
 
   // Simons 每日推薦的收盤價 Map（用於與 TWSE/TPEx 日期比較，使用較新的）
   const simonsPriceMap = useMemo(() => {
@@ -242,6 +261,60 @@ export default function Explore() {
     return '⭐';
   }
 
+  // AI 量化三指標 helper
+  function getRemarkStyle(remark: string): string {
+    if (remark.includes('超高')) return 'quant-chip-remark-ultra';
+    if (remark.includes('高度')) return 'quant-chip-remark-high';
+    if (remark.includes('中度')) return 'quant-chip-remark-mid';
+    return 'quant-chip-remark-low';
+  }
+
+  function getChipStyle(pts: number): string {
+    if (pts >= 7) return 'quant-chip-pts-high';
+    if (pts >= 4) return 'quant-chip-pts-mid';
+    return 'quant-chip-pts-low';
+  }
+
+  function getCumRetStyle(cumRet: string): string {
+    const val = parseFloat(cumRet);
+    if (isNaN(val)) return '';
+    return val >= 0 ? 'quant-chip-ret-pos' : 'quant-chip-ret-neg';
+  }
+
+  function renderAiQuantChips(coid: string) {
+    if (quantLoading && !quantDataMap[coid]) {
+      return (
+        <div className="quant-chips">
+          <span className="quant-chip quant-chip-loading">載入中…</span>
+        </div>
+      );
+    }
+    const qd = quantDataMap[coid];
+    if (!qd) return null;
+    const aiRemark = qd.aiQuanBackDataComment?.remark ?? '--';
+    const cumRet = qd.aiQuanBackDataComment?.cum_ret ?? '--';
+    const ptsRaw = qd.chipStability ? parseFloat(qd.chipStability.pts) : null;
+    const chipLabel = ptsRaw === null ? '--' :
+      ptsRaw >= 9 ? '最乾淨' :
+      ptsRaw >= 7 ? '非常穩定' :
+      ptsRaw >= 5 ? '穩定' :
+      ptsRaw >= 3 ? '普通' : '凌亂';
+    const cumDisplay = cumRet === '--' ? '--' : (cumRet.startsWith('-') ? cumRet : `+${cumRet}`);
+    return (
+      <div className="quant-chips">
+        <span className={`quant-chip quant-chip-remark ${getRemarkStyle(aiRemark)}`}>
+          🤖 {aiRemark}
+        </span>
+        <span className={`quant-chip quant-chip-ret ${getCumRetStyle(cumRet)}`}>
+          📊 累積報酬 {cumDisplay}
+        </span>
+        <span className={`quant-chip quant-chip-pts ${ptsRaw !== null ? getChipStyle(ptsRaw) : ''}`}>
+          🔒 籌碼 {ptsRaw !== null ? `${ptsRaw.toFixed(0)}分` : '--'} {chipLabel}
+        </span>
+      </div>
+    );
+  }
+
   return (
     <div className="explore">
       <div className="page-header">
@@ -344,6 +417,7 @@ export default function Explore() {
                      {getAdviceBadge(rec.advice)}
                      <span className="badge badge-neutral">評分 {rec.score}分</span>
                    </div>
+                  {activeStrategy === 'ai' && renderAiQuantChips(rec.coid)}
                 </div>
                 <div className="rec-right">
                   <div className="stock-price">

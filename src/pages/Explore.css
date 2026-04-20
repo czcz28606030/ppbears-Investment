@@ -152,6 +152,48 @@
   font-weight: 700;
 }
 
+/* ── AI 量化三指標 chips ─────────────────────────────────── */
+.quant-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.quant-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+
+/* AI推薦等級 */
+.quant-chip-remark-ultra { background: #fee2e2; color: #b91c1c; }
+.quant-chip-remark-high  { background: #ffedd5; color: #c2410c; }
+.quant-chip-remark-mid   { background: #fef9c3; color: #854d0e; }
+.quant-chip-remark-low   { background: #f1f5f9; color: #64748b; }
+
+/* 累積報酬 */
+.quant-chip-ret-pos { background: #dcfce7; color: #15803d; }
+.quant-chip-ret-neg { background: #fee2e2; color: #b91c1c; }
+.quant-chip-ret     { background: #f1f5f9; color: #64748b; }
+
+/* 籌碼穩定度 */
+.quant-chip-pts-high { background: #dbeafe; color: #1d4ed8; }
+.quant-chip-pts-mid  { background: #f1f5f9; color: #475569; }
+.quant-chip-pts-low  { background: #fef3c7; color: #92400e; }
+
+/* 載入中骨架 */
+.quant-chip-loading {
+  background: #f1f5f9;
+  color: #94a3b8;
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
 @media (max-width: 900px) {
   .strategy-grid {
     gap: 12px;
