@@ -458,3 +458,22 @@
   color: #4338CA;
   border: 1px solid #C7D2FE;
 }
+
+/* Data Source Footer */
+.wl-data-source {
+  margin-top: 20px;
+  padding: 14px 18px;
+  background: rgba(122, 106, 85, 0.04);
+  border-radius: var(--radius-lg);
+  border: 1px dashed rgba(122, 106, 85, 0.15);
+}
+
+.wl-data-source-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--font-size-xs);
+  color: var(--text-light);
+  font-weight: 600;
+  line-height: 1.8;
+}

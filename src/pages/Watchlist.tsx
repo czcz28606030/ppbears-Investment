@@ -15,6 +15,8 @@ export default function Watchlist() {
   const [liveQuotes, setLiveQuotes] = useState<Record<string, { close: number; change: number }>>({});
   const [_quotesLoading, setQuotesLoading] = useState(false);
   const [removeConfirm, setRemoveConfirm] = useState<string | null>(null);
+  const [lastAnalyzedAt, setLastAnalyzedAt] = useState<string | null>(null);
+  const [latestKlineDate, setLatestKlineDate] = useState<string | null>(null);
 
   // 進入頁面時抓取即時報價 + 訊號分析
   useEffect(() => {
@@ -56,8 +58,24 @@ export default function Watchlist() {
       setLiveQuotes(quotes);
       setQuotesLoading(false);
 
+      // 記錄最新 K 線日期
+      let latestDate = '';
+      stockDatas.forEach(res => {
+        if (res?.prices?.length) {
+          const d = res.prices[res.prices.length - 1].mdate;
+          if (d && d > latestDate) latestDate = d;
+        }
+      });
+      if (latestDate) setLatestKlineDate(latestDate);
+
       // 訊號 + 警告分析
       await checkWatchlistSignals();
+
+      // 記錄分析完成時間
+      const now = new Date();
+      setLastAnalyzedAt(
+        `${now.getFullYear()}/${String(now.getMonth()+1).padStart(2,'0')}/${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`
+      );
     }
 
     fetchQuotesAndSignals();
@@ -295,6 +313,20 @@ export default function Watchlist() {
           <div className="wl-legend-item">
             <span className="wl-signal-badge wl-warn-badge-info">💡 提醒</span>
             <span>已觀察超過 2 週，是否該做決定？</span>
+          </div>
+        </div>
+      )}
+      {/* 數據來源與更新時間 */}
+      {watchlist.length > 0 && lastAnalyzedAt && (
+        <div className="wl-data-source">
+          <div className="wl-data-source-row">
+            <span>📡 數據來源：IFAlgo K 線 API</span>
+          </div>
+          <div className="wl-data-source-row">
+            <span>📅 最新 K 線日期：{latestKlineDate || '—'}</span>
+          </div>
+          <div className="wl-data-source-row">
+            <span>🕐 分析時間：{lastAnalyzedAt}</span>
           </div>
         </div>
       )}
