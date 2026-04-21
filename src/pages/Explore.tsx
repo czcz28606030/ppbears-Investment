@@ -9,7 +9,7 @@ import './Explore.css';
 
 export default function Explore() {
   const navigate = useNavigate();
-  const { hasFeature } = useStore();
+  const { hasFeature, isInWatchlist, addToWatchlist, removeFromWatchlist } = useStore();
   const hasAiFeature = hasFeature('ai_stock_picking');
   const [recommendations, setRecommendations] = useState<StockRecommendation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -40,6 +40,10 @@ export default function Explore() {
 
   async function loadData() {
     setLoading(true);
+    // 清空舊量化資料，避免重整後新 Phase-1 分數配上舊 quantDataMap 造成數據混淆
+    setQuantDataMap({});
+    setAiQualified(new Set());
+    if (activeStrategy === 'ai') setQuantLoading(true);
     setError('');
     setRecommendations([]);
     try {
@@ -203,7 +207,9 @@ export default function Explore() {
       setQuantLoading(false);
     }).catch(() => { if (!cancelled) setQuantLoading(false); });
     return () => { cancelled = true; };
-  }, [activeStrategy, recommendations.length]); // 只監聽 recommendations 的長度變化，避免無限迴圈
+  // 監聽 simonsMeta（每次 loadData 產生新物件），確保重整後一定重新執行
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeStrategy, simonsMeta]);
 
   // Simons 每日推薦的收盤價 Map（用於與 TWSE/TPEx 日期比較，使用較新的）
   const simonsPriceMap = useMemo(() => {
@@ -474,11 +480,11 @@ export default function Explore() {
           )}
         </div>
 
-        {loading && (
+        {(loading || (activeStrategy === 'ai' && quantLoading)) && (
           <div className="loading-spinner">
             <div className="spinner"></div>
             <div className="loading-text">
-              {activeStrategy === 'ai' ? 'PPBear 正在分析股票... 🐻' : '資料載入中... 🐻'}
+              {activeStrategy === 'ai' ? 'Simons 量化模型計算中... 🐻' : '資料載入中... 🐻'}
             </div>
           </div>
         )}
@@ -491,7 +497,7 @@ export default function Explore() {
           </div>
         )}
 
-        {!loading && !error && (
+        {!loading && !error && !(activeStrategy === 'ai' && quantLoading) && (
           <div className="recommendation-list">
             {filtered.length === 0 && (
               <div className="empty-state">
@@ -533,6 +539,20 @@ export default function Explore() {
                   <div className={`rec-trend ${rec.ret_w === 'rise' ? 'text-profit' : 'text-loss'}`}>
                     {rec.ret_w === 'rise' ? '📈 週漲' : '📉 週跌'}
                   </div>
+                  <button
+                    className={`wl-quick-btn ${isInWatchlist(rec.coid) ? 'wl-quick-active' : ''}`}
+                    title={isInWatchlist(rec.coid) ? '已加入觀察名單' : '加入觀察名單'}
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      if (isInWatchlist(rec.coid)) {
+                        await removeFromWatchlist(rec.coid);
+                      } else {
+                        await addToWatchlist(rec.coid, rec.stkname, parseFloat(getBestClose(rec.coid, rec.close)));
+                      }
+                    }}
+                  >
+                    {isInWatchlist(rec.coid) ? '✅' : '👁️'}
+                  </button>
                 </div>
               </div>
             ))}
