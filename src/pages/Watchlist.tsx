@@ -131,6 +131,25 @@ export default function Watchlist() {
         <h1 className="page-title">👁️ 觀察名單</h1>
       </div>
 
+      {/* 數據來源與更新時間 */}
+      {watchlist.length > 0 && (
+        <div className="wl-data-source">
+          {lastAnalyzedAt ? (
+            <>
+              <span>📡 IFAlgo K線 API</span>
+              <span className="wl-data-sep">·</span>
+              <span>📅 {latestKlineDate || '—'}</span>
+              <span className="wl-data-sep">·</span>
+              <span>🕐 {lastAnalyzedAt}</span>
+            </>
+          ) : watchlistSignalsLoading ? (
+            <span>正在抓取數據中...</span>
+          ) : (
+            <span>進入頁面後自動分析</span>
+          )}
+        </div>
+      )}
+
       {/* 訊號摘要 */}
       {signalCount > 0 && (
         <div className="wl-alert-banner">
@@ -316,20 +335,7 @@ export default function Watchlist() {
           </div>
         </div>
       )}
-      {/* 數據來源與更新時間 */}
-      {watchlist.length > 0 && lastAnalyzedAt && (
-        <div className="wl-data-source">
-          <div className="wl-data-source-row">
-            <span>📡 數據來源：IFAlgo K 線 API</span>
-          </div>
-          <div className="wl-data-source-row">
-            <span>📅 最新 K 線日期：{latestKlineDate || '—'}</span>
-          </div>
-          <div className="wl-data-source-row">
-            <span>🕐 分析時間：{lastAnalyzedAt}</span>
-          </div>
-        </div>
-      )}
+
     </div>
   );
 }
