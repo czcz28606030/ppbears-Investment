@@ -1923,7 +1923,7 @@ export const useStore = create<InvestmentStore>((set, get) => ({
             level: 'remove',
             icon: '🚨',
             title: `已跌 ${Math.abs(dropPct).toFixed(1)}%`,
-            message: `從加入價 ${w.addedPrice.toFixed(1)} 跌至 ${currentPrice.toFixed(1)}，趋勢已破壞，建議移除。`,
+            message: `從加入價 ${w.addedPrice.toFixed(1)} 跌至 ${currentPrice.toFixed(1)}，趨勢已破壞，建議移除。`,
           });
           continue;
         }
