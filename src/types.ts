@@ -264,3 +264,35 @@ export interface WalletTransaction {
   parentMessage: string | null;
   createdAt: string;
 }
+
+// ── Watchlist Module ──────────────────────────────────────
+
+export interface WatchlistItem {
+  id: string;
+  stockCode: string;
+  stockName: string;
+  addedPrice: number;
+  note?: string;
+  createdAt: string;
+}
+
+export type WatchlistSignalType = 'ma5_support' | 'volume_shrink' | 'both';
+
+export interface WatchlistSignal {
+  stockCode: string;
+  signalType: WatchlistSignalType;
+  currentPrice: number;
+  ma5: number;
+  volumeChange: number;     // 百分比，負數表示縮量
+  message: string;          // 人類可讀的中文描述
+}
+
+export type WatchlistWarningLevel = 'remove' | 'caution' | 'info';
+
+export interface WatchlistWarning {
+  stockCode: string;
+  level: WatchlistWarningLevel;
+  icon: string;
+  title: string;
+  message: string;
+}

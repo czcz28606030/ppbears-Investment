@@ -27,6 +27,7 @@ import ProfileSettings from './pages/ProfileSettings';
 import AdminDashboard from './pages/AdminDashboard';
 import ForgotPassword from './pages/ForgotPassword';
 import UpdatePassword from './pages/UpdatePassword';
+import Watchlist from './pages/Watchlist';
 
 import './App.css';
 
@@ -76,6 +77,7 @@ function AppContent() {
           {/* Main App Routes */}
           <Route path="/" element={<Dashboard />} />
           <Route path="/explore" element={<Explore />} />
+          <Route path="/watchlist" element={<Watchlist />} />
           <Route path="/portfolio" element={<Portfolio />} />
           <Route path="/stock/:code" element={<StockDetail />} />
           <Route path="/learn" element={<LearnHome />} />
@@ -117,6 +119,10 @@ function AppContent() {
             <NavLink to="/explore" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
               <span className="nav-icon-wrap"><span className="nav-icon">🔍</span></span>
               <span className="nav-label">找股票</span>
+            </NavLink>
+            <NavLink to="/watchlist" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+              <span className="nav-icon-wrap"><span className="nav-icon">👁️</span></span>
+              <span className="nav-label">觀察</span>
             </NavLink>
             <NavLink to="/portfolio" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
               <span className="nav-icon-wrap"><span className="nav-icon">💼</span></span>

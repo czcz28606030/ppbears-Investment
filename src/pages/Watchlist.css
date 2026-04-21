@@ -1,0 +1,460 @@
+/* ============================================
+   Watchlist Page — 觀察名單
+   ============================================ */
+
+.watchlist-page {
+  padding-bottom: 20px;
+}
+
+/* Alert Banner */
+.wl-alert-banner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: linear-gradient(135deg, #FFF5E6, #FFEDD5);
+  border: 2px solid #FFCA3A;
+  border-radius: var(--radius-lg);
+  padding: 16px 20px;
+  margin-bottom: 20px;
+  animation: wlPulse 2s ease-in-out infinite;
+}
+
+@keyframes wlPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 202, 58, 0.4); }
+  50% { box-shadow: 0 0 0 8px rgba(255, 202, 58, 0); }
+}
+
+.wl-alert-icon {
+  font-size: 32px;
+  flex-shrink: 0;
+}
+
+.wl-alert-title {
+  font-weight: 900;
+  font-size: var(--font-size-base);
+  color: var(--text-primary);
+}
+
+.wl-alert-desc {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+.wl-loading-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  font-weight: 600;
+  padding: 8px 0;
+  margin-bottom: 12px;
+}
+
+/* Card List */
+.wl-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.wl-card {
+  background: var(--bg-card);
+  border-radius: var(--radius-lg);
+  padding: 18px;
+  box-shadow: var(--shadow-sm);
+  border: 1.5px solid rgba(255, 202, 58, 0.15);
+  transition: var(--transition-normal);
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+
+.wl-card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+.wl-card-signal {
+  border-color: transparent;
+}
+
+.wl-card-both {
+  border-color: #FF595E;
+  box-shadow: 0 4px 16px rgba(255, 89, 94, 0.15);
+}
+
+.wl-card-ma5_support {
+  border-color: #8AC926;
+  box-shadow: 0 4px 16px rgba(138, 201, 38, 0.15);
+}
+
+.wl-card-volume_shrink {
+  border-color: #1982C4;
+  box-shadow: 0 4px 16px rgba(25, 130, 196, 0.15);
+}
+
+/* Signal Stripe */
+.wl-signal-stripe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 5px;
+  height: 100%;
+  border-radius: 4px 0 0 4px;
+}
+
+.wl-stripe-both { background: linear-gradient(180deg, #FF595E, #FFCA3A); }
+.wl-stripe-ma5_support { background: #8AC926; }
+.wl-stripe-volume_shrink { background: #1982C4; }
+
+/* Card Header */
+.wl-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.wl-stock-name {
+  font-weight: 900;
+  font-size: var(--font-size-lg);
+  color: var(--text-primary);
+}
+
+.wl-stock-code {
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+  font-weight: 700;
+  margin-top: 2px;
+}
+
+.wl-price-info {
+  text-align: right;
+}
+
+.wl-price {
+  font-weight: 900;
+  font-size: var(--font-size-xl);
+}
+
+.wl-change {
+  font-size: var(--font-size-xs);
+  font-weight: 800;
+  margin-top: 2px;
+}
+
+/* Card Body */
+.wl-card-body {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.wl-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--font-size-sm);
+}
+
+.wl-meta-label {
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.wl-meta-value {
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+/* Signal Badge */
+.wl-signal-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-xs);
+  font-weight: 900;
+}
+
+.wl-signal-both {
+  background: linear-gradient(135deg, #FEF2F2, #FFF7ED);
+  color: #DC2626;
+  border: 1px solid rgba(255, 89, 94, 0.3);
+}
+
+.wl-signal-ma5 {
+  background: rgba(138, 201, 38, 0.12);
+  color: #4D7C0F;
+  border: 1px solid rgba(138, 201, 38, 0.3);
+}
+
+.wl-signal-vol {
+  background: rgba(25, 130, 196, 0.10);
+  color: #1D4ED8;
+  border: 1px solid rgba(25, 130, 196, 0.3);
+}
+
+.wl-signal-none {
+  background: rgba(122, 106, 85, 0.08);
+  color: var(--text-secondary);
+  border: 1px solid rgba(122, 106, 85, 0.15);
+}
+
+/* Signal Box */
+.wl-signal-box {
+  margin-top: 10px;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+}
+
+.wl-signal-box-both {
+  background: linear-gradient(135deg, #FEF2F2, #FFF7ED);
+  border: 1px solid rgba(255, 89, 94, 0.2);
+}
+
+.wl-signal-box-ma5_support {
+  background: rgba(138, 201, 38, 0.08);
+  border: 1px solid rgba(138, 201, 38, 0.2);
+}
+
+.wl-signal-box-volume_shrink {
+  background: rgba(25, 130, 196, 0.06);
+  border: 1px solid rgba(25, 130, 196, 0.2);
+}
+
+.wl-signal-message {
+  font-weight: 800;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.wl-signal-detail {
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+/* Actions */
+.wl-card-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 10px;
+}
+
+.wl-remove-btn {
+  font-size: var(--font-size-xs);
+  color: var(--text-light);
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: transparent;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.wl-remove-btn:hover {
+  color: #DC2626;
+  border-color: #DC2626;
+  background: rgba(220, 38, 38, 0.05);
+}
+
+.wl-remove-confirm {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.wl-confirm-yes {
+  padding: 3px 12px;
+  border-radius: var(--radius-full);
+  background: #DC2626;
+  color: white;
+  font-weight: 800;
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+  border: none;
+}
+
+.wl-confirm-no {
+  padding: 3px 12px;
+  border-radius: var(--radius-full);
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--text-secondary);
+  font-weight: 800;
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+  border: none;
+}
+
+/* Legend */
+.wl-legend {
+  margin-top: 28px;
+  background: var(--bg-card);
+  border-radius: var(--radius-lg);
+  padding: 18px;
+  box-shadow: var(--shadow-xs);
+  border: 1.5px solid rgba(255, 202, 58, 0.15);
+}
+
+.wl-legend-title {
+  font-weight: 900;
+  font-size: var(--font-size-base);
+  color: var(--text-primary);
+  margin-bottom: 12px;
+}
+
+.wl-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.wl-legend-item:last-child {
+  margin-bottom: 0;
+}
+
+.wl-legend-section {
+  font-size: var(--font-size-xs);
+  font-weight: 900;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+
+/* Warning Banner */
+.wl-warn-banner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: linear-gradient(135deg, #FEF2F2, #FFF1F2);
+  border: 2px solid #FCA5A5;
+  border-radius: var(--radius-lg);
+  padding: 16px 20px;
+  margin-bottom: 20px;
+}
+
+.wl-warn-title {
+  font-weight: 900;
+  font-size: var(--font-size-base);
+  color: #DC2626;
+}
+
+/* Warning Card Styles */
+.wl-card-warn-remove {
+  border-color: #FCA5A5 !important;
+  background: linear-gradient(135deg, #FFFBFB, #FFF5F5);
+}
+
+.wl-card-warn-caution {
+  border-color: #FCD34D !important;
+}
+
+.wl-card-warn-info {
+  border-color: rgba(99, 102, 241, 0.25) !important;
+}
+
+/* Warning Stripe */
+.wl-stripe-remove {
+  background: #DC2626;
+}
+
+/* Warning Box */
+.wl-warning-box {
+  margin-top: 10px;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+}
+
+.wl-warning-remove {
+  background: #FEF2F2;
+  border: 1px solid #FECACA;
+}
+
+.wl-warning-caution {
+  background: #FFFBEB;
+  border: 1px solid #FDE68A;
+}
+
+.wl-warning-info {
+  background: #EEF2FF;
+  border: 1px solid #C7D2FE;
+}
+
+.wl-warning-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.wl-warning-icon {
+  font-size: 18px;
+}
+
+.wl-warning-title {
+  font-weight: 900;
+  color: var(--text-primary);
+}
+
+.wl-warning-message {
+  color: var(--text-secondary);
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.wl-warning-remove-btn {
+  margin-top: 8px;
+  padding: 5px 16px;
+  border-radius: var(--radius-full);
+  background: #DC2626;
+  color: white;
+  font-weight: 800;
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+  border: none;
+  transition: var(--transition-fast);
+}
+
+.wl-warning-remove-btn:hover {
+  background: #B91C1C;
+  transform: scale(1.03);
+}
+
+/* Warning Badge in Legend */
+.wl-warn-badge-remove {
+  background: #FEF2F2;
+  color: #DC2626;
+  border: 1px solid #FECACA;
+}
+
+.wl-warn-badge-caution {
+  background: #FFFBEB;
+  color: #92400E;
+  border: 1px solid #FDE68A;
+}
+
+.wl-warn-badge-info {
+  background: #EEF2FF;
+  color: #4338CA;
+  border: 1px solid #C7D2FE;
+}

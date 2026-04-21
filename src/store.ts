@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { supabase } from './supabase';
 import type { Session } from '@supabase/supabase-js';
-import type { UserAccount, Trade, Holding, WithdrawalRequest, FeatureOverride, SystemSettings, LessonResult, RewardRule, RewardTriggerType, WalletTransaction, RewardShopItem, RedemptionRequest } from './types';
+import type { UserAccount, Trade, Holding, WithdrawalRequest, FeatureOverride, SystemSettings, LessonResult, RewardRule, RewardTriggerType, WalletTransaction, RewardShopItem, RedemptionRequest, WatchlistItem, WatchlistSignal, WatchlistWarning } from './types';
 import { fetchStockData, fetchOfficialClosePrice } from './api';
 
 // ─── 股價刷新快取控制 ─────────────────────────────────────────────────────────
@@ -194,6 +194,17 @@ interface InvestmentStore {
   // Trade Note
   updateTradeNote: (tradeId: string, note: string) => Promise<{ error: string | null }>;
 
+  // Watchlist
+  watchlist: WatchlistItem[];
+  watchlistSignals: WatchlistSignal[];
+  watchlistWarnings: WatchlistWarning[];
+  watchlistSignalsLoading: boolean;
+  fetchWatchlist: () => Promise<void>;
+  addToWatchlist: (stockCode: string, stockName: string, currentPrice: number, note?: string) => Promise<{ error: string | null }>;
+  removeFromWatchlist: (stockCode: string) => Promise<{ error: string | null }>;
+  isInWatchlist: (stockCode: string) => boolean;
+  checkWatchlistSignals: () => Promise<void>;
+
   // Getters
   getPortfolioSummary: () => PortfolioSummary;
 }
@@ -324,6 +335,12 @@ export const useStore = create<InvestmentStore>((set, get) => ({
   rewardRules: [],
   shopItems: [],
   redemptions: [],
+
+  // ─── Watchlist ──────────────────────────────
+  watchlist: [],
+  watchlistSignals: [],
+  watchlistWarnings: [],
+  watchlistSignalsLoading: false,
 
   fetchLearningProfile: async () => {
     if (!supabase) return;
@@ -1001,7 +1018,7 @@ export const useStore = create<InvestmentStore>((set, get) => ({
 
   logout: async () => {
     // 先立即清除本地狀態（UI 立即回應），signOut 網路請求在背景執行不阻塞
-    set({ user: null, session: null, children: [], holdings: [], trades: [], withdrawalRequests: [], featureOverrides: [], allUsers: [], learningProfile: null, learningWallet: null, learningWalletTxs: [], childrenTxLog: [], completedLessonIds: [], rewardRules: [], shopItems: [], redemptions: [] });
+    set({ user: null, session: null, children: [], holdings: [], trades: [], withdrawalRequests: [], featureOverrides: [], allUsers: [], learningProfile: null, learningWallet: null, learningWalletTxs: [], childrenTxLog: [], completedLessonIds: [], rewardRules: [], shopItems: [], redemptions: [], watchlist: [], watchlistSignals: [], watchlistWarnings: [] });
     if (supabase) supabase.auth.signOut().catch(() => {}); // 背景執行，失敗不影響 UI
     if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; }
   },
@@ -1060,7 +1077,8 @@ export const useStore = create<InvestmentStore>((set, get) => ({
           });
           set({ systemSettings: newSettings });
         }
-      })()
+      })(),
+      get().fetchWatchlist(),
     ]);
 
     set({ loading: false });
@@ -1721,6 +1739,222 @@ export const useStore = create<InvestmentStore>((set, get) => ({
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
     return trades.filter(t => t.timestamp >= todayStart.getTime()).length;
+  },
+
+  // ─── Watchlist ──────────────────────────────
+  fetchWatchlist: async () => {
+    if (!supabase) return;
+    const { user } = get();
+    if (!user) return;
+    const { data } = await supabase
+      .from('watchlist')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
+    const watchlist: WatchlistItem[] = (data || []).map(r => ({
+      id: r.id as string,
+      stockCode: r.stock_code as string,
+      stockName: r.stock_name as string,
+      addedPrice: Number(r.added_price) || 0,
+      note: (r.note as string) || undefined,
+      createdAt: r.created_at as string,
+    }));
+    set({ watchlist });
+  },
+
+  addToWatchlist: async (stockCode, stockName, currentPrice, note) => {
+    if (!supabase) return { error: '資料庫未連線' };
+    const { user } = get();
+    if (!user) return { error: '尚未登入' };
+    const { error } = await supabase.from('watchlist').insert([{
+      user_id: user.id,
+      stock_code: stockCode,
+      stock_name: stockName,
+      added_price: currentPrice,
+      note: note || null,
+    }]);
+    if (error) {
+      if (error.message.includes('duplicate') || error.message.includes('unique')) {
+        return { error: '這檔股票已在觀察名單中' };
+      }
+      return { error: error.message };
+    }
+    await get().fetchWatchlist();
+    return { error: null };
+  },
+
+  removeFromWatchlist: async (stockCode) => {
+    if (!supabase) return { error: '資料庫未連線' };
+    const { user } = get();
+    if (!user) return { error: '尚未登入' };
+    const { error } = await supabase
+      .from('watchlist')
+      .delete()
+      .eq('user_id', user.id)
+      .eq('stock_code', stockCode);
+    if (error) return { error: error.message };
+    set(s => ({ watchlist: s.watchlist.filter(w => w.stockCode !== stockCode) }));
+    return { error: null };
+  },
+
+  isInWatchlist: (stockCode) => {
+    return get().watchlist.some(w => w.stockCode === stockCode);
+  },
+
+  checkWatchlistSignals: async () => {
+    const { watchlist } = get();
+    if (watchlist.length === 0) {
+      set({ watchlistSignals: [], watchlistSignalsLoading: false });
+      return;
+    }
+    set({ watchlistSignalsLoading: true });
+
+    const signals: WatchlistSignal[] = [];
+
+    // 平行抓取所有觀察股票的 K 線資料
+    const stockDatas = await Promise.all(
+      watchlist.map(w => fetchStockData(w.stockCode).catch(() => null))
+    );
+
+    for (let i = 0; i < watchlist.length; i++) {
+      const w = watchlist[i];
+      const stockRes = stockDatas[i];
+      if (!stockRes || !stockRes.prices || stockRes.prices.length < 6) continue;
+
+      const prices = stockRes.prices;
+      const closes = prices.map(p => parseFloat(p.close_d)).filter(c => !isNaN(c) && c > 0);
+      const volumes = prices.map(p => p.volume).filter(v => v > 0);
+      if (closes.length < 6 || volumes.length < 6) continue;
+
+      // 計算 MA5（最近 5 日收盤價平均）
+      const recent5 = closes.slice(-5);
+      const ma5 = recent5.reduce((s, c) => s + c, 0) / 5;
+      const currentPrice = closes[closes.length - 1];
+      const prevClose = closes[closes.length - 2];
+
+      // === 訊號 1：MA5 支撐確認 ===
+      // 前一日收盤接近或跌破 MA5，今日站回上方
+      const prevMa5Closes = closes.slice(-6, -1);
+      const prevMa5 = prevMa5Closes.reduce((s, c) => s + c, 0) / 5;
+      const prevNearMa5 = prevClose <= prevMa5 * 1.01; // 前日接近或低於 MA5
+      const nowAboveMa5 = currentPrice > ma5;           // 今日站回上方
+      const ma5Support = prevNearMa5 && nowAboveMa5;
+
+      // === 訊號 2：縮量回檔 ===
+      // 最近 3 日平均量 < 前 5 日平均量的 70%，且最近 3 日跌幅 < 3%
+      const recent3Vol = volumes.slice(-3);
+      const prev5Vol = volumes.slice(-8, -3);
+      const avgRecent3Vol = recent3Vol.reduce((s, v) => s + v, 0) / recent3Vol.length;
+      const avgPrev5Vol = prev5Vol.length > 0
+        ? prev5Vol.reduce((s, v) => s + v, 0) / prev5Vol.length
+        : avgRecent3Vol;
+      const volChangeRatio = avgPrev5Vol > 0 ? ((avgRecent3Vol - avgPrev5Vol) / avgPrev5Vol) * 100 : 0;
+      const volShrink = volChangeRatio < -30; // 量縮超過 30%
+
+      const recent3Close = closes.slice(-3);
+      const close3DaysAgo = closes[closes.length - 4] || closes[closes.length - 3];
+      const recentDropPct = close3DaysAgo > 0
+        ? ((currentPrice - close3DaysAgo) / close3DaysAgo) * 100
+        : 0;
+      const smallDrop = recentDropPct > -3; // 跌幅 < 3%（跌少）
+      const volumeShrinkSignal = volShrink && smallDrop;
+
+      // 組合訊號
+      if (ma5Support && volumeShrinkSignal) {
+        signals.push({
+          stockCode: w.stockCode,
+          signalType: 'both',
+          currentPrice,
+          ma5: Math.round(ma5 * 100) / 100,
+          volumeChange: Math.round(volChangeRatio * 10) / 10,
+          message: `🔥 雙重確認！股價回測 MA5（${ma5.toFixed(1)}）後站穩，且成交量縮${Math.abs(volChangeRatio).toFixed(0)}%，是理想的進場時機！`,
+        });
+      } else if (ma5Support) {
+        signals.push({
+          stockCode: w.stockCode,
+          signalType: 'ma5_support',
+          currentPrice,
+          ma5: Math.round(ma5 * 100) / 100,
+          volumeChange: Math.round(volChangeRatio * 10) / 10,
+          message: `🟢 MA5 支撐確認！股價回測 MA5（${ma5.toFixed(1)}）後站穩，可考慮分批進場。`,
+        });
+      } else if (volumeShrinkSignal) {
+        signals.push({
+          stockCode: w.stockCode,
+          signalType: 'volume_shrink',
+          currentPrice,
+          ma5: Math.round(ma5 * 100) / 100,
+          volumeChange: Math.round(volChangeRatio * 10) / 10,
+          message: `🔵 縮量回檔中！成交量縮${Math.abs(volChangeRatio).toFixed(0)}%且跌幅小，等待支撐確認後可進場。`,
+        });
+      }
+    }
+
+    // === 警告標記：建議移除 / 注意 / 提醒 ===
+    const warnings: WatchlistWarning[] = [];
+    const { holdings } = get();
+    const now = Date.now();
+
+    for (const w of watchlist) {
+      const quote = stockDatas[watchlist.indexOf(w)];
+      const currentPrice = quote?.prices?.length
+        ? parseFloat(quote.prices[quote.prices.length - 1].close_d)
+        : 0;
+      const addedAt = new Date(w.createdAt).getTime();
+      const daysSinceAdded = (now - addedAt) / (1000 * 60 * 60 * 24);
+
+      // 🔴 已買入持有中 → 建議移除
+      if (holdings.some(h => h.stockCode === w.stockCode)) {
+        warnings.push({
+          stockCode: w.stockCode,
+          level: 'remove',
+          icon: '✅',
+          title: '已買入持有中',
+          message: `你已經持有這檔股票，可以從觀察名單移除。`,
+        });
+        continue;
+      }
+
+      // 🔴 從加入價跌超過 -15%
+      if (w.addedPrice > 0 && currentPrice > 0) {
+        const dropPct = ((currentPrice - w.addedPrice) / w.addedPrice) * 100;
+        if (dropPct < -15) {
+          warnings.push({
+            stockCode: w.stockCode,
+            level: 'remove',
+            icon: '🚨',
+            title: `已跌 ${Math.abs(dropPct).toFixed(1)}%`,
+            message: `從加入價 ${w.addedPrice.toFixed(1)} 跌至 ${currentPrice.toFixed(1)}，趋勢已破壞，建議移除。`,
+          });
+          continue;
+        }
+      }
+
+      // 🟡 觀察超過 30 天
+      if (daysSinceAdded > 30) {
+        warnings.push({
+          stockCode: w.stockCode,
+          level: 'caution',
+          icon: '⏰',
+          title: `已觀察 ${Math.floor(daysSinceAdded)} 天`,
+          message: `觀察超過 30 天未進場，機會可能已過，考慮移除或重新評估。`,
+        });
+        continue;
+      }
+
+      // 🟡 觀察超過 14 天
+      if (daysSinceAdded > 14) {
+        warnings.push({
+          stockCode: w.stockCode,
+          level: 'info',
+          icon: '💡',
+          title: `已觀察 ${Math.floor(daysSinceAdded)} 天`,
+          message: `已觀察超過 2 週，是否該做決定？`,
+        });
+      }
+    }
+
+    set({ watchlistSignals: signals, watchlistWarnings: warnings, watchlistSignalsLoading: false });
   },
 
   getPortfolioSummary: () => {

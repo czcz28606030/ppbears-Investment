@@ -48,7 +48,7 @@ export default function StockDetail() {
     };
   }, [activeTooltip]);
   
-  const { user, holdings, executeBuy, executeSell, getPortfolioSummary, hasFeature } = useStore();
+  const { user, holdings, executeBuy, executeSell, getPortfolioSummary, hasFeature, isInWatchlist, addToWatchlist, removeFromWatchlist } = useStore();
   const holding = holdings.find(h => h.stockCode === code);
   const summary = getPortfolioSummary();
 
@@ -551,7 +551,7 @@ export default function StockDetail() {
         <div className="price-date">
           收盤價 · {priceDate}
         </div>
-        <div style={{ marginTop: 16 }}>
+        <div style={{ marginTop: 16, display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
           <button 
             className="btn" 
             style={{ 
@@ -562,6 +562,27 @@ export default function StockDetail() {
             onClick={() => window.open(`https://tw.stock.yahoo.com/quote/${code}.TW/technical-analysis`, '_blank')}
           >
             📈 查看 Yahoo 最新技術線圖
+          </button>
+          <button
+            className="btn"
+            style={{
+              background: isInWatchlist(code!) ? 'rgba(255, 202, 58, 0.15)' : 'transparent',
+              border: `1px solid ${isInWatchlist(code!) ? '#FFCA3A' : '#888'}`,
+              color: isInWatchlist(code!) ? '#D97706' : '#888',
+              padding: '6px 16px', borderRadius: '20px', fontSize: '14px', fontWeight: 800,
+              display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer'
+            }}
+            onClick={async () => {
+              if (!code) return;
+              if (isInWatchlist(code)) {
+                await removeFromWatchlist(code);
+              } else {
+                const name = stockData?.stkname || twseQuote?.Name || tpexQuote?.CompanyName || code;
+                await addToWatchlist(code, name, price);
+              }
+            }}
+          >
+            {isInWatchlist(code!) ? '👁️‍🗨️ 已觀察' : '👁️ 加入觀察'}
           </button>
         </div>
       </div>

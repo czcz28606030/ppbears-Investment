@@ -1,4 +1,18 @@
 ﻿
+## [v1.10.0] - 2026-04-21
+### Added
+- **觀察名單（Watchlist）**：新增底部導覽「觀察」頁面，讓使用者追蹤感興趣的股票
+  - 新增 `watchlist` Supabase 資料表（見 `supabase-watchlist.sql`），支援 RLS 隔離
+  - 個股頁右下角可一鍵加入/移除觀察名單
+  - 觀察頁顯示即時報價、技術訊號（加碼/出場/中立）與進場提醒
+  - store 新增 `watchlist`、`watchlistSignals`、`watchlistWarnings` 狀態與對應 action
+
+### Fixed
+- **AI 聰明選股數據混淆修正**：修正三項連環 bug，確保所有卡片都顯示 Simons 量化評分
+  - `loadData()` 一開始清空舊 `quantDataMap`，防止重整後新分數配上舊 badge
+  - quant `useEffect` dependency 從 `recommendations.length` 改為 `simonsMeta`，重整後一定重新執行
+  - `quantLoading` 期間隱藏卡片、改顯示 spinner，Phase-1 `calculateAdvice` 分數不再出現
+
 ## [v1.9.0] - 2026-04-21
 ### Changed
 - **交易效能大幅優化**：買入、賣出從 8+ 次序列 DB 往返壓縮為 **1 次 RPC 呼叫**，一般情況下從 1–3 秒縮短至 < 500 ms，並根治「資料庫操作逾時」錯誤
