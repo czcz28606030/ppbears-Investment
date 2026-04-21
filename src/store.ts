@@ -1851,7 +1851,6 @@ export const useStore = create<InvestmentStore>((set, get) => ({
       const volChangeRatio = avgPrev5Vol > 0 ? ((avgRecent3Vol - avgPrev5Vol) / avgPrev5Vol) * 100 : 0;
       const volShrink = volChangeRatio < -30; // 量縮超過 30%
 
-      const recent3Close = closes.slice(-3);
       const close3DaysAgo = closes[closes.length - 4] || closes[closes.length - 3];
       const recentDropPct = close3DaysAgo > 0
         ? ((currentPrice - close3DaysAgo) / close3DaysAgo) * 100

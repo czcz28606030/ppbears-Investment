@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useStore, formatPrice, formatMoney } from '../store';
+import { useStore, formatPrice } from '../store';
 import { fetchStockData } from '../api';
 import type { WatchlistSignal, WatchlistWarning } from '../types';
 import './Watchlist.css';
@@ -13,7 +13,7 @@ export default function Watchlist() {
   } = useStore();
 
   const [liveQuotes, setLiveQuotes] = useState<Record<string, { close: number; change: number }>>({});
-  const [quotesLoading, setQuotesLoading] = useState(false);
+  const [_quotesLoading, setQuotesLoading] = useState(false);
   const [removeConfirm, setRemoveConfirm] = useState<string | null>(null);
 
   // 進入頁面時抓取即時報價 + 訊號分析
