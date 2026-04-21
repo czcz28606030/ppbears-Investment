@@ -1,0 +1,72 @@
+{
+  "lesson_id": "L053",
+  "stage": 3,
+  "level": 3,
+  "domain": "quant",
+  "title": "強度指標：籌碼的推力夠嗎？",
+  "summary": "認識 Simons 強度指標（Strength），了解籌碼推力如何影響股票走勢，以及如何判斷力道強弱。",
+  "cards": [
+    {
+      "type": "text_image",
+      "title": "什麼是「強度指標」？",
+      "body": "強度指標（Strength）是 Simons 量化模型中的「籌碼推力」數字 💪\n\n想像一下：一艘船要前進，需要引擎的推力。\n\n• 引擎很強 → 船跑得快 🚤\n• 引擎很弱 → 慢吞吞或停下來\n\n股票的強度指標也是：\n數字越高 = 背後推動這支股票的籌碼力量越強\n→ 代表有資金（大戶、法人）在積極推動這支股票",
+      "image_key": "lesson_053_card_01"
+    },
+    {
+      "type": "text_image",
+      "title": "強度指標的等級怎麼看？",
+      "body": "PPBears 把強度指標分成三個等級：\n\n💪 籌碼有力（Strength ≥ 3.0）\n→ 推力很強，有資金在積極布局\n→ 通常對股價有正面支撐\n\n🔥 正在轉強（1.0 ≤ Strength < 3.0）\n→ 力道在增強中，值得追蹤\n→ 可能是起漲前的蓄力期\n\n💤 力道偏淡（Strength < 1.0）\n→ 推力不足，籌碼沒有明顯動作\n→ 短期動能弱，等待觀望較好",
+      "image_key": "lesson_053_card_02"
+    },
+    {
+      "type": "text_image",
+      "title": "「籌碼」是什麼？",
+      "body": "說到強度指標，要先知道「籌碼」是什麼 🧩\n\n籌碼 = 股票的持有分布\n\n• 散戶（我們一般人）持有 → 容易因為緊張而賣掉\n• 大戶、法人持有 → 通常比較有耐心，不會亂動\n\n所以，籌碼穩定 = 大戶持有比例高 = 不容易被隨便甩掉\n\n強度指標反映的就是「有力量的人在推這支股票嗎？」\n如果是，代表背後有支撐，股票比較不容易無緣無故下跌。",
+      "image_key": "lesson_053_card_03"
+    },
+    {
+      "type": "text_image",
+      "title": "強度 vs PSR：兩個一起看",
+      "body": "強度指標和 PSR 熱度值，是最好的搭配組合 🤝\n\n✅ PSR 高 + 強度高\n→ 市場很熱 + 籌碼有力 = 強力雙確認！最理想\n\n⚠️ PSR 高 + 強度低\n→ 市場看起來熱，但沒有大資金推 = 可能是散戶追價，要小心\n\n🔍 PSR 低 + 強度高\n→ 市場還沒注意到，但有大戶悄悄在買 = 可能是潛力股\n\n💤 PSR 低 + 強度低\n→ 大家都沒在動 = 現在不是好時機",
+      "image_key": "lesson_053_card_04"
+    }
+  ],
+  "preset_questions": [
+    {
+      "question_type": "choice",
+      "question_text": "強度指標（Strength）越高，代表什麼？",
+      "options": [
+        "公司的工廠規模越大",
+        "背後推動股票的籌碼力量越強",
+        "股票的價格越貴",
+        "公司的員工人數越多"
+      ],
+      "correct_answer": 1,
+      "explanation": "答對！💪 強度指標反映的是籌碼推力，數字越高代表有越強大的資金力量在推動這支股票。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "強度指標低（力道偏淡），代表現在是買進的最好時機。",
+      "correct_answer": false,
+      "explanation": "不對！💤 強度低代表籌碼推力不足，動能弱，通常需要等待其他指標轉強後再考慮進場。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "如果一支股票的 PSR 很高，但強度指標很低，這代表什麼？",
+      "options": [
+        "強力雙確認，最佳買進時機",
+        "市場熱度高，但沒大資金推，可能是散戶追價，要小心",
+        "大戶在悄悄買進，是潛力股",
+        "這支股票完全沒人關注"
+      ],
+      "correct_answer": 1,
+      "explanation": "對！⚠️ PSR 高但強度低，代表市場熱鬧但缺乏大資金支撐，可能是散戶情緒性追價，要特別小心追高的風險。"
+    }
+  ],
+  "ai_prompt_context": {
+    "topic": "Simons 強度指標的定義、等級劃分、籌碼概念、與PSR搭配使用",
+    "age_hint": "9-12歲",
+    "vocabulary_level": "intermediate",
+    "metaphor_suggestions": ["船的引擎推力比喻", "籌碼=誰持有股票", "PSR+強度組合判讀"]
+  }
+}

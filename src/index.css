@@ -450,6 +450,13 @@ ul, ol { list-style: none; }
   color: var(--text-secondary);
 }
 
+.badge-premium {
+  background: linear-gradient(135deg, #FFD700, #FFA000);
+  color: #5D4037;
+  font-weight: 900;
+  box-shadow: 0 2px 8px rgba(255, 160, 0, 0.35);
+}
+
 /* ============================================
    Stock Card
    ============================================ */
@@ -528,6 +535,8 @@ ul, ol { list-style: none; }
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
   margin-bottom: var(--space-md);
 }
 

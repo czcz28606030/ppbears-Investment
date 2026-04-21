@@ -1,0 +1,72 @@
+{
+  "lesson_id": "L052",
+  "stage": 3,
+  "level": 2,
+  "domain": "quant",
+  "title": "熱度值（PSR）：市場有多熱？",
+  "summary": "學習 PSR 熱度值的意義，了解如何用它判斷一檔股票的市場關注度與資金熱度。",
+  "cards": [
+    {
+      "type": "text_image",
+      "title": "什麼是 PSR？",
+      "body": "PSR 是 Simons 量化模型裡的「熱度值」指標 🔥\n\n你可以把它想成：一家夜市攤位前面排了多少人。\n\n• 排很多人 → 大家都想買 → 人氣很旺 → 熱度高\n• 沒什麼人 → 大家不感興趣 → 冷場 → 熱度低\n\n股票的 PSR 也是一樣：\n數字越高 = 市場越多人關注 + 資金越積極流入",
+      "image_key": "lesson_052_card_01"
+    },
+    {
+      "type": "text_image",
+      "title": "如何看 PSR 的等級？",
+      "body": "PPBears 把 PSR 分成四個等級：\n\n🔥 市場火熱（PSR ≥ 3.0）\n→ 非常多人在看，資金積極追進\n→ 短期動能強，但追高要小心\n\n✨ 資金有看（1.5 ≤ PSR < 3.0）\n→ 有一定關注，資金開始關注\n→ 可以持續觀察\n\n😐 關注一般（0.5 ≤ PSR < 1.5）\n→ 市場普通，沒特別熱\n→ 需要其他指標輔助判斷\n\n💤 相對冷門（PSR < 0.5）\n→ 市場幾乎沒人在關注\n→ 短期動能弱",
+      "image_key": "lesson_052_card_02"
+    },
+    {
+      "type": "text_image",
+      "title": "PSR 高就一定要買嗎？",
+      "body": "PSR 很高，代表市場很熱門。但是——\n\n熱門 ≠ 一定賺錢 🤔\n\n想想看：夜市最熱的攤位，是不是排隊最久、搶到的時候大家都快吃完了？\n\nPSR 高的風險：\n⚠️ 可能已經漲了很多\n⚠️ 如果大家都買了，之後賣的人也多\n\nPSR 的最佳使用方式：\n✅ 搭配籌碼穩定度、氣動指數一起看\n✅ PSR 高 + 籌碼穩 = 比較安全的熱門股\n✅ PSR 高 + 籌碼不穩 = 小心可能假熱鬧",
+      "image_key": "lesson_052_card_03"
+    },
+    {
+      "type": "text_image",
+      "title": "PSR 在 PPBears 的哪裡看？",
+      "body": "在 PPBears 的個股頁面裡，滑到「Simons 量化模型」區塊，就可以看到 PSR 熱度值 🐻📊\n\n畫面上會顯示：\n• 具體的 PSR 數值\n• 對應的等級標籤（市場火熱 / 資金有看 / 關注一般 / 相對冷門）\n• 一段說明文字幫你解讀這個數字的意思\n\n試著去查你喜歡的股票，看看它的熱度是多少！🔍",
+      "image_key": "lesson_052_card_04"
+    }
+  ],
+  "preset_questions": [
+    {
+      "question_type": "choice",
+      "question_text": "PSR 熱度值越高，代表什麼？",
+      "options": [
+        "公司賺的錢越多",
+        "股票價格越便宜",
+        "市場關注度越高、資金越積極",
+        "公司的產品賣得越貴"
+      ],
+      "correct_answer": 2,
+      "explanation": "答對！🔥 PSR 熱度值越高，代表市場越多人在關注這支股票，資金流入也越積極。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "PSR 很高的股票，就一定是好的買點，應該馬上買。",
+      "correct_answer": false,
+      "explanation": "不對喔！🤔 PSR 高代表市場熱門，但可能已經漲了一段。最好搭配其他指標（像籌碼穩定度）一起判斷，才更安全。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "一檔股票的 PSR 是 0.3，代表它是什麼狀況？",
+      "options": [
+        "市場火熱，大家瘋狂搶購",
+        "資金有在關注，可以觀察",
+        "相對冷門，市場幾乎沒人在看",
+        "籌碼非常穩定"
+      ],
+      "correct_answer": 2,
+      "explanation": "對！💤 PSR 小於 0.5 屬於「相對冷門」，代表市場關注度很低，動能較弱，需要其他指標輔助判斷。"
+    }
+  ],
+  "ai_prompt_context": {
+    "topic": "PSR 熱度值的定義、等級劃分、使用限制與正確搭配方法",
+    "age_hint": "9-12歲",
+    "vocabulary_level": "intermediate",
+    "metaphor_suggestions": ["夜市排隊比喻", "熱門≠一定賺", "PSR搭配其他指標"]
+  }
+}

@@ -4,215 +4,273 @@
   gap: var(--space-lg);
 }
 
-/* ── Simons 量化模型 ────────────────────────────────────── */
-.simons-score-card {
-  display: flex;
-  align-items: flex-start;
-  gap: 16px;
-  padding: 16px;
-  background: linear-gradient(135deg, #fdf4ff 0%, #f0f9ff 100%);
-  border: 1.5px solid rgba(123, 44, 191, 0.15);
-  border-radius: 16px;
-  margin-bottom: 12px;
+/* ── Simons 量化模型：統一卡片系統 ─────────────────────── */
+
+.sm-meta-date {
+  font-size: 12px;
+  color: var(--text-light);
+  font-weight: 700;
 }
 
-.simons-score-left {
+/* 統一卡片容器 */
+.sm-card {
+  background: var(--bg-card);
+  border: 1.5px solid var(--border-color);
+  border-radius: 18px;
+  padding: 18px;
+  margin-bottom: 12px;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  flex-shrink: 0;
-  min-width: 80px;
+  gap: 14px;
 }
 
-.simons-score-label {
-  font-size: 11px;
-  font-weight: 700;
+.sm-card-hero {
+  background: linear-gradient(135deg, #fdf4ff 0%, #f0f9ff 100%);
+  border-color: rgba(123, 44, 191, 0.18);
+}
+
+.sm-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.sm-card-metric {
+  height: 100%;
+}
+
+/* 卡片頭部：標題 + 徽章 */
+.sm-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.sm-card-title {
+  font-size: 16px;
+  font-weight: 900;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.sm-card-sub {
+  font-size: 12px;
+  font-weight: 600;
   color: var(--text-light);
-  margin-bottom: 4px;
+  margin-top: 3px;
 }
 
-.simons-score-value {
-  font-size: 48px;
+/* 徽章樣式 */
+.sm-badge {
+  font-size: 14px;
+  font-weight: 800;
+  padding: 7px 14px;
+  border-radius: 999px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.sm-badge-good {
+  background: rgba(22, 163, 74, 0.12);
+  color: #16a34a;
+  border: 1.5px solid rgba(22, 163, 74, 0.3);
+}
+
+.sm-badge-warn {
+  background: rgba(234, 179, 8, 0.14);
+  color: #ca8a04;
+  border: 1.5px solid rgba(234, 179, 8, 0.3);
+}
+
+.sm-badge-bad {
+  background: rgba(239, 68, 68, 0.12);
+  color: #dc2626;
+  border: 1.5px solid rgba(239, 68, 68, 0.3);
+}
+
+.sm-badge-mute {
+  background: rgba(100, 116, 139, 0.1);
+  color: #64748b;
+  border: 1.5px solid rgba(100, 116, 139, 0.2);
+}
+
+/* 大數字顯示區 */
+.sm-big-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 4px 0;
+}
+
+.sm-big-value {
+  font-size: 56px;
   font-weight: 900;
   line-height: 1;
+  color: var(--text-primary);
+  letter-spacing: -1.5px;
+}
+
+.sm-big-value.sm-big-purple {
   color: #7B2CBF;
 }
 
-.simons-score-sub {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--text-light);
-  margin-top: 4px;
-  text-align: center;
-}
-
-.simons-score-right {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.simons-trend-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.simons-trend-label {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--text-secondary);
-  min-width: 40px;
-}
-
-.simons-trend-badge {
-  font-size: 12px;
-  font-weight: 800;
-  padding: 3px 10px;
-  border-radius: 20px;
-}
-
-.simons-trend-up {
-  background: rgba(220, 38, 38, 0.1);
-  color: #dc2626;
-  border: 1px solid rgba(220, 38, 38, 0.2);
-}
-
-.simons-trend-down {
-  background: rgba(22, 163, 74, 0.1);
-  color: #16a34a;
-  border: 1px solid rgba(22, 163, 74, 0.2);
-}
-
-.simons-trend-flat {
-  background: rgba(100, 116, 139, 0.1);
-  color: #64748b;
-  border: 1px solid rgba(100, 116, 139, 0.2);
-}
-
-.simons-unusual {
-  font-size: 12px;
-  font-weight: 700;
-  color: #ea580c;
-  background: rgba(234, 88, 12, 0.08);
-  padding: 4px 10px;
-  border-radius: 8px;
-  border: 1px solid rgba(234, 88, 12, 0.15);
-}
-
-.simons-section-title {
-  font-size: 13px;
-  font-weight: 800;
-  color: var(--text-secondary);
-  margin: 12px 0 8px;
-}
-
-.simons-row-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  margin-bottom: 4px;
-}
-
-.simons-metric-card {
-  padding: 14px;
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.simons-metric-label {
-  font-size: 11px;
+.sm-big-unit {
+  font-size: 15px;
   font-weight: 700;
   color: var(--text-light);
 }
 
-.simons-metric-value {
-  font-size: 24px;
-  font-weight: 900;
-  line-height: 1;
-}
-
-.simons-gvi-card {
-  padding: 16px;
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: 16px;
-}
-
-.simons-gvi-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 12px;
-}
-
-.simons-gvi-value {
-  font-size: 36px;
-  font-weight: 900;
-  color: var(--text-primary);
-  line-height: 1;
-}
-
-.simons-gvi-badge {
-  font-size: 14px;
-  font-weight: 800;
-  padding: 6px 14px;
-  border-radius: 20px;
-}
-
-.simons-gvi-high {
-  background: rgba(22, 163, 74, 0.12);
-  color: #16a34a;
-  border: 1.5px solid rgba(22, 163, 74, 0.25);
-}
-
-.simons-gvi-mid {
-  background: rgba(234, 179, 8, 0.12);
-  color: #ca8a04;
-  border: 1.5px solid rgba(234, 179, 8, 0.25);
-}
-
-.simons-gvi-low {
-  background: rgba(239, 68, 68, 0.1);
-  color: #dc2626;
-  border: 1.5px solid rgba(239, 68, 68, 0.2);
-}
-
-.simons-gvi-bar-wrap {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.simons-gvi-bar-track {
-  height: 10px;
+/* 進度條 */
+.sm-bar-track {
+  height: 12px;
   background: rgba(0, 0, 0, 0.06);
   border-radius: 999px;
   overflow: hidden;
 }
 
-.simons-gvi-bar-fill {
+.sm-bar-fill {
   height: 100%;
   border-radius: 999px;
   transition: width 0.6s ease;
 }
 
-.simons-gvi-bar-high { background: linear-gradient(to right, #16a34a, #4ade80); }
-.simons-gvi-bar-mid  { background: linear-gradient(to right, #ca8a04, #fbbf24); }
-.simons-gvi-bar-low  { background: linear-gradient(to right, #dc2626, #f87171); }
+.sm-bar-good { background: linear-gradient(to right, #16a34a, #4ade80); }
+.sm-bar-warn { background: linear-gradient(to right, #ca8a04, #fbbf24); }
+.sm-bar-bad  { background: linear-gradient(to right, #dc2626, #f87171); }
+.sm-bar-mute { background: linear-gradient(to right, #94a3b8, #cbd5e1); }
 
-.simons-gvi-labels {
+.sm-bar-labels {
   display: flex;
   justify-content: space-between;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   color: var(--text-light);
+  margin-top: -4px;
 }
+
+/* 判斷指引提示框（統一風格） */
+.sm-tip {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.6;
+  color: var(--text-secondary);
+  background: rgba(123, 44, 191, 0.06);
+  border-left: 4px solid rgba(123, 44, 191, 0.5);
+  padding: 10px 12px;
+  border-radius: 10px;
+}
+
+.sm-tip-warn {
+  color: #c2410c;
+  background: rgba(234, 88, 12, 0.08);
+  border-left-color: rgba(234, 88, 12, 0.6);
+}
+
+/* 趨勢格（週/月） */
+.sm-trend-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.sm-trend-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 8px;
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.sm-trend-cell-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.sm-trend-pill {
+  font-size: 14px;
+  font-weight: 800;
+  padding: 6px 14px;
+  border-radius: 999px;
+}
+
+.sm-trend-up {
+  background: rgba(220, 38, 38, 0.12);
+  color: #dc2626;
+  border: 1.5px solid rgba(220, 38, 38, 0.25);
+}
+
+.sm-trend-down {
+  background: rgba(22, 163, 74, 0.12);
+  color: #16a34a;
+  border: 1.5px solid rgba(22, 163, 74, 0.25);
+}
+
+.sm-trend-flat {
+  background: rgba(100, 116, 139, 0.12);
+  color: #64748b;
+  border: 1.5px solid rgba(100, 116, 139, 0.2);
+}
+
+/* 對比區（個股 vs 板塊） */
+.sm-compare-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(0, 0, 0, 0.025);
+  border-radius: 14px;
+  padding: 14px 12px;
+}
+
+.sm-compare-cell {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.sm-compare-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-light);
+  text-align: center;
+}
+
+.sm-compare-value {
+  font-size: 32px;
+  font-weight: 900;
+  color: var(--text-primary);
+  line-height: 1;
+  letter-spacing: -1px;
+}
+
+.sm-compare-value.muted {
+  color: var(--text-secondary);
+}
+
+.sm-compare-vs {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--text-light);
+  padding: 0 4px;
+}
+
+.sm-compare-diff {
+  font-size: 16px;
+  font-weight: 800;
+  text-align: center;
+  padding: 6px 0;
+}
+
+.sm-diff-good { color: #16a34a; }
+.sm-diff-bad  { color: #dc2626; }
+.sm-diff-mute { color: #64748b; }
 
 
 
@@ -571,6 +629,106 @@
 }
 
 /* Cost Bar Comparison */
+.chip-analysis-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.chip-analysis-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+  gap: 12px;
+}
+
+.chip-overview-card {
+  background: linear-gradient(135deg, rgba(245, 251, 255, 0.95) 0%, rgba(255, 250, 243, 0.95) 100%);
+}
+
+.chip-bars-card {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(252, 248, 241, 0.96) 100%);
+}
+
+.chip-hero-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.chip-hero-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-light);
+  margin-bottom: 6px;
+}
+
+.chip-hero-value {
+  font-size: 34px;
+  line-height: 1;
+  font-weight: 900;
+  color: var(--text-primary);
+  letter-spacing: -1px;
+}
+
+.chip-hero-diff {
+  font-size: 12px;
+  font-weight: 800;
+  padding: 7px 11px;
+  border-radius: 999px;
+  white-space: normal;
+  line-height: 1.4;
+  text-align: center;
+  max-width: 130px;
+  flex-shrink: 0;
+}
+
+.chip-hero-good {
+  background: rgba(22, 163, 74, 0.12);
+  color: #15803d;
+  border: 1.5px solid rgba(22, 163, 74, 0.22);
+}
+
+.chip-hero-bad {
+  background: rgba(239, 68, 68, 0.12);
+  color: #dc2626;
+  border: 1.5px solid rgba(239, 68, 68, 0.22);
+}
+
+.chip-hero-neutral {
+  background: rgba(100, 116, 139, 0.1);
+  color: #64748b;
+  border: 1.5px solid rgba(100, 116, 139, 0.2);
+}
+
+.chip-mini-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.chip-mini-card {
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.chip-mini-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-light);
+  margin-bottom: 6px;
+}
+
+.chip-mini-value {
+  font-size: 18px;
+  font-weight: 900;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
 .cost-comparison-container {
   display: flex;
   flex-direction: column;
@@ -587,28 +745,46 @@
   gap: 16px;
 }
 
+.cost-comparison-polished {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  gap: 14px;
+}
+
 .cost-bar-row {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 7px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(0, 0, 0, 0.04);
 }
 
 .cost-bar-header {
   display: flex;
   justify-content: space-between;
-  align-items: baseline;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
 }
 
 .cost-bar-label {
   font-size: 13px;
   font-weight: 700;
   color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 
 .cost-bar-value-wrap {
   display: flex;
   align-items: baseline;
-  gap: 8px;
+  gap: 6px;
+  flex-shrink: 0;
 }
 
 .cost-bar-value {
@@ -623,15 +799,15 @@
 
 .cost-bar-track {
   width: 100%;
-  height: 8px;
-  background: rgba(0, 0, 0, 0.05);
-  border-radius: 4px;
+  height: 10px;
+  background: rgba(15, 23, 42, 0.06);
+  border-radius: 999px;
   overflow: hidden;
 }
 
 .cost-bar-fill {
   height: 100%;
-  border-radius: 4px;
+  border-radius: 999px;
   transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -646,6 +822,47 @@
 }
 
 @media (max-width: 640px) {
+  .sm-metric-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .chip-analysis-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .chip-hero-row {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+
+  .chip-hero-diff {
+    max-width: none;
+    width: 100%;
+    text-align: left;
+  }
+
+  .chip-hero-value {
+    font-size: 28px;
+  }
+
+  .chip-mini-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .chip-mini-card {
+    padding: 8px 6px;
+  }
+
+  .chip-mini-value {
+    font-size: 14px;
+  }
+
+  .chip-mini-label {
+    font-size: 10px;
+    margin-bottom: 4px;
+  }
+
   .stock-live-analysis-header {
     flex-direction: column;
   }
@@ -666,6 +883,250 @@
 @keyframes blink {
   0%, 100% { opacity: 1; }
   50% { opacity: 0; }
+}
+
+/* Tooltip Styles */
+.tooltip-trigger {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: help;
+  transition: all 0.2s ease;
+}
+
+.tooltip-trigger:hover {
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.tooltip-icon {
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: white;
+  font-weight: 900;
+  opacity: 0.8;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.tooltip-trigger:hover .tooltip-icon {
+  opacity: 1;
+  transform: scale(1.2);
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
+}
+
+.chip-mini-card {
+  position: relative;
+}
+
+.tooltip-box {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: clamp(320px, 90vw, 420px);
+  background: white;
+  border: 2px solid var(--primary);
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.2);
+  z-index: 1000;
+  color: var(--text-primary);
+  animation: tooltipFadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: auto;
+  max-height: 85vh;
+  overflow-y: auto;
+}
+
+@keyframes tooltipFadeIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -48%);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%);
+  }
+}
+
+/* 防止 Tooltip 超出左右边界（桌面版） */
+@media (min-width: 769px) {
+  .tooltip-box {
+    max-width: calc(100vw - 40px);
+    animation: tooltipFadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+}
+
+/* 主标题 */
+.tooltip-box p:first-child {
+  font-size: 16px;
+  font-weight: 900;
+  color: white;
+  background: linear-gradient(135deg, var(--primary) 0%, #2563eb 100%);
+  margin: -20px -20px 16px -20px;
+  padding: 16px 20px;
+  border-radius: 14px 14px 0 0;
+  text-align: center;
+}
+
+.tooltip-box p:first-child + p {
+  font-size: 14px;
+  line-height: 1.7;
+  color: #475569;
+  margin-bottom: 16px;
+}
+
+.tooltip-box p {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--text-primary);
+}
+
+.tooltip-box p:last-child {
+  margin-bottom: 0;
+}
+
+.tooltip-box strong {
+  color: var(--primary);
+  font-weight: 800;
+}
+
+/* 代码示例 */
+.tooltip-example {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.08), rgba(59, 130, 246, 0.04));
+  border-left: 4px solid #3b82f6;
+  border-radius: 8px;
+  padding: 14px;
+  font-size: 13px;
+  font-family: 'Monaco', 'Courier New', monospace;
+  color: #1e40af;
+  margin: 12px 0 !important;
+  line-height: 1.6;
+  font-weight: 500;
+}
+
+.tooltip-example strong {
+  color: #1e40af;
+}
+
+/* 分类说明 */
+.tooltip-category {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.08), rgba(16, 185, 129, 0.04));
+  border-left: 4px solid #10b981;
+  border-radius: 8px;
+  padding: 14px;
+  margin: 12px 0 !important;
+  line-height: 1.7;
+}
+
+.tooltip-category strong {
+  color: #059669;
+  display: block;
+  margin-bottom: 4px;
+}
+
+.tooltip-category br {
+  line-height: 1.8;
+}
+
+/* 提示信息 */
+.tooltip-tip {
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.12), rgba(251, 191, 36, 0.06));
+  border-left: 4px solid #fbbf24;
+  border-radius: 8px;
+  padding: 14px;
+  font-size: 13px;
+  margin: 14px 0 0 0 !important;
+  color: #78350f;
+  font-weight: 600;
+  line-height: 1.6;
+}
+
+@media (max-width: 768px) {
+  /* 手机版背景遮蔽层 */
+  .tooltip-overlay {
+    display: block !important;
+  }
+
+  /* 手机版 Tooltip 变成模态框 */
+  .tooltip-box {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    bottom: auto;
+    right: auto;
+    width: 90vw;
+    max-width: 480px;
+    max-height: 85vh;
+    background-color: #ffffff;
+    border-radius: 18px;
+    padding: 24px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    animation: tooltipSlideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  @keyframes tooltipSlideIn {
+    from {
+      opacity: 0;
+      transform: translate(-50%, -45%);
+    }
+    to {
+      opacity: 1;
+      transform: translate(-50%, -50%);
+    }
+  }
+}
+
+/* PC 版本（桌面） */
+@media (min-width: 769px) {
+  .tooltip-overlay {
+    display: block !important;
+  }
+
+  .tooltip-box {
+    animation: tooltipFadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+}
+
+/* 关闭按钮样式 */
+.tooltip-close-btn {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 36px;
+  height: 36px;
+  border: none;
+  background: rgba(59, 130, 246, 0.15);
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--primary);
+  transition: all 0.2s ease;
+  padding: 0;
+  z-index: 1001;
+}
+
+.tooltip-close-btn:hover {
+  background: rgba(59, 130, 246, 0.25);
+  transform: scale(1.15);
+}
+
+.tooltip-close-btn:active {
+  transform: scale(0.95);
 }
 
 /* Stat Value Row + Badges */
@@ -703,53 +1164,124 @@
   border: 1.5px solid rgba(239, 68, 68, 0.2);
 }
 
-/* Strength Card */
-.strength-card {
+/* ─── 同策略推薦股票滑塊 ─────────────────────── */
+.related-stocks-section {
+  margin-top: 16px;
+  margin-bottom: 8px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.related-stocks-scroll {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  padding: 4px 2px 12px;
+  scrollbar-width: none;
+  width: 100%;
+  cursor: grab;
+  touch-action: pan-x;
+  user-select: none;
+}
+.related-stocks-scroll:active {
+  cursor: grabbing;
+}
+.related-stocks-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+/* 左右箭頭按鈕 */
+.related-scroll-arrows {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.related-arrow-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border-color, #e0d6c2);
+  background: var(--card-bg, #fffdf7);
+  color: var(--text-primary);
+  font-size: 12px;
+  cursor: pointer;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-top: 16px;
-  padding: 14px 16px;
-  background: var(--card-bg);
-  border-radius: 16px;
-  border: 1px solid var(--border-color);
+  justify-content: center;
+  transition: background 0.15s;
+}
+.related-arrow-btn:hover {
+  background: #f0e8d8;
+}
+.related-arrow-btn:active {
+  background: #e8dcc8;
 }
 
-.strength-left {
+.related-stock-card {
+  flex: 0 0 155px;
+  scroll-snap-align: start;
+  background: var(--card-bg, #fffdf7);
+  border: 1.5px solid var(--border-color, #f0e6d2);
+  border-radius: 14px;
+  padding: 12px 10px;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
+}
+.related-stock-card:active {
+  transform: scale(0.97);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
 }
 
-.strength-value {
-  font-size: 28px;
-  font-weight: 900;
-  color: var(--text-primary);
-  line-height: 1;
-}
-
-.strength-badge {
-  font-size: 17px;
+.related-stock-name {
+  font-size: 15px;
   font-weight: 800;
-  padding: 8px 18px;
-  border-radius: 20px;
+  color: var(--text-primary);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.related-stock-code {
+  font-size: 11px;
+  color: var(--text-light, #999);
+  font-weight: 600;
+}
+.related-stock-price {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin: 4px 0 6px;
 }
 
-.strength-strong {
-  background: rgba(16, 185, 129, 0.12);
-  color: #059669;
-  border: 2px solid rgba(16, 185, 129, 0.25);
+.related-stock-chip {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 6px;
+  white-space: nowrap;
+  line-height: 1.4;
 }
 
-.strength-medium {
-  background: rgba(251, 146, 60, 0.12);
-  color: #ea580c;
-  border: 2px solid rgba(251, 146, 60, 0.25);
-}
+/* AI 推薦等級色彩 */
+.rs-chip-ultra { background: #ffe0e0; color: #cc2222; }
+.rs-chip-high  { background: #fff0e0; color: #cc6600; }
+.rs-chip-mid   { background: #e8f5e9; color: #2e7d32; }
+.rs-chip-low   { background: #f0f0f0; color: #666; }
 
-.strength-weak {
-  background: rgba(148, 163, 184, 0.12);
-  color: #64748b;
-  border: 2px solid rgba(148, 163, 184, 0.25);
-}
+/* 累積報酬色彩 */
+.rs-chip-ret-pos { background: #ffe0e0; color: #cc2222; }
+.rs-chip-ret-neg { background: #e0f0e0; color: #2e7d32; }
+
+/* 籌碼穩定度色彩 */
+.rs-chip-pts-high { background: #e0f0ff; color: #1565c0; }
+.rs-chip-pts-mid  { background: #fff8e1; color: #f57f17; }
+.rs-chip-pts-low  { background: #f0f0f0; color: #888; }
+
+/* 載入中 */
+.rs-chip-loading { background: #f5f5f5; color: #aaa; }

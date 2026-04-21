@@ -483,6 +483,116 @@ export async function fetchSimonsData(date?: string): Promise<SimonsItem[]> {
   }
 }
 
+// 【Premium 專屬】基於 Simons 量化模型計算評分
+export function calculateSimonsScore(
+  item: SimonsItem,
+  quantData: StockQuantData
+): { advice: AIAdvice; text: string; kidText: string; score: number } {
+  let score = 50; // 基礎分
+
+  // ========== 1️⃣ AI推薦等級 (40分) ==========
+  const remark = quantData.aiQuanBackDataComment?.remark ?? '';
+  if (remark.includes('超高')) {
+    score += 30; // 超高度 → +30 分
+  } else if (remark.includes('高度')) {
+    score += 22; // 高度 → +22 分
+  } else if (remark.includes('中度')) {
+    score += 12; // 中度 → +12 分
+  } else if (remark.includes('低度')) {
+    score += 2; // 低度 → +2 分
+  }
+
+  // ========== 2️⃣ 熱度值 PSR (30分) ==========
+  const psr = item.psr || 0;
+  // PSR 標準：7+ 優秀、5-7 正常、<5 低溫
+  score += Math.max(-15, Math.min(20, (psr - 5) * 2));
+
+  // ========== 3️⃣ 強度指標 Strength (20分) ==========
+  const strength = parseFloat(item.strength) || 0;
+  if (strength > 2.5) {
+    score += 15; // 強度極佳
+  } else if (strength > 2.0) {
+    score += 12; // 強度優良
+  } else if (strength > 1.5) {
+    score += 8; // 強度不錯
+  } else if (strength > 1.0) {
+    score += 3; // 強度一般
+  } else if (strength < 0.5) {
+    score -= 12; // 強度偏弱
+  }
+
+  // ========== 4️⃣ 氣動指數 GVI (15分) ==========
+  const gvi = item.gvi || 0;
+  const mediangvi = parseFloat(item.mediangvi) || 0;
+  // GVI > 中位數 表示資金流入強
+  if (gvi > mediangvi * 1.2) {
+    score += 12; // 資金流入明顯
+  } else if (gvi > mediangvi) {
+    score += 6; // 資金流入溫和
+  } else if (gvi < mediangvi * 0.8) {
+    score -= 10; // 資金流出明顯
+  }
+
+  // ========== 5️⃣ 籌碼穩定度 Chip Stability (10分) ==========
+  const chipPts = quantData.chipStability ? parseFloat(quantData.chipStability.pts) : null;
+  if (chipPts !== null) {
+    if (chipPts >= 8) {
+      score += 10; // 最乾淨
+    } else if (chipPts >= 6) {
+      score += 6; // 很穩定
+    } else if (chipPts >= 4) {
+      score += 2; // 穩定
+    } else if (chipPts < 2) {
+      score -= 8; // 凌亂
+    }
+  }
+
+  // ========== 6️⃣ 累積報酬信心度 (可選) ==========
+  const cumRet = quantData.aiQuanBackDataComment?.cum_ret ?? '';
+  const cumRetNum = parseFloat(cumRet);
+  if (!isNaN(cumRetNum)) {
+    if (cumRetNum > 100) {
+      score += 5; // 歷史回測超群
+    } else if (cumRetNum > 50) {
+      score += 3;
+    } else if (cumRetNum < 0) {
+      score -= 5; // 負報酬警示
+    }
+  }
+
+  // ========== 邊界限制 ==========
+  score = Math.max(0, Math.min(100, score));
+
+  let advice: AIAdvice;
+  let text: string;
+  let kidText: string;
+
+  // 評級邏輯（根據 Simons 五維評分）
+  if (score >= 75) {
+    advice = 'buy';
+    text = `Simons 量化評分 ${score}分！AI推薦等級高、籌碼穩定、資金流入明顯，強烈建議買進。`;
+    kidText = `🐻 Simons說：「這間公司五個指標都亮綠燈！考了 ${score} 分，是天選之股～」 🌟`;
+  } else if (score >= 60) {
+    advice = 'buy';
+    text = `Simons 量化評分 ${score}分，多數指標向好，建議可以考慮買進。`;
+    kidText = `🐻 Simons說：「這間公司表現不錯，考了 ${score} 分，可以買喔～」 👍`;
+  } else if (score >= 45) {
+    advice = 'hold';
+    text = `Simons 量化評分 ${score}分，指標混合訊號，建議繼續觀望。`;
+    kidText = `🐻 Simons說：「這間公司還在考慮中，考了 ${score} 分，先看看～」 🤔`;
+  } else if (score >= 30) {
+    advice = 'hold';
+    text = `Simons 量化評分 ${score}分，部分指標偏弱，建議保守等待。`;
+    kidText = `🐻 Simons說：「這間公司最近比較普通，考了 ${score} 分，先不急喔～」 😐`;
+  } else {
+    advice = 'sell';
+    text = `Simons 量化評分 ${score}分，多數指標偏弱，建議避免或考慮出場。`;
+    kidText = `🐻 Simons說：「這間公司現在不太好，只有 ${score} 分，先等等吧～」 ❌`;
+  }
+
+  return { advice, text, kidText, score };
+}
+
 // 計算 AI 投資建議
 export function calculateAdvice(item: SimonsItem): { advice: AIAdvice; text: string; kidText: string; score: number } {
   const psr = item.psr || 0;
@@ -549,8 +659,19 @@ export function calculateAdvice(item: SimonsItem): { advice: AIAdvice; text: str
 }
 
 // 轉換為推薦格式
-export function toRecommendation(item: SimonsItem): StockRecommendation {
-  const { advice, text, kidText, score } = calculateAdvice(item);
+export function toRecommendation(
+  item: SimonsItem,
+  quantData?: StockQuantData
+): StockRecommendation {
+  // 如果有量化資料且有 AI 推薦等級，使用 Premium Simons 評分
+  let result;
+  if (quantData?.aiQuanBackDataComment) {
+    result = calculateSimonsScore(item, quantData);
+  } else {
+    result = calculateAdvice(item);
+  }
+
+  const { advice, text, kidText, score } = result;
   return {
     ...item,
     advice,

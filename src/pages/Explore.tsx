@@ -13,13 +13,30 @@ export default function Explore() {
   const hasAiFeature = hasFeature('ai_stock_picking');
   const [recommendations, setRecommendations] = useState<StockRecommendation[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [activeStrategy, setActiveStrategy] = useState(hasAiFeature ? 'ai' : 'A');
+
+  // 從 sessionStorage 恢復狀態（從 StockDetail 返回時）
+  const savedState = useRef(() => {
+    try {
+      const raw = sessionStorage.getItem('explore_state');
+      if (raw) {
+        sessionStorage.removeItem('explore_state');
+        return JSON.parse(raw) as { search: string; activeStrategy: string; scrollY: number };
+      }
+    } catch {}
+    return null;
+  });
+  const restored = useRef(savedState.current());
+
+  const [search, setSearch] = useState(restored.current?.search || '');
+  const [activeStrategy, setActiveStrategy] = useState(restored.current?.activeStrategy || (hasAiFeature ? 'ai' : 'A'));
   const [error, setError] = useState('');
   const [twsePriceMap, setTwsePriceMap] = useState<Record<string, { close: string; change: string; name: string; volume: number; date: string }>>({});
   const [quantDataMap, setQuantDataMap] = useState<Record<string, StockQuantData>>({});
   const [quantLoading, setQuantLoading] = useState(false);
+  const [aiQualified, setAiQualified] = useState<Set<string>>(new Set()); // 記錄符合「中度以上 + 正報酬」的股票
+  const [simonsMeta, setSimonsMeta] = useState<Record<string, any>>({}); // 保存原始 SimonsItem 供重新評分用
   const resultRef = useRef<HTMLDivElement>(null);
+  const pendingScrollY = useRef(restored.current?.scrollY ?? 0);
 
   async function loadData() {
     setLoading(true);
@@ -79,7 +96,13 @@ export default function Explore() {
         const dateStr = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
         const items = await fetchSimonsData(dateStr);
         if (items.length > 0) {
-          const recs = items.map(toRecommendation);
+          // 保存原始 SimonsItem meta 供後續量化評分使用
+          const meta: Record<string, any> = {};
+          items.forEach(item => {
+            meta[item.coid] = item;
+          });
+          setSimonsMeta(meta);
+          const recs = items.map(item => toRecommendation(item));
           recs.sort((a, b) => b.score - a.score);
           setRecommendations(recs);
           setLoading(false);
@@ -97,21 +120,90 @@ export default function Explore() {
     loadData();
   }, []);
 
-  // AI 策略啟用時，批次抓取所有推薦股票的量化三指標
+  // 資料載入完成後恢復捲動位置
+  useEffect(() => {
+    if (!loading && pendingScrollY.current > 0) {
+      const y = pendingScrollY.current;
+      pendingScrollY.current = 0;
+      requestAnimationFrame(() => window.scrollTo(0, y));
+    }
+  }, [loading]);
+
+  // 點擊股票卡前保存狀態
+  function navigateToStock(coid: string) {
+    // 保存 Explore 頁狀態
+    sessionStorage.setItem('explore_state', JSON.stringify({
+      search,
+      activeStrategy,
+      scrollY: window.scrollY,
+    }));
+    // 保存當前篩選列表供 StockDetail 滑塊使用
+    const stockList = filtered.map(r => {
+      const qd = quantDataMap[r.coid];
+      return {
+        coid: r.coid,
+        name: r.stkname,
+        close: getBestClose(r.coid, r.close),
+        aiRemark: qd?.aiQuanBackDataComment?.remark ?? null,
+        cumRet: qd?.aiQuanBackDataComment?.cum_ret ?? null,
+        chipPts: qd?.chipStability ? parseFloat(qd.chipStability.pts) : null,
+      };
+    });
+    sessionStorage.setItem('explore_stock_list', JSON.stringify(stockList));
+    navigate(`/stock/${coid}`);
+  }
+
+  // AI 策略啟用時，批次抓取所有推薦股票的量化三指標（不限制數量，抓全部）
+  // 【修改】獲取量化資料後，重新計算 Premium Simons 評分並排序
   useEffect(() => {
     if (activeStrategy !== 'ai' || recommendations.length === 0) return;
     let cancelled = false;
     setQuantLoading(true);
-    const targets = recommendations.slice(0, 25); // 最多 25 支
-    Promise.all(targets.map(r => fetchStockQuantData(r.coid))).then(results => {
+    // 抓所有 recommendations 的量化資料（API 效能許可）
+    Promise.all(recommendations.map(r => fetchStockQuantData(r.coid))).then(results => {
       if (cancelled) return;
       const map: Record<string, StockQuantData> = {};
-      targets.forEach((r, i) => { map[r.coid] = results[i]; });
+      const qualified = new Set<string>();
+      let updatedRecs: StockRecommendation[] = [];
+      
+      recommendations.forEach((r, i) => {
+        const qd = results[i];
+        map[r.coid] = qd;
+        // 判斷是否符合「中度以上推薦」且「正報酬」
+        const remark = qd.aiQuanBackDataComment?.remark ?? '';
+        const cumRet = qd.aiQuanBackDataComment?.cum_ret ?? '';
+        const isMidOrAbove = remark.includes('中度') || remark.includes('高度') || remark.includes('超高'); // 判斷是否中度以上
+        const cumRetNum = parseFloat(cumRet);
+        const isPositive = !isNaN(cumRetNum) && cumRetNum >= 0;
+        if (isMidOrAbove && isPositive) {
+          qualified.add(r.coid);
+        }
+        
+        // 【NEW】如果有量化資料且有 AI 推薦等級，使用 Simons 量化評分重新計算
+        if (qd.aiQuanBackDataComment && simonsMeta[r.coid]) {
+          const simonsItem = simonsMeta[r.coid];
+          updatedRecs.push(toRecommendation(simonsItem, qd));
+        } else {
+          // 否則保持原來的評分
+          updatedRecs.push(r);
+        }
+      });
+      
       setQuantDataMap(map);
+      setAiQualified(qualified);
+      
+      // 【NEW】使用新的 Simons 評分重新排序（優先有資料的）
+      const recsWithData = updatedRecs.filter(rec => map[rec.coid]?.aiQuanBackDataComment);
+      const recsNoData = updatedRecs.filter(rec => !map[rec.coid]?.aiQuanBackDataComment);
+      const sorted = [
+        ...recsWithData.sort((a, b) => b.score - a.score),
+        ...recsNoData.sort((a, b) => b.score - a.score),
+      ];
+      setRecommendations(sorted);
       setQuantLoading(false);
     }).catch(() => { if (!cancelled) setQuantLoading(false); });
     return () => { cancelled = true; };
-  }, [activeStrategy, recommendations]);
+  }, [activeStrategy, recommendations.length]); // 只監聽 recommendations 的長度變化，避免無限迴圈
 
   // Simons 每日推薦的收盤價 Map（用於與 TWSE/TPEx 日期比較，使用較新的）
   const simonsPriceMap = useMemo(() => {
@@ -167,7 +259,16 @@ export default function Explore() {
       } as StockRecommendation));
     }
 
-    if (activeStrategy === 'ai') return recommendations;
+    if (activeStrategy === 'ai') {
+      // AI 策略：只保留「中度以上推薦」且「正報酬」的股票，並優先排列有資料的
+      const qualified = recommendations.filter(r => aiQualified.has(r.coid));
+      const others = recommendations.filter(r => !aiQualified.has(r.coid));
+      // qualified 在前，others 在後，各自按 score 排序
+      return [
+        ...qualified.sort((a, b) => b.score - a.score),
+        ...others.sort((a, b) => b.score - a.score),
+      ];
+    }
 
     // 每日動態策略篩選（從 Simons + TWSE 數據過濾，每天隨數據更新）
     let list: StockRecommendation[] = [];
@@ -243,7 +344,7 @@ export default function Explore() {
     }
 
     return list.sort((a, b) => b.score - a.score).slice(0, 20);
-  }, [recommendations, activeStrategy, search, twsePriceMap]);
+  }, [recommendations, activeStrategy, search, twsePriceMap, aiQualified]);
 
   function getAdviceBadge(advice: string) {
     switch (advice) {
@@ -290,7 +391,8 @@ export default function Explore() {
       );
     }
     const qd = quantDataMap[coid];
-    if (!qd) return null;
+    // 若無完整資料，返回 null（非頂級推薦股票會進個股頁才載）
+    if (!qd || !qd.aiQuanBackDataComment) return null;
     const aiRemark = qd.aiQuanBackDataComment?.remark ?? '--';
     const cumRet = qd.aiQuanBackDataComment?.cum_ret ?? '--';
     const ptsRaw = qd.chipStability ? parseFloat(qd.chipStability.pts) : null;
@@ -402,7 +504,7 @@ export default function Explore() {
               <div
                 key={rec.coid}
                 className="stock-card recommendation-card"
-                onClick={() => navigate(`/stock/${rec.coid}`)}
+                onClick={() => navigateToStock(rec.coid)}
               >
                 <div className="rec-left">
                   <div className="rec-header">
@@ -415,7 +517,12 @@ export default function Explore() {
                   </div>
                   <div className="rec-badges">
                      {getAdviceBadge(rec.advice)}
-                     <span className="badge badge-neutral">評分 {rec.score}分</span>
+                     {/* 【NEW】Premium Simons 評分標籤 */}
+                     {activeStrategy === 'ai' && quantDataMap[rec.coid]?.aiQuanBackDataComment ? (
+                       <span className="badge badge-premium">💎 Simons量化評分 {rec.score}分</span>
+                     ) : (
+                       <span className="badge badge-neutral">評分 {rec.score}分</span>
+                     )}
                    </div>
                   {activeStrategy === 'ai' && renderAiQuantChips(rec.coid)}
                 </div>

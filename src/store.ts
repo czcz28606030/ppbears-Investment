@@ -1326,49 +1326,16 @@ export const useStore = create<InvestmentStore>((set, get) => ({
 
   // ─── Trading ───────────────────────────────
   executeBuy: async (stockCode, stockName, quantity, price, industry, reason) => {
-    const { user, holdings } = get();
+    const { user, holdings, trades } = get();
     if (!user || !supabase) return { success: false, message: '尚未登入' };
-    
-    // Fetch broker settings Context (use parent's if child)
-    let feeRate = user.brokerFeeRate;
-    let minFee = user.brokerMinFee;
-    if (user.role === 'child' && user.parentId) {
-      const parentFetch = supabase.from('users').select('broker_fee_rate, broker_min_fee').eq('id', user.parentId).single();
-      const timeout = new Promise<{ data: null }>(resolve => setTimeout(() => resolve({ data: null }), 5000));
-      const { data: parentData } = await Promise.race([parentFetch, timeout]) as { data: { broker_fee_rate: number | null; broker_min_fee: number | null } | null };
-      if (parentData) {
-        feeRate = parentData.broker_fee_rate !== null ? Number(parentData.broker_fee_rate) : 0.001425;
-        minFee = parentData.broker_min_fee !== null ? Number(parentData.broker_min_fee) : 20;
-      }
-    }
-
-    const baseCost = quantity * price;
-    const fee = Math.max(minFee, Math.round(baseCost * feeRate));
-    const totalCost = baseCost + fee;
-
-    // ── 即時讀取最新餘額，避免 Tab 閒置後使用舊快取值 ─────────────────────
-    let currentBalance = user.availableBalance;
-    const balRes = await Promise.race([
-      supabase.from('users').select('available_balance').eq('id', user.id).single(),
-      new Promise<{ data: null; error: null }>(r => setTimeout(() => r({ data: null, error: null }), 5000)),
-    ]);
-    if (balRes.data) {
-      currentBalance = Number((balRes.data as any).available_balance ?? user.availableBalance);
-    }
-
-    if (totalCost > currentBalance) return { success: false, message: `餘額不足！需要更多零用錢才能買喔 💰\n(預估總金額含手續費: NT$ ${formatMoney(totalCost)})` };
     if (quantity <= 0) return { success: false, message: '至少要買 1 股喔！' };
 
-    // ─ Paywall: 持股上限檢查 ─
+    // ─ Paywall: 持股上限檢查（本地判斷，不打 DB）─
     if (!get().isPremiumUser()) {
       const uniqueStocks = new Set(holdings.map(h => h.stockCode));
       if (!uniqueStocks.has(stockCode) && uniqueStocks.size >= get().systemSettings.free_max_holdings) {
         return { success: false, message: `🔒 免費帳號最多只能持有 ${get().systemSettings.free_max_holdings} 檔股票喔！\n升級 Premium 可解鎖無限持股 💎` };
       }
-    }
-
-    // ─ Paywall: 每日交易次數檢查 ─
-    if (!get().isPremiumUser()) {
       const todayCount = get().getTodayTradeCount();
       if (todayCount >= get().systemSettings.free_max_daily_trades) {
         return { success: false, message: `🔒 免費帳號每日最多交易 ${get().systemSettings.free_max_daily_trades} 次！\n升級 Premium 可解鎖無限交易 💎` };
@@ -1376,44 +1343,78 @@ export const useStore = create<InvestmentStore>((set, get) => ({
     }
 
     try {
-      await withWriteTimeout(supabase.from('users').update({ available_balance: currentBalance - totalCost }).eq('id', user.id));
-      await withWriteTimeout(supabase.from('trades').insert([{
-        user_id: user.id, stock_code: stockCode, stock_name: stockName,
-        trade_type: 'buy', quantity, price, total_amount: totalCost, reason: reason || null, timestamp: Date.now(),
-      }]));
+      // 單一 RPC 完成：讀手續費 → 驗餘額 → 更新 balance → 寫 trades → upsert holdings
+      const { data, error } = await withWriteTimeout(
+        supabase.rpc('execute_buy_trade', {
+          p_stock_code: stockCode,
+          p_stock_name: stockName,
+          p_quantity: quantity,
+          p_price: price,
+          p_industry: industry || '',
+          p_reason: reason || null,
+        }),
+        15000
+      );
+      if (error) throw error;
+      const row = Array.isArray(data) ? data[0] : data;
+      if (!row) throw new Error('RPC 未回傳資料');
 
-      const existing = holdings.find(h => h.stockCode === stockCode);
-      if (existing) {
-        const newShares = existing.totalShares + quantity;
-        // 加總總花費 / 總股數
-        const newAvgCost = parseFloat(((existing.avgCost * existing.totalShares + totalCost) / newShares).toFixed(2));
-        await withWriteTimeout(supabase.from('holdings').update({
-          total_shares: newShares, avg_cost: newAvgCost, current_price: price,
-          updated_at: new Date().toISOString(),
-        }).eq('user_id', user.id).eq('stock_code', stockCode));
-      } else {
-        await withWriteTimeout(supabase.from('holdings').insert([{
-          user_id: user.id, stock_code: stockCode, stock_name: stockName,
-          total_shares: quantity, avg_cost: price, current_price: price, industry: industry || '',
-        }]));
-      }
-      await get().loadUserData(user.id);
+      // 本地狀態更新，不再 reload 全部資料
+      const newBalance = Number(row.new_balance);
+      const newTrade: Trade = {
+        id: row.trade_id,
+        stockCode, stockName,
+        tradeType: 'buy',
+        quantity, price,
+        totalAmount: Number(row.total_cost),
+        reason: reason || undefined,
+        timestamp: Number(row.trade_timestamp),
+      };
+      const newSharesNum = Number(row.new_shares);
+      const newAvgCostNum = Number(row.new_avg_cost);
+      const existingIdx = holdings.findIndex(h => h.stockCode === stockCode);
+      const newHoldings: Holding[] = existingIdx >= 0
+        ? holdings.map((h, i) => i === existingIdx
+            ? { ...h, totalShares: newSharesNum, avgCost: newAvgCostNum, currentPrice: price }
+            : h)
+        : [...holdings, {
+            stockCode, stockName,
+            totalShares: newSharesNum, avgCost: newAvgCostNum,
+            currentPrice: price, industry: industry || '',
+          }];
+
+      set({
+        user: { ...user, availableBalance: newBalance },
+        trades: [newTrade, ...trades],
+        holdings: newHoldings,
+      });
+
       return { success: true, message: `成功買入 ${stockName} ${quantity} 股 🎉` };
     } catch (err) {
       console.error('executeBuy error:', err);
-      return { success: false, message: `⚠️ 買入失敗：${err instanceof Error ? err.message : '請檢查網路後再試。'}` };
+      const raw = err instanceof Error ? err.message : String(err);
+      if (raw.includes('insufficient_balance')) {
+        return { success: false, message: `餘額不足！需要更多零用錢才能買喔 💰` };
+      }
+      if (raw.includes('not_authenticated')) {
+        return { success: false, message: '登入逾期，請重新登入' };
+      }
+      if (raw.includes('function') && raw.includes('execute_buy_trade')) {
+        return { success: false, message: '⚠️ 交易服務尚未部署，請管理員執行 supabase-trade-rpc.sql' };
+      }
+      return { success: false, message: `⚠️ 買入失敗：${raw || '請檢查網路後再試。'}` };
     }
   },
 
   executeSell: async (stockCode, quantity, price, reason) => {
-    const { user, holdings } = get();
+    const { user, holdings, trades } = get();
     if (!user || !supabase) return { success: false, message: '尚未登入' };
     const holding = holdings.find(h => h.stockCode === stockCode);
     if (!holding) return { success: false, message: '你沒有持有這檔股票喔！' };
     if (quantity > holding.totalShares) return { success: false, message: `你只有 ${holding.totalShares} 股，不能賣超過喔！` };
     if (quantity <= 0) return { success: false, message: '至少要賣 1 股喔！' };
 
-    // ─ Paywall: 每日交易次數檢查 ─
+    // ─ Paywall: 每日交易次數檢查（本地判斷）─
     if (!get().isPremiumUser()) {
       const todayCount = get().getTodayTradeCount();
       if (todayCount >= get().systemSettings.free_max_daily_trades) {
@@ -1421,57 +1422,48 @@ export const useStore = create<InvestmentStore>((set, get) => ({
       }
     }
 
-    // Fetch broker settings Context (use parent's if child)
-    let feeRate = user.brokerFeeRate;
-    let minFee = user.brokerMinFee;
-    let taxRate = user.brokerTaxRate;
-    if (user.role === 'child' && user.parentId) {
-      const parentFetch = supabase.from('users').select('broker_fee_rate, broker_min_fee, broker_tax_rate').eq('id', user.parentId).single();
-      const timeout = new Promise<{ data: null }>(resolve => setTimeout(() => resolve({ data: null }), 5000));
-      const { data: parentData } = await Promise.race([parentFetch, timeout]) as { data: { broker_fee_rate: number | null; broker_min_fee: number | null; broker_tax_rate: number | null } | null };
-      if (parentData) {
-        feeRate = parentData.broker_fee_rate !== null ? Number(parentData.broker_fee_rate) : 0.001425;
-        minFee = parentData.broker_min_fee !== null ? Number(parentData.broker_min_fee) : 20;
-        taxRate = parentData.broker_tax_rate !== null ? Number(parentData.broker_tax_rate) : 0.003;
-      }
-    }
-
-    const baseValue = quantity * price;
-    const fee = Math.max(minFee, Math.round(baseValue * feeRate));
-    const tax = Math.round(baseValue * taxRate);
-    const totalReceived = baseValue - fee - tax;
-
-    // profit 計算: 實收金額 - (當初買這些股票的總成本)
-    const profit = totalReceived - (holding.avgCost * quantity);
-
-    // ── 即時讀取最新餘額，避免 Tab 閒置後使用舊快取值 ─────────────────────
-    let currentSellBalance = user.availableBalance;
-    const sellBalRes = await Promise.race([
-      supabase.from('users').select('available_balance').eq('id', user.id).single(),
-      new Promise<{ data: null; error: null }>(r => setTimeout(() => r({ data: null, error: null }), 5000)),
-    ]);
-    if (sellBalRes.data) {
-      currentSellBalance = Number((sellBalRes.data as any).available_balance ?? user.availableBalance);
-    }
-
     try {
-      await withWriteTimeout(supabase.from('users').update({ available_balance: currentSellBalance + totalReceived }).eq('id', user.id));
-      await withWriteTimeout(supabase.from('trades').insert([{
-        user_id: user.id, stock_code: stockCode, stock_name: holding.stockName,
-        trade_type: 'sell', quantity, price, total_amount: totalReceived,
-        reason: reason || null, profit: profit, timestamp: Date.now(),
-      }]));
+      const { data, error } = await withWriteTimeout(
+        supabase.rpc('execute_sell_trade', {
+          p_stock_code: stockCode,
+          p_quantity: quantity,
+          p_price: price,
+          p_reason: reason || null,
+        }),
+        15000
+      );
+      if (error) throw error;
+      const row = Array.isArray(data) ? data[0] : data;
+      if (!row) throw new Error('RPC 未回傳資料');
 
-      const remaining = holding.totalShares - quantity;
-      if (remaining <= 0) {
-        await withWriteTimeout(supabase.from('holdings').delete().eq('user_id', user.id).eq('stock_code', stockCode));
-      } else {
-        await withWriteTimeout(supabase.from('holdings').update({
-          total_shares: remaining, current_price: price, updated_at: new Date().toISOString(),
-        }).eq('user_id', user.id).eq('stock_code', stockCode));
-      }
+      const newBalance = Number(row.new_balance);
+      const profit = Number(row.profit);
+      const totalReceived = Number(row.total_received);
+      const remaining = Number(row.remaining_shares);
 
-      await get().loadUserData(user.id);
+      const newTrade: Trade = {
+        id: row.trade_id,
+        stockCode, stockName: holding.stockName,
+        tradeType: 'sell',
+        quantity, price,
+        totalAmount: totalReceived,
+        reason: reason || undefined,
+        profit,
+        timestamp: Number(row.trade_timestamp),
+      };
+
+      const newHoldings: Holding[] = remaining <= 0
+        ? holdings.filter(h => h.stockCode !== stockCode)
+        : holdings.map(h => h.stockCode === stockCode
+            ? { ...h, totalShares: remaining, currentPrice: price }
+            : h);
+
+      set({
+        user: { ...user, availableBalance: newBalance },
+        trades: [newTrade, ...trades],
+        holdings: newHoldings,
+      });
+
       const emoji = profit >= 0 ? '📈' : '📉';
       return {
         success: true,
@@ -1479,7 +1471,20 @@ export const useStore = create<InvestmentStore>((set, get) => ({
       };
     } catch (err) {
       console.error('executeSell error:', err);
-      return { success: false, message: `⚠️ 賣出失敗：${err instanceof Error ? err.message : '請檢查網路後再試。'}` };
+      const raw = err instanceof Error ? err.message : String(err);
+      if (raw.includes('insufficient_shares')) {
+        return { success: false, message: '持股不足，可能資料已變動，請重新整理頁面' };
+      }
+      if (raw.includes('no_holding')) {
+        return { success: false, message: '你沒有持有這檔股票喔！' };
+      }
+      if (raw.includes('not_authenticated')) {
+        return { success: false, message: '登入逾期，請重新登入' };
+      }
+      if (raw.includes('function') && raw.includes('execute_sell_trade')) {
+        return { success: false, message: '⚠️ 交易服務尚未部署，請管理員執行 supabase-trade-rpc.sql' };
+      }
+      return { success: false, message: `⚠️ 賣出失敗：${raw || '請檢查網路後再試。'}` };
     }
   },
 

@@ -1,0 +1,72 @@
+{
+  "lesson_id": "L051",
+  "stage": 3,
+  "level": 1,
+  "domain": "quant",
+  "title": "什麼是量化模型？認識 Simons 大師",
+  "summary": "了解「量化投資」的概念，並認識把數學帶進股市的傳奇人物 Jim Simons。",
+  "cards": [
+    {
+      "type": "text_image",
+      "title": "投資也可以用數學？",
+      "body": "你知道嗎？有一群人不靠感覺選股票，而是靠「數學公式」和「電腦」來決定要買哪檔股！📊🤖\n\n這就叫做「量化投資」，英文叫 Quantitative Investing，簡稱「Quant」。\n\n他們的方法是：\n• 蒐集大量數據（過去幾十年的價格、成交量…）\n• 找出規律（什麼狀況下股票容易漲？）\n• 用電腦自動找機會、自動下單",
+      "image_key": "lesson_051_card_01"
+    },
+    {
+      "type": "text_image",
+      "title": "傳奇人物：Jim Simons",
+      "body": "Jim Simons 是一位數學家 🧮，後來他把數學帶進了股票市場。\n\n他在 1982 年創立了「文藝復興科技公司」，用超強的數學模型操盤。\n\n結果呢？\n• 30 年平均年報酬率超過 60%！📈\n• 這在全世界都幾乎沒有人做到過\n• 連股神巴菲特的成績都沒他好（在那段時間）\n\n他靠數學，從股市賺到了上千億元！",
+      "image_key": "lesson_051_card_02"
+    },
+    {
+      "type": "text_image",
+      "title": "PPBears 的 Simons 量化模型",
+      "body": "PPBears 也引進了一套「量化模型分析」的工具 🐻📊，用來幫你看一檔股票是不是值得注意。\n\n這套模型會計算幾個重要的數字：\n🔥 熱度值（PSR）：市場有多少人在關注這檔股票\n📊 強度指標：籌碼的推力有多強\n💨 氣動指數：資金進出的力道對比\n🧲 籌碼穩定度：大戶有沒有穩定持有\n\n這四個指標組合在一起，就是 AI 推薦的依據！",
+      "image_key": "lesson_051_card_03"
+    },
+    {
+      "type": "text_image",
+      "title": "量化≠魔法，但很有用！",
+      "body": "有了量化模型，是不是就一定賺錢？\n\n答案是：不一定 😅，但它有很大的優點：\n\n✅ 不靠情緒，只看數據\n✅ 可以同時分析幾千支股票\n✅ 規律找出來之後，勝率比猜猜看高很多\n\n❌ 缺點：\n• 黑天鵝事件（突發新聞）不容易預測\n• 模型需要不斷更新\n\n所以量化模型是輔助工具，搭配你自己的判斷最好！🧠",
+      "image_key": "lesson_051_card_04"
+    }
+  ],
+  "preset_questions": [
+    {
+      "question_type": "choice",
+      "question_text": "「量化投資」的意思是什麼？",
+      "options": [
+        "靠感覺選很多股票",
+        "用數學和電腦分析數據來選股",
+        "只買台積電一家公司",
+        "每天都換不同的股票"
+      ],
+      "correct_answer": 1,
+      "explanation": "答對！📊 量化投資就是用數學模型和電腦分析大量數據，找出有規律的投資機會，而不是靠感覺。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "Jim Simons 是一位數學家，他用數學幫自己在股市賺了很多錢。",
+      "correct_answer": true,
+      "explanation": "正確！🧮 Jim Simons 原本是數學教授，後來把數學模型用在股票投資，創造了驚人的長期報酬。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "PPBears 的 Simons 量化模型中，「熱度值（PSR）」代表什麼？",
+      "options": [
+        "公司賺多少錢",
+        "市場有多少人在關注這檔股票",
+        "股票的價格高不高",
+        "公司的老闆叫什麼名字"
+      ],
+      "correct_answer": 1,
+      "explanation": "對！🔥 PSR 熱度值代表市場對這檔股票的關注程度與資金熱度，是量化模型中的重要指標之一。"
+    }
+  ],
+  "ai_prompt_context": {
+    "topic": "量化投資概念、Jim Simons 介紹、PPBears Simons 量化模型四大指標",
+    "age_hint": "9-12歲",
+    "vocabulary_level": "intermediate",
+    "metaphor_suggestions": ["數學家選股", "電腦自動分析", "四大指標像體檢報告"]
+  }
+}
