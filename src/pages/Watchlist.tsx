@@ -89,6 +89,7 @@ export default function Watchlist() {
           aiQuanBackDataComment: null,
           chipStability: null,
           stockInfo: null,
+          currentSignal: 'neutral' as const,
         }))))
       ]);
 

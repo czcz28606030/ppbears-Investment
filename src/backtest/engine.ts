@@ -71,7 +71,7 @@ export interface BacktestResult {
  * Run Backtest based on AI Trading Signals (Layer 1)
  */
 export async function runAiSignalBacktest(config: BacktestConfig): Promise<BacktestResult> {
-  const { data: signals, error } = await supabase
+  const { data: signals, error } = await supabase!
     .from('ai_trading_signals')
     .select('*')
     .gte('in_date', config.startDate)
@@ -107,7 +107,7 @@ export async function runAiSignalBacktest(config: BacktestConfig): Promise<Backt
   
   let idCounter = 1;
 
-  for (const date of allDates) {
+  for (const _date of allDates) {
     // 1. Check if any active position should be sold today
     // (In reality, we sell on out_date. We need a timeline of all dates, not just in_dates)
   }
