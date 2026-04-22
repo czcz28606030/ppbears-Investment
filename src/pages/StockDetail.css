@@ -471,7 +471,24 @@
   font-size: var(--font-size-sm);
   opacity: 0.8;
   font-weight: 600;
+  position: relative;
 }
+
+.simons-score-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  opacity: 0.85;
+  cursor: pointer;
+  color: inherit;
+  text-decoration: underline dotted rgba(0,0,0,0.35);
+  text-underline-offset: 3px;
+}
+
+.simons-score-btn:hover { opacity: 1; }
 
 /* Stat Bar */
 .stat-bar {
@@ -932,7 +949,8 @@
   left: 50%;
   transform: translate(-50%, -50%);
   width: clamp(320px, 90vw, 420px);
-  background: white;
+  background: #ffffff;
+  background-color: #ffffff;
   border: 2px solid var(--primary);
   border-radius: 16px;
   padding: 20px;
@@ -943,6 +961,7 @@
   pointer-events: auto;
   max-height: 85vh;
   overflow-y: auto;
+  isolation: isolate;
 }
 
 @keyframes tooltipFadeIn {
@@ -1001,12 +1020,11 @@
 
 /* 代码示例 */
 .tooltip-example {
-  background: linear-gradient(135deg, rgba(59, 130, 246, 0.08), rgba(59, 130, 246, 0.04));
+  background: #dbeafe;
   border-left: 4px solid #3b82f6;
   border-radius: 8px;
   padding: 14px;
   font-size: 13px;
-  font-family: 'Monaco', 'Courier New', monospace;
   color: #1e40af;
   margin: 12px 0 !important;
   line-height: 1.6;
@@ -1019,7 +1037,7 @@
 
 /* 分类说明 */
 .tooltip-category {
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.08), rgba(16, 185, 129, 0.04));
+  background: #d1fae5;
   border-left: 4px solid #10b981;
   border-radius: 8px;
   padding: 14px;
@@ -1039,7 +1057,7 @@
 
 /* 提示信息 */
 .tooltip-tip {
-  background: linear-gradient(135deg, rgba(251, 191, 36, 0.12), rgba(251, 191, 36, 0.06));
+  background: #fef9c3;
   border-left: 4px solid #fbbf24;
   border-radius: 8px;
   padding: 14px;

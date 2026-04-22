@@ -421,19 +421,21 @@ export const useStore = create<InvestmentStore>((set, get) => ({
     const { user } = get();
     if (!user) return;
 
-    const { data } = await supabase
-      .from('learning_wallet')
-      .select('*')
-      .eq('user_id', user.id)
-      .maybeSingle();
+    const res = await withTimeout(
+      supabase.from('learning_wallet').select('*').eq('user_id', user.id).maybeSingle(),
+      10000,
+      { data: null, error: null } as any
+    );
+    const data = res.data;
 
     if (!data) {
-      const { data: created } = await supabase
-        .from('learning_wallet')
-        .insert([{ user_id: user.id }])
-        .select()
-        .single();
-      if (created) {
+      const createRes = await withTimeout(
+        supabase.from('learning_wallet').insert([{ user_id: user.id }]).select().single(),
+        10000,
+        { data: null, error: { message: 'timeout' } } as any
+      );
+      if (createRes.data) {
+        const created = createRes.data;
         set({
           learningWallet: {
             balance: Number(created.balance),
@@ -607,14 +609,12 @@ export const useStore = create<InvestmentStore>((set, get) => ({
     if (!supabase) return;
     const { user } = get();
     if (!user || user.role !== 'parent') return;
-    const { data } = await supabase
-      .from('reward_rules')
-      .select('*')
-      .eq('parent_id', user.id)
-      .order('created_at', { ascending: true });
-    set({
-      rewardRules: (data || []).map(rowToRewardRule),
-    });
+    const res = await withTimeout(
+      supabase.from('reward_rules').select('*').eq('parent_id', user.id).order('created_at', { ascending: true }),
+      10000,
+      { data: null, error: null } as any
+    );
+    if (res.data) set({ rewardRules: res.data.map(rowToRewardRule) });
   },
 
   applyRewardTemplate: async (template) => {
@@ -622,50 +622,82 @@ export const useStore = create<InvestmentStore>((set, get) => ({
     const { user } = get();
     if (!user || user.role !== 'parent') return { error: '權限不足' };
     const amounts = REWARD_TEMPLATES[template];
-    // 刪除現有非 custom 規則
-    await supabase
-      .from('reward_rules')
-      .delete()
-      .eq('parent_id', user.id)
-      .neq('trigger_type', 'custom');
-    // 批次新增
-    const rows = (Object.entries(amounts) as [RewardTriggerType, number][]).map(([triggerType, amount]) => ({
-      parent_id: user.id,
-      trigger_type: triggerType,
-      amount,
-      is_active: true,
-    }));
-    const { error } = await supabase.from('reward_rules').insert(rows);
-    if (error) return { error: error.message };
-    await get().fetchRewardRules();
-    return { error: null };
+    try {
+      // 刪除現有非 custom 規則
+      await withWriteTimeout(
+        supabase.from('reward_rules').delete().eq('parent_id', user.id).neq('trigger_type', 'custom'),
+        10000
+      );
+      // 批次新增
+      const rows = (Object.entries(amounts) as [RewardTriggerType, number][]).map(([triggerType, amount]) => ({
+        parent_id: user.id,
+        trigger_type: triggerType,
+        amount,
+        is_active: true,
+      }));
+      const { error } = await withWriteTimeout(
+        supabase.from('reward_rules').insert(rows),
+        10000
+      );
+      if (error) return { error: (error as { message: string }).message };
+      // 樂觀更新本地狀態
+      const optimistic = rows.map((r, i) => ({
+        id: `tmp-${i}`,
+        parentId: user.id,
+        childId: null,
+        triggerType: r.trigger_type as RewardTriggerType,
+        triggerLabel: null,
+        amount: r.amount,
+        isActive: true,
+        createdAt: new Date().toISOString(),
+      }));
+      set(s => ({ rewardRules: [
+        ...s.rewardRules.filter(r => r.triggerType === 'custom'),
+        ...optimistic,
+      ]}));
+      // 背景静默刷新（不 await）
+      get().fetchRewardRules().catch(() => {});
+      return { error: null };
+    } catch (e: unknown) {
+      return { error: e instanceof Error ? e.message : '套用失敗，請稍後再試' };
+    }
   },
 
   saveRewardRule: async (rule) => {
     if (!supabase) return { error: '資料庫未連線' };
     const { user } = get();
     if (!user || user.role !== 'parent') return { error: '權限不足' };
-    const { error } = await supabase.from('reward_rules').insert([{
-      parent_id: user.id,
-      child_id: rule.childId ?? null,
-      trigger_type: rule.triggerType,
-      trigger_label: rule.triggerLabel ?? null,
-      amount: rule.amount,
-      is_active: rule.isActive,
-    }]);
-    if (error) return { error: error.message };
-    await get().fetchRewardRules();
-    return { error: null };
+    try {
+      const { data, error } = await withWriteTimeout(
+        supabase.from('reward_rules').insert([{
+          parent_id: user.id,
+          child_id: rule.childId ?? null,
+          trigger_type: rule.triggerType,
+          trigger_label: rule.triggerLabel ?? null,
+          amount: rule.amount,
+          is_active: rule.isActive,
+        }]).select().single(),
+        10000
+      );
+      if (error) return { error: (error as { message: string }).message };
+      if (data) set(s => ({ rewardRules: [...s.rewardRules, rowToRewardRule(data as Record<string, unknown>)] }));
+      get().fetchRewardRules().catch(() => {});
+      return { error: null };
+    } catch (e: unknown) {
+      return { error: e instanceof Error ? e.message : '儲存失敗' };
+    }
   },
 
   deleteRewardRule: async (ruleId) => {
     if (!supabase) return { error: '資料庫未連線' };
-    const { error } = await supabase
-      .from('reward_rules')
-      .delete()
-      .eq('id', ruleId);
-    if (error) return { error: error.message };
+    // 樂觀更新：先從本地移除
     set(s => ({ rewardRules: s.rewardRules.filter(r => r.id !== ruleId) }));
+    try {
+      await withWriteTimeout(
+        supabase.from('reward_rules').delete().eq('id', ruleId),
+        10000
+      );
+    } catch {}
     return { error: null };
   },
 
@@ -689,12 +721,13 @@ export const useStore = create<InvestmentStore>((set, get) => ({
     if (!supabase) return;
     const { user } = get();
     if (!user) return;
-    const { data } = await supabase
-      .from('lesson_progress')
-      .select('lesson_id')
-      .eq('user_id', user.id);
-    if (data) {
-      const ids = [...new Set(data.map((r: { lesson_id: string }) => r.lesson_id))];
+    const res = await withTimeout(
+      supabase.from('lesson_progress').select('lesson_id').eq('user_id', user.id),
+      10000,
+      { data: null, error: null } as any
+    );
+    if (res.data) {
+      const ids: string[] = Array.from(new Set(res.data.map((r: { lesson_id: string }) => r.lesson_id as string)));
       set({ completedLessonIds: ids });
     }
   },
@@ -703,24 +736,25 @@ export const useStore = create<InvestmentStore>((set, get) => ({
     if (!supabase) return;
     const { user } = get();
     if (!user) return;
-    const { data } = await supabase
-      .from('wallet_transactions')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-      .limit(50);
-    set({
-      learningWalletTxs: (data || []).map(r => ({
-        id: r.id as string,
-        userId: r.user_id as string,
-        amount: Number(r.amount),
-        txType: r.tx_type as WalletTransaction['txType'],
-        source: (r.source as string) || null,
-        description: (r.description as string) || null,
-        parentMessage: (r.parent_message as string) || null,
-        createdAt: r.created_at as string,
-      })),
-    });
+    const res = await withTimeout(
+      supabase.from('wallet_transactions').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(50),
+      10000,
+      { data: null, error: null } as any
+    );
+    if (res.data) {
+      set({
+        learningWalletTxs: res.data.map((r: Record<string, unknown>) => ({
+          id: r.id as string,
+          userId: r.user_id as string,
+          amount: Number(r.amount),
+          txType: r.tx_type as WalletTransaction['txType'],
+          source: (r.source as string) || null,
+          description: (r.description as string) || null,
+          parentMessage: (r.parent_message as string) || null,
+          createdAt: r.created_at as string,
+        })),
+      });
+    }
   },
 
   fetchChildrenTransactions: async () => {
@@ -729,24 +763,25 @@ export const useStore = create<InvestmentStore>((set, get) => ({
     if (!user || user.role !== 'parent') return;
     const childIds = children.map(c => c.id);
     if (childIds.length === 0) return;
-    const { data } = await supabase
-      .from('wallet_transactions')
-      .select('*')
-      .in('user_id', childIds)
-      .order('created_at', { ascending: false })
-      .limit(200);
-    set({
-      childrenTxLog: (data || []).map(r => ({
-        id: r.id as string,
-        userId: r.user_id as string,
-        amount: Number(r.amount),
-        txType: r.tx_type as WalletTransaction['txType'],
-        source: (r.source as string) || null,
-        description: (r.description as string) || null,
-        parentMessage: (r.parent_message as string) || null,
-        createdAt: r.created_at as string,
-      })),
-    });
+    const res = await withTimeout(
+      supabase.from('wallet_transactions').select('*').in('user_id', childIds).order('created_at', { ascending: false }).limit(200),
+      10000,
+      { data: null, error: null } as any
+    );
+    if (res.data) {
+      set({
+        childrenTxLog: res.data.map((r: Record<string, unknown>) => ({
+          id: r.id as string,
+          userId: r.user_id as string,
+          amount: Number(r.amount),
+          txType: r.tx_type as WalletTransaction['txType'],
+          source: (r.source as string) || null,
+          description: (r.description as string) || null,
+          parentMessage: (r.parent_message as string) || null,
+          createdAt: r.created_at as string,
+        })),
+      });
+    }
   },
 
   // ─── Shop Items ───────────────────────────
@@ -757,13 +792,17 @@ export const useStore = create<InvestmentStore>((set, get) => ({
     // parent fetches own items; child fetches parent's items
     const parentId = user.role === 'parent' ? user.id : user.parentId;
     if (!parentId) return;
-    const { data } = await supabase
-      .from('reward_shop_items')
-      .select('*')
-      .eq('parent_id', parentId)
-      .order('sort_order', { ascending: true })
-      .order('created_at', { ascending: true });
-    set({ shopItems: (data || []).map(rowToShopItem) });
+    const res = await withTimeout(
+      supabase
+        .from('reward_shop_items')
+        .select('*')
+        .eq('parent_id', parentId)
+        .order('sort_order', { ascending: true })
+        .order('created_at', { ascending: true }),
+      10000,
+      { data: null, error: null } as any
+    );
+    if (res.data) set({ shopItems: res.data.map(rowToShopItem) });
   },
 
   saveShopItem: async (item) => {
@@ -771,41 +810,67 @@ export const useStore = create<InvestmentStore>((set, get) => ({
     const { user } = get();
     if (!user || user.role !== 'parent') return { error: '權限不足' };
     const { shopItems } = get();
-    const { error } = await supabase.from('reward_shop_items').insert([{
-      parent_id:   user.id,
-      name:        item.name,
-      description: item.description ?? null,
-      icon:        item.icon ?? null,
-      item_type:   item.itemType,
-      cost_coins:  item.costCoins,
-      cash_value:  item.cashValue ?? null,
-      is_active:   true,
-      sort_order:  shopItems.length,
-    }]);
-    if (error) return { error: error.message };
-    await get().fetchShopItems();
-    return { error: null };
+    try {
+      const { data, error } = await withWriteTimeout(
+        supabase.from('reward_shop_items').insert([{
+          parent_id:   user.id,
+          name:        item.name,
+          description: item.description ?? null,
+          icon:        item.icon ?? null,
+          item_type:   item.itemType,
+          cost_coins:  item.costCoins,
+          cash_value:  item.cashValue ?? null,
+          is_active:   true,
+          sort_order:  shopItems.length,
+        }]).select().single(),
+        12000
+      );
+      if (error) return { error: error.message };
+      // 樂觀更新本地狀態，不阻塞 UI
+      if (data) set(s => ({ shopItems: [...s.shopItems, rowToShopItem(data)] }));
+      // 背景静默刷新（不 await）
+      get().fetchShopItems().catch(() => {});
+      return { error: null };
+    } catch (e: unknown) {
+      return { error: e instanceof Error ? e.message : '儲存失敗，請稍後再試' };
+    }
   },
 
   deleteShopItem: async (itemId) => {
     if (!supabase) return { error: '資料庫未連線' };
-    const { error } = await supabase
-      .from('reward_shop_items').delete().eq('id', itemId);
-    if (error) return { error: error.message };
+    // 樂觀更新：先從本地移除
     set(s => ({ shopItems: s.shopItems.filter(i => i.id !== itemId) }));
+    try {
+      await withWriteTimeout(
+        supabase.from('reward_shop_items').delete().eq('id', itemId),
+        10000
+      );
+    } catch (e: unknown) {
+      // DB 失敗就背景刷新，確保資料一致
+      get().fetchShopItems().catch(() => {});
+      return { error: e instanceof Error ? e.message : '刪除失敗' };
+    }
     return { error: null };
   },
 
   toggleShopItem: async (itemId, isActive) => {
     if (!supabase) return { error: '資料庫未連線' };
-    const { error } = await supabase
-      .from('reward_shop_items')
-      .update({ is_active: isActive })
-      .eq('id', itemId);
-    if (error) return { error: error.message };
+    // 樂觀更新：先更新本地
     set(s => ({
       shopItems: s.shopItems.map(i => i.id === itemId ? { ...i, isActive } : i),
     }));
+    try {
+      await withWriteTimeout(
+        supabase.from('reward_shop_items').update({ is_active: isActive }).eq('id', itemId),
+        10000
+      );
+    } catch (e: unknown) {
+      // 回滾
+      set(s => ({
+        shopItems: s.shopItems.map(i => i.id === itemId ? { ...i, isActive: !isActive } : i),
+      }));
+      return { error: e instanceof Error ? e.message : '更新失敗' };
+    }
     return { error: null };
   },
 
@@ -1764,8 +1829,23 @@ export const useStore = create<InvestmentStore>((set, get) => ({
 
   addToWatchlist: async (stockCode, stockName, currentPrice, note) => {
     if (!supabase) return { error: '資料庫未連線' };
-    const { user } = get();
+    const { user, watchlist } = get();
     if (!user) return { error: '尚未登入' };
+    // 防止重複加入
+    if (watchlist.some(w => w.stockCode === stockCode)) {
+      return { error: '這檔股票已在觀察名單中' };
+    }
+    // 樂觀更新：立即加入本地 state，UI 瞬間反應
+    const optimisticItem = {
+      id: `temp-${Date.now()}`,
+      stockCode,
+      stockName,
+      addedPrice: currentPrice,
+      note: note || undefined,
+      createdAt: new Date().toISOString(),
+    };
+    set(s => ({ watchlist: [optimisticItem, ...s.watchlist] }));
+
     const { error } = await supabase.from('watchlist').insert([{
       user_id: user.id,
       stock_code: stockCode,
@@ -1774,12 +1854,15 @@ export const useStore = create<InvestmentStore>((set, get) => ({
       note: note || null,
     }]);
     if (error) {
+      // 回滾樂觀更新
+      set(s => ({ watchlist: s.watchlist.filter(w => w.id !== optimisticItem.id) }));
       if (error.message.includes('duplicate') || error.message.includes('unique')) {
         return { error: '這檔股票已在觀察名單中' };
       }
       return { error: error.message };
     }
-    await get().fetchWatchlist();
+    // 背景同步真正的 DB id（不阻塞 UI）
+    get().fetchWatchlist();
     return { error: null };
   },
 

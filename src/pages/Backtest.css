@@ -1,0 +1,209 @@
+.backtest-page {
+  padding: 16px;
+  padding-bottom: 90px; /* space for bottom nav */
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.backtest-premium-lock {
+  text-align: center;
+  padding: 40px 20px;
+  background: var(--bg-card);
+  border-radius: 16px;
+  margin-top: 40px;
+  box-shadow: var(--shadow-sm);
+}
+
+.backtest-premium-lock-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.backtest-header {
+  margin-bottom: 24px;
+}
+
+/* Config Panel */
+.backtest-config-panel {
+  background: var(--bg-card);
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: var(--shadow-sm);
+  margin-bottom: 24px;
+}
+
+.config-group {
+  margin-bottom: 16px;
+}
+
+.config-group-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  margin-bottom: 10px;
+}
+
+.strategy-selectors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.strategy-btn {
+  padding: 8px 16px;
+  border-radius: 20px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 13px;
+}
+
+.strategy-btn.active {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
+
+.config-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.config-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.config-item label {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  margin-bottom: 4px;
+  font-weight: 600;
+}
+
+.config-item input, .config-item select {
+  padding: 8px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: inherit;
+  background: var(--bg-primary);
+}
+
+.btn-run-backtest {
+  width: 100%;
+  padding: 14px;
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 800;
+  cursor: pointer;
+  margin-top: 20px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  box-shadow: var(--shadow-sm);
+}
+
+.btn-run-backtest:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+/* Results */
+.backtest-results {
+  animation: fadeIn 0.4s ease-out;
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.summary-card {
+  background: var(--bg-card);
+  padding: 16px;
+  border-radius: 12px;
+  box-shadow: var(--shadow-sm);
+  text-align: center;
+}
+
+.summary-card-title {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.summary-card-value {
+  font-size: 20px;
+  font-weight: 900;
+  color: var(--text-primary);
+}
+
+.summary-card-value.profit {
+  color: var(--color-profit);
+}
+
+.summary-card-value.loss {
+  color: var(--color-loss);
+}
+
+.trades-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.trade-item {
+  background: var(--bg-card);
+  padding: 16px;
+  border-radius: 12px;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.trade-item-left {
+  display: flex;
+  flex-direction: column;
+}
+
+.trade-item-name {
+  font-weight: 800;
+  font-size: 15px;
+  margin-bottom: 4px;
+}
+
+.trade-item-dates {
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.trade-item-right {
+  text-align: right;
+}
+
+.trade-item-profit {
+  font-weight: 800;
+  font-size: 16px;
+}
+
+.trade-item-profit.profit { color: var(--color-profit); }
+.trade-item-profit.loss { color: var(--color-loss); }
+
+.trade-item-meta {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  margin-top: 4px;
+}

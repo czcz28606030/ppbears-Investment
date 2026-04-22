@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore, formatMoney, formatPrice } from '../store';
-import type { Holding } from '../types';
+import type { Holding, SimonsItem } from '../types';
+import { fetchSimonsData, fetchStockQuantData, calculateSimonsScore, calculateAdvice } from '../api';
 import './Portfolio.css';
 
 export default function Portfolio() {
@@ -19,7 +20,15 @@ export default function Portfolio() {
   const pl = summary.totalProfitLoss;
   const isProfit = pl >= 0;
 
-  const [aiSignals, setAiSignals] = useState<Record<string, { advice: string, color: string, icon: string, signalType: 'buy' | 'sell' | 'neutral' }>>({});
+  const [aiSignals, setAiSignals] = useState<Record<string, {
+    primaryLabel: string;
+    primaryType: 'buy' | 'sell' | 'neutral';
+    primaryIcon: string;
+    simonsScore: number;
+    simonsLabel: string;
+    simonsType: 'strong-buy' | 'buy' | 'hold' | 'reduce' | 'sell' | '';
+    simonsComment: string;
+  }>>({});
   const [signalDataDate, setSignalDataDate] = useState<string>('');;
   const [enableCustomSignal, setEnableCustomSignal] = useState(() => {
     return localStorage.getItem('ppbears_custom_signal') === 'true';
@@ -39,47 +48,89 @@ export default function Portfolio() {
         return;
       }
       
-      const signals: Record<string, { advice: string, color: string, icon: string, signalType: 'buy' | 'sell' | 'neutral' }> = {};
-      
+      const signals: Record<string, {
+        primaryLabel: string;
+        primaryType: 'buy' | 'sell' | 'neutral';
+        primaryIcon: string;
+        simonsScore: number;
+        simonsLabel: string;
+        simonsType: 'strong-buy' | 'buy' | 'hold' | 'reduce' | 'sell' | '';
+        simonsComment: string;
+      }> = {};
+
       if (hasAiFeature) {
+        // 記錄 Simons 量化模型爬取時間
+        if (mounted) {
+          const now = new Date();
+          const pad = (n: number) => String(n).padStart(2, '0');
+          setSignalDataDate(`${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`);
+        }
         try {
-          let buySet = new Set<string>();
-          const _pad = (n: number) => String(n).padStart(2, '0');
-          for (let i = 0; i < 7; i++) {
-            const d = new Date();
-            d.setDate(d.getDate() - i);
-            if (d.getDay() === 0 || d.getDay() === 6) continue;
-            const dateStr = `${d.getFullYear()}-${_pad(d.getMonth() + 1)}-${_pad(d.getDate())}`;
-            const res = await fetch(`https://api.ifalgo.com.tw/frontapi/common/getSimonsData?searchDate=${dateStr}`);
-            const data = await res.json();
-            const items = data.data?.dataItems || [];
-            if (items.length > 0) {
-              buySet = new Set(items.map((it: any) => it.coid));
-              if (mounted) setSignalDataDate(dateStr);
-              break;
-            }
-          }
+          // 並行取得 Simons 每日推薦清單
+          const simonsItems = await fetchSimonsData().catch(() => [] as SimonsItem[]);
+          const simonsItemMap: Record<string, SimonsItem> = {};
+          simonsItems.forEach(item => { simonsItemMap[item.coid] = item; });
 
           await Promise.all(holdings.map(async (h) => {
-            if (buySet.has(h.stockCode)) {
-              signals[h.stockCode] = { advice: 'AI 加碼', color: '#dc2626', icon: '🚀', signalType: 'buy' };
-              return;
+            const simonsItem = simonsItemMap[h.stockCode];
+            const quantData = await fetchStockQuantData(h.stockCode).catch(() => null);
+
+            // ── 主訊號：原始 AI 建議（保留原邏輯）──
+            let primaryLabel: string;
+            let primaryType: 'buy' | 'sell' | 'neutral';
+            let primaryIcon: string;
+
+            // ── 主訊號：使用 fetchStockQuantData 裡已解析的 currentSignal ──
+            // (sell_sig 來自 aiQuanBackDataTradingList 最新一筆，已在 api.ts 正確解析)
+            const sig = quantData?.currentSignal ?? 'neutral';
+            if (sig === 'buy') {
+              primaryLabel = 'AI 加碼'; primaryType = 'buy'; primaryIcon = '🚀';
+            } else if (sig === 'sell') {
+              primaryLabel = 'AI 出場'; primaryType = 'sell'; primaryIcon = '⚠️';
+            } else {
+              primaryLabel = 'AI 中立'; primaryType = 'neutral'; primaryIcon = '⚖️';
             }
-            try {
-              const res = await fetch(`https://api.ifalgo.com.tw/frontapi/stock?coid=${h.stockCode}`);
-              const json = await res.json();
-              const list = json.data?.stock?.aiQuanBackDataTradingList || [];
-              if (list.length > 0) {
-                const last = list[list.length - 1];
-                if (last.sell_sig === '出場' || last.sell_sig === '賣出') {
-                  signals[h.stockCode] = { advice: 'AI 出場', color: '#16a34a', icon: '⚠️', signalType: 'sell' };
-                  return;
-                }
+
+            // ── 輔助訊號：Simons 量化評分 ──
+            let simonsScore = 0;
+            let simonsLabel = '';
+            let simonsType: 'strong-buy' | 'buy' | 'hold' | 'reduce' | 'sell' | '' = '';
+            let simonsComment = '';
+
+            if (simonsItem && quantData?.aiQuanBackDataComment) {
+              const result = calculateSimonsScore(simonsItem, quantData!);
+              simonsScore = result.score;
+              simonsComment = result.text.replace(/^(Simons 量化評分|綜合評分) \d+分[！。，]?\s*/, '');
+            } else if (simonsItem) {
+              const result = calculateAdvice(simonsItem);
+              simonsScore = result.score;
+              simonsComment = result.text.replace(/^(Simons 量化評分|綜合評分) \d+分[！。，]?\s*/, '');
+            } else if (quantData?.aiQuanBackDataComment) {
+              // 不在 Simons 名單但有量化資料：估算分數，不顯示「未在名單」文字
+              const remark = quantData.aiQuanBackDataComment.remark;
+              const cumRet = quantData.aiQuanBackDataComment.cum_ret || '';
+              if (remark.includes('超高')) simonsScore = 76;
+              else if (remark.includes('高度')) simonsScore = 62;
+              else if (remark.includes('中度')) simonsScore = 48;
+              else simonsScore = 33;
+              if (quantData.chipStability) {
+                const pts = parseFloat(quantData.chipStability.pts);
+                if (pts >= 8) simonsScore += 5;
+                else if (pts < 2) simonsScore -= 5;
               }
-              signals[h.stockCode] = { advice: 'AI 中立', color: '#888888', icon: '⚖️', signalType: 'neutral' };
-            } catch {
-              signals[h.stockCode] = { advice: 'AI 中立', color: '#888888', icon: '⚖️', signalType: 'neutral' };
+              simonsScore = Math.max(0, Math.min(100, simonsScore));
+              simonsComment = `AI推薦等級：${remark}${cumRet ? `，累積報酬 ${cumRet}` : ''}`;
             }
+
+            if (simonsScore > 0) {
+              if (simonsScore >= 75) { simonsLabel = '強力加碼'; simonsType = 'strong-buy'; }
+              else if (simonsScore >= 60) { simonsLabel = '加碼'; simonsType = 'buy'; }
+              else if (simonsScore >= 45) { simonsLabel = '觀望'; simonsType = 'hold'; }
+              else if (simonsScore >= 30) { simonsLabel = '減碼'; simonsType = 'reduce'; }
+              else { simonsLabel = '出場'; simonsType = 'sell'; }
+            }
+
+            signals[h.stockCode] = { primaryLabel, primaryType, primaryIcon, simonsScore, simonsLabel, simonsType, simonsComment };
           }));
 
         } catch (err) {
@@ -101,20 +152,17 @@ export default function Portfolio() {
                  const slice = arr.slice(arr.length - period - offset, arr.length - offset);
                  return slice.reduce((a, b) => a + b, 0) / period;
                };
-               
                const lastClose = closes[closes.length - 1];
                const sma60 = getSMA(closes, 60, 0);
                const sma60Prev = getSMA(closes, 60, 1);
                const prevClose = closes[closes.length - 2];
-               
                const max20 = Math.max(...closes.slice(-20));
-               
                if (lastClose > sma60 && lastClose >= max20) {
-                 signals[h.stockCode] = { advice: '技術 加碼', color: '#dc2626', icon: '🚀', signalType: 'buy' };
+                 signals[h.stockCode] = { primaryLabel: '技術加碼', primaryType: 'buy', primaryIcon: '🚀', simonsScore: 0, simonsLabel: '', simonsType: '', simonsComment: '' };
                } else if (lastClose < sma60 && prevClose < sma60Prev) {
-                 signals[h.stockCode] = { advice: '技術 出場', color: '#16a34a', icon: '⚠️', signalType: 'sell' };
+                 signals[h.stockCode] = { primaryLabel: '技術出場', primaryType: 'sell', primaryIcon: '🚪', simonsScore: 0, simonsLabel: '', simonsType: '', simonsComment: '' };
                } else {
-                 signals[h.stockCode] = { advice: '技術 中立', color: '#888888', icon: '⚖️', signalType: 'neutral' };
+                 signals[h.stockCode] = { primaryLabel: '技術中立', primaryType: 'neutral', primaryIcon: '⚖️', simonsScore: 0, simonsLabel: '', simonsType: '', simonsComment: '' };
                }
              }
           } catch (e) {
@@ -198,8 +246,8 @@ export default function Portfolio() {
       {/* 資料來源小字 */}
       <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', marginBottom: '16px', marginTop: '6px', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 600 }}>
         <span>ℹ️ 資料來源與時間：</span>
-        {(hasAiFeature && signalDataDate) ? (
-          <span style={{ color: 'var(--primary)' }}>Simons 量化模型（{signalDataDate}）</span>
+        {hasAiFeature ? (
+          <span style={{ color: 'var(--primary)' }}>Simons 量化模型（爆取：{signalDataDate || '載入中...'}）</span>
         ) : enableCustomSignal ? (
           <span style={{ color: 'var(--primary)' }}>FinMind 技術指標（近 150 日）</span>
         ) : (
@@ -223,39 +271,53 @@ export default function Portfolio() {
               const itemPL = (h.currentPrice - h.avgCost) * h.totalShares;
               const itemPLPct = ((h.currentPrice - h.avgCost) / h.avgCost * 100);
               const itemIsProfit = itemPL >= 0;
+              const signal = aiSignals[h.stockCode];
               return (
                 <div
                   key={h.stockCode}
-                  className={`holding-item${aiSignals[h.stockCode] ? ` signal-${aiSignals[h.stockCode].signalType}` : ''}`}
+                  className={`holding-item${signal ? ` signal-${signal.primaryType}` : ''}`}
                   onClick={() => navigate(`/stock/${h.stockCode}`)}
                 >
-                  <div className="holding-left">
-                    {aiSignals[h.stockCode] ? (
-                      <div className={`signal-badge signal-badge-${aiSignals[h.stockCode].signalType}`}>
-                        <span className="signal-badge-icon">{aiSignals[h.stockCode].icon}</span>
-                        <span className="signal-badge-text">{aiSignals[h.stockCode].advice}</span>
+                  <div className="holding-main-row">
+                    <div className="holding-left">
+                      {signal ? (
+                        <div className={`signal-badge signal-badge-${signal.primaryType}`}>
+                          <span className="signal-badge-icon">{signal.primaryIcon}</span>
+                          <span className="signal-badge-text">{signal.primaryLabel}</span>
+                        </div>
+                      ) : (
+                        <div className="holding-emoji">{itemIsProfit ? '😊' : '😢'}</div>
+                      )}
+                      <div>
+                        <div className="holding-name">{h.stockName}</div>
+                        <div className="holding-code">{h.stockCode}</div>
                       </div>
-                    ) : (
-                      <div className="holding-emoji">{itemIsProfit ? '😊' : '😢'}</div>
-                    )}
-                    <div>
-                      <div className="holding-name">{h.stockName}</div>
-                      <div className="holding-code">{h.stockCode}</div>
+                    </div>
+                    <div className="holding-center">
+                      <div className="holding-shares">{h.totalShares} 股</div>
+                      <div className="holding-avg">成本 {formatPrice(h.avgCost)}</div>
+                    </div>
+                    <div className="holding-right">
+                      <div className="holding-current">NT$ {formatPrice(h.currentPrice)}</div>
+                      <div className={`holding-pl ${itemIsProfit ? 'text-profit' : 'text-loss'}`}>
+                        {itemIsProfit ? '+' : ''}{formatMoney(itemPL)}
+                      </div>
+                      <div className={`holding-pl-pct ${itemIsProfit ? 'text-profit' : 'text-loss'}`}>
+                        ({itemIsProfit ? '+' : ''}{itemPLPct.toFixed(1)}%)
+                      </div>
                     </div>
                   </div>
-                  <div className="holding-center">
-                    <div className="holding-shares">{h.totalShares} 股</div>
-                    <div className="holding-avg">成本 {formatPrice(h.avgCost)}</div>
-                  </div>
-                  <div className="holding-right">
-                    <div className="holding-current">NT$ {formatPrice(h.currentPrice)}</div>
-                    <div className={`holding-pl ${itemIsProfit ? 'text-profit' : 'text-loss'}`}>
-                      {itemIsProfit ? '+' : ''}{formatMoney(itemPL)}
+                  {signal && signal.simonsScore > 0 && signal.simonsType !== '' && (
+                    <div className={`holding-simons-comment simons-comment-${signal.simonsType}`}>
+                      <span className="holding-simons-score">💎 Simons {signal.simonsScore}分</span>
+                      <span className={`holding-simons-aux simons-aux-${signal.simonsType}`}>
+                        {{'strong-buy':'💹','buy':'🚀','hold':'👀','reduce':'⚠️','sell':'🚪'}[signal.simonsType]} {signal.simonsLabel}
+                      </span>
+                      {signal.simonsComment && (
+                        <><span className="holding-simons-sep"> · </span><span className="holding-simons-text">{signal.simonsComment}</span></>
+                      )}
                     </div>
-                    <div className={`holding-pl-pct ${itemIsProfit ? 'text-profit' : 'text-loss'}`}>
-                      ({itemIsProfit ? '+' : ''}{itemPLPct.toFixed(1)}%)
-                    </div>
-                  </div>
+                  )}
                 </div>
               );
             })

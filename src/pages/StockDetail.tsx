@@ -51,6 +51,7 @@ export default function StockDetail() {
   const { user, holdings, executeBuy, executeSell, getPortfolioSummary, hasFeature, isInWatchlist, addToWatchlist, removeFromWatchlist } = useStore();
   const holding = holdings.find(h => h.stockCode === code);
   const summary = getPortfolioSummary();
+  const [wlBusy, setWlBusy] = useState(false);
 
   // ─── 响应式 Tooltip 组件 ─────────────────────────────
   const TooltipBox = ({ id, children }: { id: string; children: React.ReactNode }) => {
@@ -565,24 +566,32 @@ export default function StockDetail() {
           </button>
           <button
             className="btn"
+            disabled={wlBusy}
             style={{
               background: isInWatchlist(code!) ? 'rgba(255, 202, 58, 0.15)' : 'transparent',
               border: `1px solid ${isInWatchlist(code!) ? '#FFCA3A' : '#888'}`,
               color: isInWatchlist(code!) ? '#D97706' : '#888',
               padding: '6px 16px', borderRadius: '20px', fontSize: '14px', fontWeight: 800,
-              display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer'
+              display: 'inline-flex', alignItems: 'center', gap: 6, cursor: wlBusy ? 'wait' : 'pointer',
+              opacity: wlBusy ? 0.6 : 1,
             }}
             onClick={async () => {
-              if (!code) return;
-              if (isInWatchlist(code)) {
-                await removeFromWatchlist(code);
-              } else {
-                const name = stockData?.stkname || twseQuote?.Name || tpexQuote?.CompanyName || code;
-                await addToWatchlist(code, name, price);
+              if (!code || wlBusy) return;
+              setWlBusy(true);
+              try {
+                if (isInWatchlist(code)) {
+                  await removeFromWatchlist(code);
+                } else {
+                  const name = stockData?.stkname || twseQuote?.Name || tpexQuote?.CompanyName || code;
+                  const result = await addToWatchlist(code, name, price);
+                  if (result.error) alert(result.error);
+                }
+              } finally {
+                setWlBusy(false);
               }
             }}
           >
-            {isInWatchlist(code!) ? '👁️‍🗨️ 已觀察' : '👁️ 加入觀察'}
+            {wlBusy ? '⏳ 處理中...' : isInWatchlist(code!) ? '👁️‍🗨️ 已觀察' : '👁️ 加入觀察'}
           </button>
         </div>
       </div>
@@ -676,7 +685,34 @@ export default function StockDetail() {
             {recommendation.advice === 'sell' && '🔴 可以考慮賣出'}
             {/* 【NEW】Premium 會員且有量化資料時顯示 Simons 標籤 */}
             {quantData?.aiQuanBackDataComment && hasFeature('ai_stock_picking') ? (
-              <span className="ai-score">💎 Simons量化評分 ({recommendation.score}分)</span>
+              <span className="ai-score">
+                <button
+                  className="simons-score-btn"
+                  onClick={e => { e.stopPropagation(); setActiveTooltip(activeTooltip === 'simonsScore' ? null : 'simonsScore'); }}
+                  aria-label="Simons 評分說明"
+                >
+                  💎 Simons量化評分 ({recommendation.score}分) ⓘ
+                </button>
+                {activeTooltip === 'simonsScore' && (
+                  <TooltipBox id="simonsScore">
+                    <p><strong>💎 Simons 量化評分計算方式</strong></p>
+                    <p>評分由 0–100 分，分數越高表示表現越強。共分六個維度計算：</p>
+                    <p className="tooltip-category">
+                      <strong>AI 推薦等級</strong>基礎分 +0∼30 分：超高度 +30、高度 +22、中度 +12、低度 +2<br/>
+                      <strong>熱度值 PSR</strong>最高 +20 分：PSR 越高資金流入越強，也可減分至 -15<br/>
+                      <strong>強度指標 Strength</strong>最高 +15 分：&gt;2.5 強度極佳；&lt;0.5 減 12 分<br/>
+                      <strong>氣動指數 GVI</strong>最高 +12 分：GVI 高於中位數 ×1.2 表示資金明顯流入<br/>
+                      <strong>籌碼穩定度</strong>最高 +10 分：pts ≥8 最乾淨；pts&lt;2 減 8 分<br/>
+                      <strong>累積報酬信心度</strong>最高 +5 分：歷史回測正報酬越高，信心度越高
+                    </p>
+                    <p className="tooltip-example">
+                      <strong>評級標準：</strong><br/>
+                      ≥ 75 強力買進　60–74 買進　45–59 觀望　30–44 減碼　&lt;30 出場
+                    </p>
+                    <p className="tooltip-tip">💡 分數越高表示量化模型越看好該股，建議搭配其他指標綜合判斷</p>
+                  </TooltipBox>
+                )}
+              </span>
             ) : (
               <span className="ai-score">({recommendation.score}分)</span>
             )}

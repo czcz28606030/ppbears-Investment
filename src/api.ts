@@ -2,6 +2,25 @@ import type { StockData, SimonsItem, StockQuote, StockRecommendation, AIAdvice, 
 
 const IFALGO_BASE = '/api/ifalgo';
 
+// ── 每日快取工具（key 帶日期，隔天自動過期）────────────────────────────────────
+function _todayStr(): string {
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}
+function getDailyCache<T>(key: string): T | null {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const parsed: { date: string; data: T } = JSON.parse(raw);
+    if (parsed.date !== _todayStr()) { localStorage.removeItem(key); return null; }
+    return parsed.data;
+  } catch { return null; }
+}
+function setDailyCache<T>(key: string, data: T): void {
+  try { localStorage.setItem(key, JSON.stringify({ date: _todayStr(), data })); } catch {}
+}
+
 // TWSE OpenAPI Base
 const TWSE_BASE = '/api/twse';
 
@@ -380,6 +399,9 @@ export async function getFreshStockAnalysis(
   industry: string,
   status: string
 ): Promise<StockLiveAnalysis | null> {
+  const cacheKey = `ppbears_daily_analysis_${code}`;
+  const cached = getDailyCache<StockLiveAnalysis>(cacheKey);
+  if (cached) return cached;
   try {
     const response = await fetch('/api/stock-analysis', {
       method: 'POST',
@@ -399,13 +421,15 @@ export async function getFreshStockAnalysis(
     const data = await response.json();
     if (!data?.technical || !data?.chips || !data?.news) return null;
 
-    return {
+    const result: StockLiveAnalysis = {
       technical: data.technical,
       chips: data.chips,
       news: data.news,
       headlines: Array.isArray(data.headlines) ? data.headlines : [],
       generatedAt: data.generatedAt || new Date().toISOString(),
     };
+    setDailyCache(cacheKey, result);
+    return result;
   } catch (err) {
     console.error('getFreshStockAnalysis error:', err);
     return null;
@@ -442,22 +466,53 @@ export interface StockQuantData {
     gvi: number;
     mediangvi: string;
   } | null;
+  currentSignal: 'buy' | 'sell' | 'neutral'; // 從 aiQuanBackDataTradingList 最新一筆 sell_sig 判斷
 }
 
 export async function fetchStockQuantData(coid: string): Promise<StockQuantData> {
-  const empty: StockQuantData = { aiQuanBackDataComment: null, chipStability: null, stockInfo: null };
+  const empty: StockQuantData = { aiQuanBackDataComment: null, chipStability: null, stockInfo: null, currentSignal: 'neutral' };
+  const cacheKey = `ppbears_daily_quant4_${coid}`; // v4: 改用 out_date 判斷進出場
+  const cached = getDailyCache<StockQuantData>(cacheKey);
+  if (cached) return cached;
   try {
     const url = `${IFALGO_BASE}/stock?coid=${coid}`;
     const res = await fetch(url, { cache: 'no-store' });
     const json = await res.json();
-    const stock = json.data?.stock;  // aiQuanBackDataComment 在此層
-    const pos = stock?.position;     // chipStability, stockInfo 在 position 下
+    const stock = json.data?.stock;
+    const pos = stock?.position;
     if (!stock) return empty;
-    return {
+
+    // 從 aiQuanBackDataTradingList 判斷目前訊號
+    // 邏輯：
+    //   最後一筆「沒有 out_date」             → AI 持倉中     → 顯示「AI 加碼」
+    //   最後一筆「有 out_date」+ sell_sig='出場' → AI 剛出場     → 顯示「AI 出場」
+    //   最後一筆「有 out_date」+ sell_sig='中立' → AI 已結束，無訊號 → 顯示「AI 中立」
+    //   無任何紀錄                             → 無訊號       → 顯示「AI 中立」
+    const tradingList: any[] = stock.aiQuanBackDataTradingList || [];
+    let currentSignal: 'buy' | 'sell' | 'neutral' = 'neutral';
+    if (tradingList.length > 0) {
+      const last = tradingList[tradingList.length - 1];
+      const outDate: string = last?.out_date ?? '';
+      const sig: string = last?.sell_sig ?? '';
+      const hasOpenPosition = !outDate || outDate === '' || outDate === 'NA' || outDate === 'null';
+      console.log(`[QuantData] ${coid} out_date='${outDate}' sell_sig='${sig}' hasOpenPosition=${hasOpenPosition}`);
+      if (hasOpenPosition) {
+        currentSignal = 'buy';   // AI 持倉中 → AI 加碼
+      } else if (sig === '出場' || sig === '賣出') {
+        currentSignal = 'sell';  // AI 已明確出場 → AI 出場
+      } else {
+        currentSignal = 'neutral'; // '中立' 或其他 → AI 中立
+      }
+    }
+
+    const result: StockQuantData = {
       aiQuanBackDataComment: stock.aiQuanBackDataComment ?? null,
       chipStability: pos?.chipStability ?? null,
       stockInfo: pos?.stockInfo ?? null,
+      currentSignal,
     };
+    setDailyCache(cacheKey, result);
+    return result;
   } catch (err) {
     console.error('fetchStockQuantData error:', err);
     return empty;
@@ -466,17 +521,17 @@ export async function fetchStockQuantData(coid: string): Promise<StockQuantData>
 
 // 取得 Simons 每日推薦
 export async function fetchSimonsData(date?: string): Promise<SimonsItem[]> {
+  const d = date || _todayStr();
+  const cacheKey = `ppbears_daily_simons_${d}`;
+  const cached = getDailyCache<SimonsItem[]>(cacheKey);
+  if (cached) return cached;
   try {
-    const d = date || (() => {
-      const now = new Date();
-      const pad = (n: number) => String(n).padStart(2, '0');
-      return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-    })();
-    // 加 _t 時間戳破除 Vercel edge cache
     const url = `${IFALGO_BASE}/common/getSimonsData?searchDate=${d}&_t=${Date.now()}`;
     const res = await fetch(url, { cache: 'no-store' });
     const json = await res.json();
-    return json.data?.dataItems || [];
+    const items: SimonsItem[] = json.data?.dataItems || [];
+    if (items.length > 0) setDailyCache(cacheKey, items);
+    return items;
   } catch (err) {
     console.error('fetchSimonsData error:', err);
     return [];

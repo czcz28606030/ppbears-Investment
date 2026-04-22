@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore, formatMoney, formatPrice } from '../store';
 import { supabase } from '../supabase';
@@ -19,6 +19,7 @@ export default function AdminDashboard() {
 
   const [allHoldings, setAllHoldings] = useState<any[]>([]);
   const [liveQuotes, setLiveQuotes] = useState<Record<string, TWSTEStockQuote>>({});
+  const [adminLoading, setAdminLoading] = useState(true);
 
   const [search, setSearch] = useState('');
   const [balanceModal, setBalanceModal] = useState<{ userId: string; name: string; current: number } | null>(null);
@@ -41,30 +42,47 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     if (user?.isAdmin) {
-      loadAllUsers();
-      if (supabase) {
-        supabase.from('holdings').select('*').then(({ data }) => {
-          setAllHoldings(data || []);
+      setAdminLoading(true);
+      // 並行加載三個數據源，而非串聯
+      Promise.all([
+        loadAllUsers(),
+        supabase
+          ? supabase.from('holdings').select('*').then(({ data }) => data || [])
+          : Promise.resolve([]),
+        fetchTWSEAllStocks(),
+      ])
+        .then(([_, holdingsData, twseData]) => {
+          setAllHoldings(holdingsData);
+          const quotesMap: Record<string, TWSTEStockQuote> = {};
+          twseData.forEach(t => quotesMap[t.Code] = t);
+          setLiveQuotes(quotesMap);
+        })
+        .catch((err) => {
+          console.error('Failed to load admin data:', err);
+        })
+        .finally(() => {
+          setAdminLoading(false);
         });
-      }
-      fetchTWSEAllStocks().then((data) => {
-        const quotesMap: Record<string, TWSTEStockQuote> = {};
-        data.forEach(t => quotesMap[t.Code] = t);
-        setLiveQuotes(quotesMap);
-      });
     }
   }, [user]);
 
-  const calculateUnrealizedPnL = (userId: string) => {
-    const userHoldings = allHoldings.filter(h => h.user_id === userId);
-    let pnl = 0;
-    userHoldings.forEach(h => {
+  // 用 useMemo 快取每個用戶的未平倉損益計算結果，避免每次渲染都重新計算
+  const pnlMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    allHoldings.forEach(h => {
+      if (!map[h.user_id]) {
+        map[h.user_id] = 0;
+      }
       const q = liveQuotes[h.stock_code];
       const currentPrice = q ? parseFloat(q.ClosingPrice) : Number(h.current_price);
-      pnl += (currentPrice - Number(h.avg_cost)) * Number(h.total_shares);
+      map[h.user_id] += (currentPrice - Number(h.avg_cost)) * Number(h.total_shares);
     });
-    return pnl;
-  };
+    return map;
+  }, [allHoldings, liveQuotes]);
+
+  const calculateUnrealizedPnL = useCallback((userId: string) => {
+    return pnlMap[userId] || 0;
+  }, [pnlMap]);
 
   if (!user?.isAdmin) {
     return (
@@ -252,6 +270,22 @@ export default function AdminDashboard() {
         <h1 className="page-title">🔧 管理後台</h1>
         <div style={{ width: 40 }}></div>
       </div>
+
+      {/* 加載狀態提示 */}
+      {adminLoading && (
+        <div style={{
+          padding: '16px',
+          background: 'rgba(33, 150, 243, 0.1)',
+          border: '1px solid #2196F3',
+          borderRadius: '8px',
+          color: '#1976D2',
+          marginBottom: '16px',
+          fontSize: '14px',
+          textAlign: 'center'
+        }}>
+          ⏳ 正在載入管理數據 (用戶、持倉、即時行情)...
+        </div>
+      )}
 
       {/* 統計卡片 */}
       <div className="admin-stats">

@@ -7,6 +7,10 @@
     {
       "path": "/api/cron-newsletter",
       "schedule": "0 23 * * *"
+    },
+    {
+      "path": "/api/backtest-daily-collect",
+      "schedule": "30 15 * * 1-5"
     }
   ],
   "rewrites": [

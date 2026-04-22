@@ -13,6 +13,7 @@ export default function Explore() {
   const hasAiFeature = hasFeature('ai_stock_picking');
   const [recommendations, setRecommendations] = useState<StockRecommendation[]>([]);
   const [loading, setLoading] = useState(true);
+  const [wlBusy, setWlBusy] = useState<string | null>(null);
 
   // 從 sessionStorage 恢復狀態（從 StockDetail 返回時）
   const savedState = useRef(() => {
@@ -34,6 +35,7 @@ export default function Explore() {
   const [quantDataMap, setQuantDataMap] = useState<Record<string, StockQuantData>>({});
   const [quantLoading, setQuantLoading] = useState(false);
   const [aiQualified, setAiQualified] = useState<Set<string>>(new Set()); // 記錄符合「中度以上 + 正報酬」的股票
+  const [aiFilterQualified, setAiFilterQualified] = useState(false); // 是否勾選篩選
   const [simonsMeta, setSimonsMeta] = useState<Record<string, any>>({}); // 保存原始 SimonsItem 供重新評分用
   const resultRef = useRef<HTMLDivElement>(null);
   const pendingScrollY = useRef(restored.current?.scrollY ?? 0);
@@ -266,14 +268,13 @@ export default function Explore() {
     }
 
     if (activeStrategy === 'ai') {
-      // AI 策略：只保留「中度以上推薦」且「正報酬」的股票，並優先排列有資料的
-      const qualified = recommendations.filter(r => aiQualified.has(r.coid));
-      const others = recommendations.filter(r => !aiQualified.has(r.coid));
-      // qualified 在前，others 在後，各自按 score 排序
-      return [
-        ...qualified.sort((a, b) => b.score - a.score),
-        ...others.sort((a, b) => b.score - a.score),
-      ];
+      // AI 策略：按 Simons 評分由高到低排序
+      // 若有勾選篩選，只顯示「中度以上推薦 + 正報酬」的股票
+      const sorted = [...recommendations].sort((a, b) => b.score - a.score);
+      if (aiFilterQualified) {
+        return sorted.filter(r => aiQualified.has(r.coid));
+      }
+      return sorted;
     }
 
     // 每日動態策略篩選（從 Simons + TWSE 數據過濾，每天隨數據更新）
@@ -467,10 +468,32 @@ export default function Explore() {
 
       {/* 篩選結果列表 */}
       <section>
-        <div ref={resultRef} className="filtered-result-header" style={{ marginBottom: 4 }}>
-          {activeStrategy === 'ai' ? '🤖 AI 每日推薦結果' : `🎯 「${STRATEGY_CARDS.find(c => c.id === activeStrategy)?.title}」策略篩選結果`}
+        <div ref={resultRef} className="filtered-result-header" style={{ marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span>{activeStrategy === 'ai' ? '🤖 AI 每日推薦結果' : `🎯 「${STRATEGY_CARDS.find(c => c.id === activeStrategy)?.title}」策略篩選結果`}</span>
           {activeStrategy === 'ai' && <span className="section-action" onClick={loadData} style={{ marginLeft: 'auto', fontWeight: 600 }}>重新整理</span>}
         </div>
+        {/* AI 策略專屬篩選勾選框 */}
+        {activeStrategy === 'ai' && (
+          <label style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer',
+            fontSize: 13, fontWeight: 700, color: aiFilterQualified ? 'var(--primary)' : 'var(--text-secondary)',
+            background: aiFilterQualified ? 'rgba(var(--primary-rgb, 220, 163, 0), 0.1)' : '#f5f5f5',
+            padding: '6px 12px', borderRadius: 20, marginBottom: 12,
+            border: aiFilterQualified ? '1px solid var(--primary)' : '1px solid #e0e0e0',
+            transition: 'all 0.2s ease'
+          }}>
+            <input
+              type="checkbox"
+              checked={aiFilterQualified}
+              onChange={e => setAiFilterQualified(e.target.checked)}
+              style={{ width: 15, height: 15, cursor: 'pointer', accentColor: 'var(--primary)' }}
+            />
+            篩選：AI 中度以上 + 累積報酬正值
+            {aiFilterQualified && aiQualified.size > 0 && (
+              <span style={{ fontWeight: 900, color: 'var(--primary)', marginLeft: 2 }}>（{aiQualified.size} 檔）</span>
+            )}
+          </label>
+        )}
         <div style={{ fontSize: '13px', color: 'var(--text-tertiary)', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 600 }}>
           <span>ℹ️ 資料來源與時間：</span>
           {activeStrategy === 'ai' ? (
@@ -540,18 +563,26 @@ export default function Explore() {
                     {rec.ret_w === 'rise' ? '📈 週漲' : '📉 週跌'}
                   </div>
                   <button
-                    className={`wl-quick-btn ${isInWatchlist(rec.coid) ? 'wl-quick-active' : ''}`}
+                    className={`wl-quick-btn ${isInWatchlist(rec.coid) ? 'wl-quick-active' : ''} ${wlBusy === rec.coid ? 'wl-quick-busy' : ''}`}
                     title={isInWatchlist(rec.coid) ? '已加入觀察名單' : '加入觀察名單'}
+                    disabled={wlBusy === rec.coid}
                     onClick={async (e) => {
                       e.stopPropagation();
-                      if (isInWatchlist(rec.coid)) {
-                        await removeFromWatchlist(rec.coid);
-                      } else {
-                        await addToWatchlist(rec.coid, rec.stkname, parseFloat(getBestClose(rec.coid, rec.close)));
+                      if (wlBusy) return;
+                      setWlBusy(rec.coid);
+                      try {
+                        if (isInWatchlist(rec.coid)) {
+                          await removeFromWatchlist(rec.coid);
+                        } else {
+                          const result = await addToWatchlist(rec.coid, rec.stkname, parseFloat(getBestClose(rec.coid, rec.close)));
+                          if (result.error) alert(result.error);
+                        }
+                      } finally {
+                        setWlBusy(null);
                       }
                     }}
                   >
-                    {isInWatchlist(rec.coid) ? '✅' : '👁️'}
+                    {wlBusy === rec.coid ? '⏳' : isInWatchlist(rec.coid) ? '✅' : '👁️'}
                   </button>
                 </div>
               </div>

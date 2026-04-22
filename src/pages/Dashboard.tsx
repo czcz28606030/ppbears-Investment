@@ -175,6 +175,12 @@ export default function Dashboard() {
           <span className="qa-label">交易紀錄</span>
         </button>
         {user?.isAdmin && (
+          <button className="quick-action-btn" onClick={() => navigate('/backtest')}>
+            <span className="qa-icon">📊</span>
+            <span className="qa-label">回測</span>
+          </button>
+        )}
+        {user?.isAdmin && (
           <button className="quick-action-btn" onClick={() => navigate('/admin')}>
             <span className="qa-icon">🔧</span>
             <span className="qa-label">管理後台</span>
@@ -355,7 +361,7 @@ export default function Dashboard() {
 
       {/* 頁尾版本號 */}
       <div style={{ textAlign: 'center', margin: '32px 0 16px', color: 'var(--text-tertiary)', fontSize: 13, fontWeight: 500 }}>
-        PPBears Investment v{import.meta.env.VITE_APP_VERSION || '1.10.0'}
+        PPBears Investment v{import.meta.env.VITE_APP_VERSION || '1.11.2'}
       </div>
     </div>
   );

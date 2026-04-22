@@ -10,6 +10,7 @@ import LearnHome from './pages/LearnHome';
 import LearnArticles from './pages/LearnArticles';
 import LessonView from './pages/LessonView';
 import WalletView from './pages/WalletView';
+import Backtest from './pages/Backtest';
 import ParentRewardsSetup from './pages/ParentRewardsSetup';
 import ParentRewardDashboard from './pages/ParentRewardDashboard';
 import ParentRewardShopManager from './pages/ParentRewardShopManager';
@@ -85,6 +86,7 @@ function AppContent() {
           <Route path="/learn/lesson/:lessonId" element={<LessonView />} />
           <Route path="/learn/wallet" element={<WalletView />} />
           <Route path="/history" element={<TradeHistory />} />
+          <Route path="/backtest" element={<Backtest />} />
 
           {/* Parent-only Routes */}
           <Route path="/manage-children" element={<ManageChildren />} />
