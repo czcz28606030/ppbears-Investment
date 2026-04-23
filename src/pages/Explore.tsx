@@ -470,29 +470,44 @@ export default function Explore() {
       <section>
         <div ref={resultRef} className="filtered-result-header" style={{ marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
           <span>{activeStrategy === 'ai' ? '🤖 AI 每日推薦結果' : `🎯 「${STRATEGY_CARDS.find(c => c.id === activeStrategy)?.title}」策略篩選結果`}</span>
-          {activeStrategy === 'ai' && <span className="section-action" onClick={loadData} style={{ marginLeft: 'auto', fontWeight: 600 }}>重新整理</span>}
         </div>
-        {/* AI 策略專屬篩選勾選框 */}
+        {/* AI 策略專屬篩選切換按鈕 */}
         {activeStrategy === 'ai' && (
-          <label style={{
-            display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer',
-            fontSize: 13, fontWeight: 700, color: aiFilterQualified ? 'var(--primary)' : 'var(--text-secondary)',
-            background: aiFilterQualified ? 'rgba(var(--primary-rgb, 220, 163, 0), 0.1)' : '#f5f5f5',
-            padding: '6px 12px', borderRadius: 20, marginBottom: 12,
-            border: aiFilterQualified ? '1px solid var(--primary)' : '1px solid #e0e0e0',
-            transition: 'all 0.2s ease'
-          }}>
-            <input
-              type="checkbox"
-              checked={aiFilterQualified}
-              onChange={e => setAiFilterQualified(e.target.checked)}
-              style={{ width: 15, height: 15, cursor: 'pointer', accentColor: 'var(--primary)' }}
-            />
+          <button
+            onClick={() => setAiFilterQualified(v => !v)}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer',
+              fontSize: 13, fontWeight: 700,
+              color: aiFilterQualified ? '#fff' : 'var(--text-secondary)',
+              background: aiFilterQualified
+                ? 'linear-gradient(135deg, var(--primary, #dca300) 0%, #f0a500 100%)'
+                : '#f0f0f0',
+              padding: '8px 16px', borderRadius: 24, marginBottom: 12,
+              border: 'none',
+              boxShadow: aiFilterQualified ? '0 2px 8px rgba(220,163,0,0.35)' : '0 1px 3px rgba(0,0,0,0.08)',
+              transition: 'all 0.22s ease',
+              userSelect: 'none',
+            }}
+          >
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              width: 20, height: 20, borderRadius: 6,
+              background: aiFilterQualified ? 'rgba(255,255,255,0.3)' : '#fff',
+              border: aiFilterQualified ? 'none' : '1.5px solid #ccc',
+              fontSize: 13, transition: 'all 0.18s',
+            }}>
+              {aiFilterQualified ? '✓' : ''}
+            </span>
             篩選：AI 中度以上 + 累積報酬正值
-            {aiFilterQualified && aiQualified.size > 0 && (
-              <span style={{ fontWeight: 900, color: 'var(--primary)', marginLeft: 2 }}>（{aiQualified.size} 檔）</span>
+            {aiQualified.size > 0 && (
+              <span style={{
+                fontWeight: 900,
+                color: aiFilterQualified ? 'rgba(255,255,255,0.9)' : 'var(--primary)',
+                background: aiFilterQualified ? 'rgba(255,255,255,0.2)' : 'rgba(220,163,0,0.12)',
+                padding: '1px 8px', borderRadius: 12, fontSize: 12,
+              }}>（{aiQualified.size} 檔）</span>
             )}
-          </label>
+          </button>
         )}
         <div style={{ fontSize: '13px', color: 'var(--text-tertiary)', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 600 }}>
           <span>ℹ️ 資料來源與時間：</span>
