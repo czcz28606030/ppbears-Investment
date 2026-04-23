@@ -351,7 +351,7 @@ export default function Explore() {
     }
 
     return list.sort((a, b) => b.score - a.score).slice(0, 20);
-  }, [recommendations, activeStrategy, search, twsePriceMap, aiQualified]);
+  }, [recommendations, activeStrategy, search, twsePriceMap, aiQualified, aiFilterQualified]);
 
   function getAdviceBadge(advice: string) {
     switch (advice) {
