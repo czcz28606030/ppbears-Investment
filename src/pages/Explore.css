@@ -251,3 +251,21 @@
   background: rgba(255, 202, 58, 0.2);
   border-color: #FFCA3A;
 }
+
+/* ── AI 量化分析進度條 ───────────────────────────── */
+.explore-progress-bar {
+  width: 200px;
+  height: 6px;
+  background: rgba(255, 202, 58, 0.2);
+  border-radius: 100px;
+  overflow: hidden;
+  margin-top: 4px;
+}
+
+.explore-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #FFCA3A 0%, #F59E0B 100%);
+  border-radius: 100px;
+  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.5);
+}

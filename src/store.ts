@@ -550,16 +550,20 @@ export const useStore = create<InvestmentStore>((set, get) => ({
       },
     });
 
-    // ── 自動發幣：查詢父母的發幣規則（不阻塞主流程）─────────────
+    // ── 自動發幣：查詢發幣規則 ─────────────────────────────────────
+    // child 帳號：查詢父母的規則；parent 帳號：查詢自己設定的規則
     let coinsEarned = 0;
     try {
-      if (user.parentId) {
+      // 決定要查誰的規則
+      const parentLookupId = user.parentId ?? (user.role === 'parent' ? user.id : null);
+
+      if (parentLookupId) {
         const rulesResult = await withRetry(() => withTimeout(
           Promise.resolve(
             sb
               .from('reward_rules')
               .select('*')
-              .eq('parent_id', user.parentId)
+              .eq('parent_id', parentLookupId)
               .eq('is_active', true)
               .or(`child_id.is.null,child_id.eq.${user.id}`)
           ),
@@ -577,6 +581,8 @@ export const useStore = create<InvestmentStore>((set, get) => ({
           if (newStreak === 7) triggeredTypes.push('streak_7');
           if (newStreak === 30) triggeredTypes.push('streak_30');
 
+          console.log('[completeLesson] triggered types:', triggeredTypes, '/ rules:', rules.length);
+
           for (const rule of rules) {
             if (triggeredTypes.includes(rule.triggerType)) {
               const { error: rpcErr } = await withRetry(() => withTimeout(
@@ -590,19 +596,28 @@ export const useStore = create<InvestmentStore>((set, get) => ({
                 12000,
                 { error: { message: 'grant_learning_coins timeout' } } as any
               ));
-              if (!rpcErr) coinsEarned += rule.amount;
+              if (rpcErr) {
+                console.error('[completeLesson] grant_learning_coins failed:', rpcErr);
+              } else {
+                coinsEarned += rule.amount;
+              }
             }
           }
 
           if (coinsEarned > 0) await get().fetchLearningWallet();
+        } else {
+          console.log('[completeLesson] no active reward rules found for parentId:', parentLookupId);
         }
+      } else {
+        console.log('[completeLesson] no parentId and not parent role, skipping coin grant');
       }
     } catch (e) {
-      console.error('reward coin granting failed:', e);
+      console.error('[completeLesson] reward coin granting failed:', e);
     }
 
     return { error: null, xpEarned, coinsEarned, levelUp, newStreak };
   },
+
 
   // ─── Reward Rules ─────────────────────────
   fetchRewardRules: async () => {

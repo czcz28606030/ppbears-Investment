@@ -4,6 +4,7 @@ import { fetchSimonsData, toRecommendation, fetchTWSEAllStocks, fetchTPEXAllStoc
 import type { StockRecommendation } from '../types';
 import type { StockQuantData } from '../api';
 import { useStore } from '../store';
+import { getCache, setCache, CACHE_KEYS } from '../cache';
 import AdBanner from '../components/AdBanner';
 import './Explore.css';
 
@@ -34,6 +35,8 @@ export default function Explore() {
   const [twsePriceMap, setTwsePriceMap] = useState<Record<string, { close: string; change: string; name: string; volume: number; date: string }>>({});
   const [quantDataMap, setQuantDataMap] = useState<Record<string, StockQuantData>>({});
   const [quantLoading, setQuantLoading] = useState(false);
+  const [quantProgress, setQuantProgress] = useState(0); // 量化分析進度 (0~100)
+  const [quantProgressText, setQuantProgressText] = useState('');
   const [aiQualified, setAiQualified] = useState<Set<string>>(new Set()); // 記錄符合「中度以上 + 正報酬」的股票
   const [aiFilterQualified, setAiFilterQualified] = useState(false); // 是否勾選篩選
   const [simonsMeta, setSimonsMeta] = useState<Record<string, any>>({}); // 保存原始 SimonsItem 供重新評分用
@@ -42,54 +45,74 @@ export default function Explore() {
 
   async function loadData() {
     setLoading(true);
-    // 清空舊量化資料，避免重整後新 Phase-1 分數配上舊 quantDataMap 造成數據混淆
+    // 清空舊量化資料，避免重整後新 Phase-1 分數配上舊 quantDataMap 造成數據混滞
     setQuantDataMap({});
     setAiQualified(new Set());
     if (activeStrategy === 'ai') setQuantLoading(true);
     setError('');
     setRecommendations([]);
     try {
-      // 同時抓 TWSE（上市）+ TPEX（上櫃）全市場資料
-      const [twseAll, tpexAll] = await Promise.all([fetchTWSEAllStocks(), fetchTPEXAllStocks()]);
+      // 檢查 TWSE 就最快取（10 分鐘）
+      type TwsePriceMapType = Record<string, { close: string; change: string; name: string; volume: number; date: string }>;
+      const cachedTwse = getCache<TwsePriceMapType>(CACHE_KEYS.TWSE_PRICE_MAP);
+      if (cachedTwse) {
+        setTwsePriceMap(cachedTwse);
+      } else {
+        // 同時抓 TWSE（上市）+ TPEX（上櫃）全市場資料
+        const [twseAll, tpexAll] = await Promise.all([fetchTWSEAllStocks(), fetchTPEXAllStocks()]);
 
-      const map: Record<string, { close: string; change: string; name: string; volume: number; date: string }> = {};
+        const map: TwsePriceMapType = {};
 
-      // TWSE 上市股票
-      for (const s of twseAll) {
-        if (s.ClosingPrice) {
-          // 民國 7 碼 "1150413" → 西元 "20260413"
-          const d = s.Date || '';
-          const date = d.length === 7
-            ? `${parseInt(d.slice(0, 3)) + 1911}${d.slice(3)}`
-            : d.replace(/-/g, '');
-          map[s.Code] = {
-            close: s.ClosingPrice,
-            change: s.Change,
-            name: s.Name || '',
-            volume: Math.floor(parseInt(s.TradeVolume || '0') / 1000),
-            date,
-          };
+        // TWSE 上市股票
+        for (const s of twseAll) {
+          if (s.ClosingPrice) {
+            // 民國 7 碼 "1150413" → 西元 "20260413"
+            const d = s.Date || '';
+            const date = d.length === 7
+              ? `${parseInt(d.slice(0, 3)) + 1911}${d.slice(3)}`
+              : d.replace(/-/g, '');
+            map[s.Code] = {
+              close: s.ClosingPrice,
+              change: s.Change,
+              name: s.Name || '',
+              volume: Math.floor(parseInt(s.TradeVolume || '0') / 1000),
+              date,
+            };
+          }
+        }
+        // TPEX 上櫃股票（合併，不覆蓋已有的上市資料）
+        for (const s of tpexAll) {
+          if (s.Close && !map[s.SecuritiesCompanyCode]) {
+            const d = s.Date || '';
+            const date = d.length === 7
+              ? `${parseInt(d.slice(0, 3)) + 1911}${d.slice(3)}`
+              : d.replace(/-/g, '');
+            map[s.SecuritiesCompanyCode] = {
+              close: s.Close,
+              change: s.Change || '0',
+              name: s.CompanyName || '',
+              volume: Math.floor(parseInt(s.TradingShares || '0') / 1000),
+              date,
+            };
+          }
+        }
+        if (Object.keys(map).length > 0) {
+          setTwsePriceMap(map);
+          setCache(CACHE_KEYS.TWSE_PRICE_MAP, map);
         }
       }
-      // TPEX 上櫃股票（合併，不覆蓋已有的上市資料）
-      for (const s of tpexAll) {
-        if (s.Close && !map[s.SecuritiesCompanyCode]) {
-          const d = s.Date || '';
-          const date = d.length === 7
-            ? `${parseInt(d.slice(0, 3)) + 1911}${d.slice(3)}`
-            : d.replace(/-/g, '');
-          map[s.SecuritiesCompanyCode] = {
-            close: s.Close,
-            change: s.Change || '0',
-            name: s.CompanyName || '',
-            volume: Math.floor(parseInt(s.TradingShares || '0') / 1000),
-            date,
-          };
-        }
-      }
-      if (Object.keys(map).length > 0) setTwsePriceMap(map);
 
-      // Try today first, then yesterday, then last few days
+      // 檢查 Simons 快取
+      type SimonsCacheData = { recs: StockRecommendation[]; meta: Record<string, any> };
+      const cachedSimons = getCache<SimonsCacheData>(CACHE_KEYS.SIMONS_DATA);
+      if (cachedSimons) {
+        setSimonsMeta(cachedSimons.meta);
+        setRecommendations(cachedSimons.recs);
+        setLoading(false);
+        return;
+      }
+
+      // 沒有快取 → Try today first, then yesterday, then last few days
       const today = new Date();
       const pad = (n: number) => String(n).padStart(2, '0');
       for (let i = 0; i < 7; i++) {
@@ -111,6 +134,8 @@ export default function Explore() {
           const recs = items.map(item => toRecommendation(item));
           recs.sort((a, b) => b.score - a.score);
           setRecommendations(recs);
+          // 寫入 Simons 快取（10 分鐘）
+          setCache<SimonsCacheData>(CACHE_KEYS.SIMONS_DATA, { recs, meta });
           setLoading(false);
           return;
         }
@@ -165,8 +190,21 @@ export default function Explore() {
     if (activeStrategy !== 'ai' || recommendations.length === 0) return;
     let cancelled = false;
     setQuantLoading(true);
+    setQuantProgress(0);
+    setQuantProgressText(`正在分析 ${recommendations.length} 支股票...`);
     // 抓所有 recommendations 的量化資料（API 效能許可）
-    Promise.all(recommendations.map(r => fetchStockQuantData(r.coid))).then(results => {
+    let completed = 0;
+    const total = recommendations.length;
+    Promise.all(recommendations.map(r =>
+      fetchStockQuantData(r.coid).then(result => {
+        if (!cancelled) {
+          completed++;
+          setQuantProgress(Math.round((completed / total) * 100));
+          setQuantProgressText(`已分析 ${completed} / ${total} 支`);
+        }
+        return result;
+      })
+    )).then(results => {
       if (cancelled) return;
       const map: Record<string, StockQuantData> = {};
       const qualified = new Set<string>();
@@ -520,10 +558,23 @@ export default function Explore() {
 
         {(loading || (activeStrategy === 'ai' && quantLoading)) && (
           <div className="loading-spinner">
-            <div className="spinner"></div>
+            <div className="spinner" />
             <div className="loading-text">
-              {activeStrategy === 'ai' ? 'Simons 量化模型計算中... 🐻' : '資料載入中... 🐻'}
+              {activeStrategy === 'ai'
+                ? quantProgress > 0
+                  ? quantProgressText
+                  : 'Simons 量化模型計算中... 🐻'
+                : '資料載入中... 🐻'
+              }
             </div>
+            {activeStrategy === 'ai' && quantProgress > 0 && (
+              <div className="explore-progress-bar">
+                <div
+                  className="explore-progress-fill"
+                  style={{ width: `${quantProgress}%` }}
+                />
+              </div>
+            )}
           </div>
         )}
 

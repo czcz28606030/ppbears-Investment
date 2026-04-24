@@ -60,6 +60,8 @@ export default function LessonView() {
   const startTimeRef = useRef(Date.now());
   const tfTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const saveHintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // 用 ref 追蹤最新 answers，避免 stale closure 導致最後一题 XP 遯失
+  const answersRef = useRef<AnswerRecord[]>([]);
 
   // 404
   if (!lesson) {
@@ -132,7 +134,9 @@ export default function LessonView() {
     const xp = calcXp(isCorrect, combo);
     setCombo(newCombo);
     setRevealed(true);
-    setAnswers(prev => [...prev, { question: currentQuestion, userAnswer: selectedChoice, isCorrect, xpEarned: xp }]);
+    const newRecord: AnswerRecord = { question: currentQuestion, userAnswer: selectedChoice, isCorrect, xpEarned: xp };
+    answersRef.current = [...answersRef.current, newRecord];
+    setAnswers(answersRef.current);
   }
 
   function handleTfAnswer(answer: boolean | null) {
@@ -143,7 +147,9 @@ export default function LessonView() {
     const xp = calcXp(isCorrect, combo);
     setCombo(newCombo);
     setRevealed(true);
-    setAnswers(prev => [...prev, { question: currentQuestion, userAnswer: answer, isCorrect, xpEarned: xp }]);
+    const newRecord: AnswerRecord = { question: currentQuestion, userAnswer: answer, isCorrect, xpEarned: xp };
+    answersRef.current = [...answersRef.current, newRecord];
+    setAnswers(answersRef.current);
   }
 
   async function handleNextQuestion() {
@@ -156,7 +162,8 @@ export default function LessonView() {
       setQuestionIndex(q => q + 1);
     } else {
       // 全部答完 → 儲存結果
-      const allAnswers = answers; // 已是最新（handleChoiceConfirm/handleTfAnswer 已 push 最後一筆）
+      // 使用 ref 取得最新答案（避免 stale closure）
+      const allAnswers = answersRef.current;
       const correct = allAnswers.filter(a => a.isCorrect).length;
       const totalXpFromQ = allAnswers.reduce((s, a) => s + a.xpEarned, 0);
       const elapsed = Math.round((Date.now() - startTimeRef.current) / 1000);
@@ -177,16 +184,13 @@ export default function LessonView() {
           timeSpentSeconds: elapsed,
           score,
         });
-        // 不阻塞結果頁：背景刷新學習檔案，避免網路抖動導致「儲存中」卡住
+        // 不阻塞結果頁：背景刷新學習檔案
         void fetchLearningProfile().catch(err => {
           console.error('fetchLearningProfile failed after completeLesson:', err);
         });
         setResultData({ xpEarned: res.xpEarned, coinsEarned: res.coinsEarned, levelUp: res.levelUp, newStreak: res.newStreak });
       } catch (err) {
         console.error('completeLesson failed:', err);
-        // 即使儲存失敗也讓使用者看到結果，避免卡住
-        const allAnswers = answers;
-        const totalXpFromQ = allAnswers.reduce((s, a) => s + a.xpEarned, 0);
         setResultData({ xpEarned: totalXpFromQ, coinsEarned: 0, levelUp: false, newStreak: 0 });
       } finally {
         if (saveHintTimerRef.current) {
@@ -382,7 +386,6 @@ export default function LessonView() {
           <div className="lesson-xp-sub">
             含每日首學 +20 XP
             {resultData.newStreak > 1 ? `・連續 ${resultData.newStreak} 天 🔥` : ''}
-            {resultData.coinsEarned === 0 && '・請主帳號設定發幣規則'}
           </div>
         </div>
       )}

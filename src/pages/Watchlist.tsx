@@ -4,6 +4,7 @@ import { useStore, formatPrice } from '../store';
 import { fetchSimonsData, fetchStockData, fetchStockQuantData, toRecommendation } from '../api';
 import type { StockQuantData } from '../api';
 import type { AIAdvice, SimonsItem, StockRecommendation, WatchlistSignal, WatchlistWarning } from '../types';
+import { getCache, setCache, clearCache, getCacheTTL, CACHE_KEYS } from '../cache';
 import './Watchlist.css';
 
 export default function Watchlist() {
@@ -23,6 +24,8 @@ export default function Watchlist() {
   const [simonsRecMap, setSimonsRecMap] = useState<Record<string, StockRecommendation>>({});
   const [filterSignalOnly, setFilterSignalOnly] = useState(false); // 只顯示有訊號的
   const [filterWarnOnly, setFilterWarnOnly] = useState(false);   // 只顯示建議移除的
+  const [dataLoading, setDataLoading] = useState(false);
+  const [loadingStep, setLoadingStep] = useState<string>('正在連線...');
 
   // 進入頁面時抓取即時報價 + 訊號分析
   useEffect(() => {
@@ -35,7 +38,33 @@ export default function Watchlist() {
   useEffect(() => {
     if (watchlist.length === 0) return;
 
+    // 檢查快取（TTL 5 分鐘）
+    type WatchlistCacheData = {
+      quotes: Record<string, { close: number; change: number }>;
+      industryMap: Record<string, string>;
+      quantDataMap: Record<string, StockQuantData>;
+      simonsRecMap: Record<string, StockRecommendation>;
+      latestKlineDate: string;
+      analyzedAt: string;
+      watchlistKeys: string; // 用來檢測觀察名單是否變更
+    };
+    const cacheKey = CACHE_KEYS.WATCHLIST_FULL;
+    const watchlistKeys = watchlist.map(w => w.stockCode).sort().join(',');
+    const cached = getCache<WatchlistCacheData>(cacheKey);
+    if (cached && cached.watchlistKeys === watchlistKeys) {
+      // 資料未過期且觀察名單未變更 → 直接讀快取
+      setLiveQuotes(cached.quotes);
+      setIndustryMap(cached.industryMap);
+      setQuantDataMap(cached.quantDataMap);
+      setSimonsRecMap(cached.simonsRecMap);
+      setLatestKlineDate(cached.latestKlineDate);
+      setLastAnalyzedAt(cached.analyzedAt);
+      return;
+    }
+
     async function fetchQuotesAndSignals() {
+      setDataLoading(true);
+      setLoadingStep(`正在抓取 ${watchlist.length} 支股票報價...`);
       setQuotesLoading(true);
 
       // 平行抓取所有觀察股票的即時報價
@@ -83,6 +112,8 @@ export default function Watchlist() {
       });
       if (latestDate) setLatestKlineDate(latestDate);
 
+      setLoadingStep('正在載入 Simons 量化模型...');
+
       const [simonsItems, quantResults] = await Promise.all([
         fetchSimonsData().catch(() => []),
         Promise.all(watchlist.map(w => fetchStockQuantData(w.stockCode).catch(() => ({
@@ -114,14 +145,27 @@ export default function Watchlist() {
       setQuantDataMap(nextQuantDataMap);
       setSimonsRecMap(nextSimonsRecMap);
 
+      setLoadingStep('正在分析 MA5 與量能訊號...');
       // 訊號 + 警告分析
       await checkWatchlistSignals();
 
       // 記錄分析完成時間
       const now = new Date();
-      setLastAnalyzedAt(
-        `${now.getFullYear()}/${String(now.getMonth()+1).padStart(2,'0')}/${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`
-      );
+      const analyzedAt = `${now.getFullYear()}/${String(now.getMonth()+1).padStart(2,'0')}/${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+      setLastAnalyzedAt(analyzedAt);
+
+      // 寫入快取（5 分鐘）
+      setCache<WatchlistCacheData>(cacheKey, {
+        quotes,
+        industryMap: nextIndustryMap,
+        quantDataMap: nextQuantDataMap,
+        simonsRecMap: nextSimonsRecMap,
+        latestKlineDate: latestDate,
+        analyzedAt,
+        watchlistKeys,
+      }, 5 * 60 * 1000);
+
+      setDataLoading(false);
     }
 
     fetchQuotesAndSignals();
@@ -243,6 +287,25 @@ export default function Watchlist() {
 
   return (
     <div className="watchlist-page">
+      {/* 全頁 Loading Overlay */}
+      {dataLoading && (
+        <div className="wl-loading-overlay">
+          <div className="wl-loading-card">
+            <div className="wl-loading-bear">🐻</div>
+            <div className="wl-loading-rings">
+              <div className="wl-loading-ring wl-ring-1" />
+              <div className="wl-loading-ring wl-ring-2" />
+              <div className="wl-loading-ring wl-ring-3" />
+            </div>
+            <div className="wl-loading-title">資料抓取中</div>
+            <div className="wl-loading-step">{loadingStep}</div>
+            <div className="wl-loading-dots">
+              <span /><span /><span />
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="page-header">
         <h1 className="page-title">👁️ 觀察名單</h1>
       </div>
@@ -257,6 +320,22 @@ export default function Watchlist() {
               <span>📅 {latestKlineDate || '—'}</span>
               <span className="wl-data-sep">·</span>
               <span>🕐 {lastAnalyzedAt}</span>
+              {getCacheTTL(CACHE_KEYS.WATCHLIST_FULL) > 0 && (
+                <span className="wl-cache-badge">⚡ 快取中</span>
+              )}
+              <button
+                className="wl-refresh-btn"
+                title="重新抓取最新資料"
+                onClick={() => {
+                  clearCache(CACHE_KEYS.WATCHLIST_FULL);
+                  setLastAnalyzedAt(null);
+                  setLiveQuotes({});
+                  setQuantDataMap({});
+                  setSimonsRecMap({});
+                }}
+              >
+                🔄 重新抓取
+              </button>
             </>
           ) : watchlistSignalsLoading ? (
             <span>正在抓取數據中...</span>
@@ -308,9 +387,9 @@ export default function Watchlist() {
         </div>
       )}
 
-      {watchlistSignalsLoading && watchlist.length > 0 && (
+      {watchlistSignalsLoading && watchlist.length > 0 && !dataLoading && (
         <div className="wl-loading-bar">
-          <span className="spinner" style={{ width: 14, height: 14, borderWidth: 2 }}></span>
+          <span className="wl-inline-spinner" />
           正在分析 MA5 與量能訊號...
         </div>
       )}

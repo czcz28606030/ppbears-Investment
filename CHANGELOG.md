@@ -1,3 +1,15 @@
+## [v1.13.0] - 2026-04-24
+### Fixed
+- **學習幣無法發放（主因）**：修正 `completeLesson` 中發幣邏輯僅限 `child` 帳號（`user.parentId` 存在時才執行）的問題。現在父母帳號學習時也能查詢自己設定的發幣規則（`parent_id = user.id`），並正確發放學習幣
+- **最後一題 XP 計算遺失（Stale Closure）**：`LessonView` 的 `handleNextQuestion` 因 React state 閉包問題，`answers` 在最後一題答完後仍取得舊快照，導致最後一題 XP 未被計入。改用 `answersRef`（`useRef`）即時追蹤最新答案，確保全部題目 XP 正確累積
+- **移除冗餘的 `learning_wallet` upsert 呼叫**：前端不再對 `learning_wallet` 直接做 upsert（會被 Supabase RLS 阻擋），改由 `grant_learning_coins` SQL 函式內部的原子性 upsert 處理錢包初始化
+- **結果頁誤導訊息移除**：完課結果頁的「請主帳號設定發幣規則」已移除，避免父母帳號看到不必要的提示
+
+### Added
+- **模組級快取系統（Portfolio 頁）**：`Portfolio` 頁面的 AI 訊號（Simons + 量化資料）加入 5 分鐘快取機制，切換頁面回來後直接讀取快取，不重複呼叫 API
+- **快取 UI 指示（Portfolio 頁）**：加入「⚡ 快取中」綠色徽章與「🔄 重新抓取」手動刷新按鈕，讓使用者清楚知道資料來源狀態
+- **模組級快取系統（Explore 頁）**：`Explore` 頁面的 TWSE/TPEX 全市場報價與 Simons 每日推薦各自加入 10 分鐘快取，大幅減少頁面切換時的重複 API 請求
+
 ## [v1.12.0] - 2026-04-23
 ### Changed
 - **AI 每日推薦篩選按鈕升級**：將「AI 中度以上 + 累積報酬正值」篩選由傳統 checkbox 改為一鍵切換方框按鈕

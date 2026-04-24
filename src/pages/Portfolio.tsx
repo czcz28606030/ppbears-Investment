@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useStore, formatMoney, formatPrice } from '../store';
 import type { Holding, SimonsItem } from '../types';
 import { fetchSimonsData, fetchStockQuantData, calculateSimonsScore, calculateAdvice } from '../api';
+import { getCache, setCache, clearCache, getCacheTTL, CACHE_KEYS } from '../cache';
 import './Portfolio.css';
 
 export default function Portfolio() {
@@ -30,6 +31,8 @@ export default function Portfolio() {
     simonsComment: string;
   }>>({});
   const [signalDataDate, setSignalDataDate] = useState<string>('');;
+  const [signalsLoading, setSignalsLoading] = useState(false);
+  const [loadingMsg, setLoadingMsg] = useState('正在載入資料...');
   const [enableCustomSignal, setEnableCustomSignal] = useState(() => {
     return localStorage.getItem('ppbears_custom_signal') === 'true';
   });
@@ -46,6 +49,25 @@ export default function Portfolio() {
       if (!hasAiFeature && !enableCustomSignal) {
         if (mounted && Object.keys(aiSignals).length > 0) setAiSignals({});
         return;
+      }
+
+      // 檢查快取（5 分鐘）
+      type SignalCacheData = typeof aiSignals & { _date: string; _holdingKeys: string };
+      const holdingKeys = holdings.map(h => h.stockCode).sort().join(',');
+      const cacheKey = CACHE_KEYS.PORTFOLIO_SIGNALS;
+      const cached = getCache<SignalCacheData>(cacheKey);
+      if (cached && cached._holdingKeys === holdingKeys) {
+        if (mounted) {
+          const { _date, _holdingKeys: _k, ...cachedSignals } = cached;
+          setAiSignals(cachedSignals);
+          setSignalDataDate(_date);
+        }
+        return;
+      }
+
+      if (mounted) {
+        setSignalsLoading(true);
+        setLoadingMsg('正在連線 Simons 量化模型...');
       }
       
       const signals: Record<string, {
@@ -67,6 +89,7 @@ export default function Portfolio() {
         }
         try {
           // 並行取得 Simons 每日推薦清單
+          if (mounted) setLoadingMsg(`正在分析 ${holdings.length} 支持股 AI 訊號...`);
           const simonsItems = await fetchSimonsData().catch(() => [] as SimonsItem[]);
           const simonsItemMap: Record<string, SimonsItem> = {};
           simonsItems.forEach(item => { simonsItemMap[item.coid] = item; });
@@ -171,7 +194,15 @@ export default function Portfolio() {
         }));
       }
 
-      if (mounted) setAiSignals(signals);
+      if (mounted) {
+        setAiSignals(signals);
+        setSignalsLoading(false);
+        // 寫入快取（5 分鐘）
+        const now = new Date();
+        const pad = (n: number) => String(n).padStart(2, '0');
+        const dateStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+        setCache(cacheKey, { ...signals, _date: dateStr, _holdingKeys: holdingKeys }, 5 * 60 * 1000);
+      }
     }
     loadSignals();
     return () => { mounted = false; };
@@ -179,6 +210,25 @@ export default function Portfolio() {
 
   return (
     <div className="portfolio">
+      {/* AI 訊號抓取 Loading Overlay */}
+      {signalsLoading && holdings.length > 0 && (
+        <div className="pf-loading-overlay">
+          <div className="pf-loading-card">
+            <div className="pf-loading-icon">📊</div>
+            <div className="pf-loading-rings">
+              <div className="pf-loading-ring pf-ring-1" />
+              <div className="pf-loading-ring pf-ring-2" />
+              <div className="pf-loading-ring pf-ring-3" />
+            </div>
+            <div className="pf-loading-title">AI 訊號分析中</div>
+            <div className="pf-loading-step">{loadingMsg}</div>
+            <div className="pf-loading-dots">
+              <span /><span /><span />
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="page-header">
         <h1 className="page-title">💼 我的庫存</h1>
       </div>
@@ -244,16 +294,35 @@ export default function Portfolio() {
       </div>
 
       {/* 資料來源小字 */}
-      <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', marginBottom: '16px', marginTop: '6px', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 600 }}>
+      <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', marginBottom: '16px', marginTop: '6px', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 600, flexWrap: 'wrap' }}>
         <span>ℹ️ 資料來源與時間：</span>
         {hasAiFeature ? (
-          <span style={{ color: 'var(--primary)' }}>Simons 量化模型（爆取：{signalDataDate || '載入中...'}）</span>
+          <>
+            <span style={{ color: 'var(--primary)' }}>Simons 量化模型（{signalDataDate || '載入中...'}）</span>
+            {getCacheTTL(CACHE_KEYS.PORTFOLIO_SIGNALS) > 0 && (
+              <span className="pf-cache-badge">⚡ 快取中</span>
+            )}
+            {signalDataDate && (
+              <button
+                className="pf-refresh-btn"
+                title="重新抓取最新 AI 訊號"
+                onClick={() => {
+                  clearCache(CACHE_KEYS.PORTFOLIO_SIGNALS);
+                  setAiSignals({});
+                  setSignalDataDate('');
+                }}
+              >
+                🔄 重新抓取
+              </button>
+            )}
+          </>
         ) : enableCustomSignal ? (
           <span style={{ color: 'var(--primary)' }}>FinMind 技術指標（近 150 日）</span>
         ) : (
           <span style={{ color: 'var(--text-tertiary)' }}>台灣證券交易所 TWSE（持倉成本為入場均價）</span>
         )}
       </div>
+
 
       {/* 持股列表 */}
       <div className="holdings-list">
