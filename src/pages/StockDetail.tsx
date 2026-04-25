@@ -5,7 +5,7 @@ import type { StockQuantData } from '../api';
 import type { TWSTEStockQuote, TPEXStockQuote } from '../api';
 import { useStore, formatPrice, formatMoney } from '../store';
 import type { StockData, StockPrice, StockRecommendation, StockLiveAnalysis, SimonsItem } from '../types';
-import TradingViewChart from '../components/TradingViewChart';
+import StockChart from '../components/TradingViewChart';
 import './StockDetail.css';
 
 export default function StockDetail() {
@@ -586,15 +586,15 @@ export default function StockDetail() {
         </div>
       </div>
 
-      {/* 📈 TradingView 即時技術線圖 */}
-      {code && (
+      {/* 📈 技術線圖（使用 ifalgo K 線資料） */}
+      {code && stockData?.prices && stockData.prices.length > 0 && (
         <div className="card tv-chart-card">
           <div className="tv-chart-header">
             <span className="tv-chart-title">📈 技術線圖</span>
-            <span className="tv-chart-subtitle">日線 · K線 · 均線 · 成交量</span>
+            <span className="tv-chart-subtitle">日K · MA5 · MA20 · 成交量</span>
           </div>
           <div className="tv-chart-wrapper">
-            <TradingViewChart symbol={`${twseQuote ? 'TWSE' : 'TPEX'}:${code}`} stockCode={code} />
+            <StockChart prices={stockData.prices} stockName={stockData.stkname || code} />
           </div>
         </div>
       )}
