@@ -193,8 +193,15 @@ const StockChartInner = memo(function StockChartInner({ prices, stockName }: Sto
         volSeries.setData(uniqueVol as any);
       }
 
-      // 自動適配
-      chart.timeScale().fitContent();
+      // 預設顯示最近半年（約 130 個交易日）
+      const HALF_YEAR_BARS = 130;
+      if (uniqueCandles.length > HALF_YEAR_BARS) {
+        const fromDate = uniqueCandles[uniqueCandles.length - HALF_YEAR_BARS].time;
+        const toDate = uniqueCandles[uniqueCandles.length - 1].time;
+        chart.timeScale().setVisibleRange({ from: fromDate, to: toDate } as any);
+      } else {
+        chart.timeScale().fitContent();
+      }
 
       // 響應式
       const ro = new ResizeObserver(entries => {
