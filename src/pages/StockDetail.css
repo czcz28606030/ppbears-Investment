@@ -1303,3 +1303,103 @@
 
 /* 載入中 */
 .rs-chip-loading { background: #f5f5f5; color: #aaa; }
+
+/* ── TradingView 技術線圖卡片 ──────────────────────── */
+.tv-chart-card {
+  background: var(--bg-card) !important;
+  border: 1.5px solid rgba(123, 44, 191, 0.12) !important;
+  border-radius: 18px !important;
+  padding: 16px 16px 8px !important;
+  overflow: hidden;
+}
+
+.tv-chart-header {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.tv-chart-title {
+  font-size: 16px;
+  font-weight: 900;
+  color: var(--text-primary);
+}
+
+.tv-chart-subtitle {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-light);
+}
+
+.tv-chart-wrapper {
+  border-radius: 12px;
+  overflow: hidden;
+  height: 420px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+/* 手機版圖表高度稍低 */
+@media (max-width: 480px) {
+  .tv-chart-wrapper {
+    height: 360px;
+  }
+  .tv-chart-card {
+    padding: 12px 12px 6px !important;
+  }
+}
+
+/* TradingView 載入失敗 fallback */
+.tv-chart-fallback {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 32px 20px;
+  text-align: center;
+}
+
+.tv-chart-fallback-icon {
+  font-size: 40px;
+  opacity: 0.6;
+}
+
+.tv-chart-fallback-text {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.tv-chart-fallback-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 20px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  border: 1.5px solid #7B2CBF;
+  background: linear-gradient(135deg, #7B2CBF 0%, #9B59B6 100%);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(123, 44, 191, 0.25);
+  transition: all 0.2s ease;
+}
+
+.tv-chart-fallback-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(123, 44, 191, 0.35);
+}
+
+.tv-chart-fallback-btn-tv {
+  background: transparent;
+  color: #7B2CBF;
+  box-shadow: none;
+}
+
+.tv-chart-fallback-btn-tv:hover {
+  background: rgba(123, 44, 191, 0.06);
+  box-shadow: none;
+}

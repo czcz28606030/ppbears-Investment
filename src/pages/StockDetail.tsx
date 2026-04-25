@@ -5,6 +5,7 @@ import type { StockQuantData } from '../api';
 import type { TWSTEStockQuote, TPEXStockQuote } from '../api';
 import { useStore, formatPrice, formatMoney } from '../store';
 import type { StockData, StockPrice, StockRecommendation, StockLiveAnalysis, SimonsItem } from '../types';
+import TradingViewChart from '../components/TradingViewChart';
 import './StockDetail.css';
 
 export default function StockDetail() {
@@ -553,17 +554,6 @@ export default function StockDetail() {
           收盤價 · {priceDate}
         </div>
         <div style={{ marginTop: 16, display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
-          <button 
-            className="btn" 
-            style={{ 
-              background: 'transparent', border: '1px solid #7B2CBF', color: '#7B2CBF', 
-              padding: '6px 16px', borderRadius: '20px', fontSize: '14px', fontWeight: 800,
-              display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer'
-            }}
-            onClick={() => window.open(`https://tw.stock.yahoo.com/quote/${code}.TW/technical-analysis`, '_blank')}
-          >
-            📈 查看 Yahoo 最新技術線圖
-          </button>
           <button
             className="btn"
             disabled={wlBusy}
@@ -595,6 +585,19 @@ export default function StockDetail() {
           </button>
         </div>
       </div>
+
+      {/* 📈 TradingView 即時技術線圖 */}
+      {code && (
+        <div className="card tv-chart-card">
+          <div className="tv-chart-header">
+            <span className="tv-chart-title">📈 技術線圖</span>
+            <span className="tv-chart-subtitle">日線 · K線 · 均線 · 成交量</span>
+          </div>
+          <div className="tv-chart-wrapper">
+            <TradingViewChart symbol={`${twseQuote ? 'TWSE' : 'TPEX'}:${code}`} stockCode={code} />
+          </div>
+        </div>
+      )}
 
       {/* 用小朋友聽得懂的話介紹 */}
       <div className="card kid-desc-card">
