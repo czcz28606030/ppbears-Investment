@@ -38,7 +38,7 @@ export default function Explore() {
   const [quantProgress, setQuantProgress] = useState(0); // 量化分析進度 (0~100)
   const [quantProgressText, setQuantProgressText] = useState('');
   const [aiQualified, setAiQualified] = useState<Set<string>>(new Set()); // 記錄符合「中度以上 + 正報酬」的股票
-  const [aiFilterQualified, setAiFilterQualified] = useState(false); // 是否勾選篩選
+  const [aiFilterQualified, setAiFilterQualified] = useState(true); // 預設勾選篩選
   const [simonsMeta, setSimonsMeta] = useState<Record<string, any>>({}); // 保存原始 SimonsItem 供重新評分用
   const resultRef = useRef<HTMLDivElement>(null);
   const pendingScrollY = useRef(restored.current?.scrollY ?? 0);
