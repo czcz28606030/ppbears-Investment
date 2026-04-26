@@ -1,3 +1,8 @@
+## [v1.17.1] - 2026-04-26
+### Fixed
+- **學習幣永遠為 0 的根本原因修正**：`completeLesson` 函式從 `reward_rules` 查到的原始 DB 資料（欄位名為蛇形命名法 `trigger_type`），被直接強制轉型為 TypeScript 的 `RewardRule[]`（期望駝峰命名法 `triggerType`），導致 `rule.triggerType` 永遠是 `undefined`，任何觸發條件都無法匹配，`grant_learning_coins` RPC 從未被呼叫
+  - 修正方式：改為透過 `rowToRewardRule()` 函式正確映射欄位（`trigger_type` → `triggerType` 等），與 `fetchRewardRules` 其他地方的寫法一致
+
 ## [v1.17.0] - 2026-04-26
 ### Changed
 - **觀察名單自動排序升級**：觀察名單股票現在以「AI 推薦等級」作為第二排序鍵，同層訊號內依 超高度 → 高度 → 中度 → 低度 自動由高到低排列，讓最值得關注的標的排最前面

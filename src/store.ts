@@ -570,7 +570,7 @@ export const useStore = create<InvestmentStore>((set, get) => ({
           12000,
           { data: [] } as any
         ));
-        const rules = (rulesResult.data ?? []) as RewardRule[];
+        const rules = (rulesResult.data ?? []).map((r: Record<string, unknown>) => rowToRewardRule(r));
 
         if (rules.length > 0) {
           const triggeredTypes: RewardTriggerType[] = [];
