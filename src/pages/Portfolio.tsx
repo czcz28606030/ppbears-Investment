@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore, formatMoney, formatPrice } from '../store';
-import type { Holding, SimonsItem } from '../types';
-import { fetchSimonsData, fetchStockQuantData, calculateSimonsScore, calculateAdvice } from '../api';
+import type { Holding } from '../types';
+import { fetchStockQuantData } from '../api';
 import { getCache, setCache, clearCache, getCacheTTL, CACHE_KEYS } from '../cache';
 import './Portfolio.css';
 
@@ -25,10 +25,6 @@ export default function Portfolio() {
     primaryLabel: string;
     primaryType: 'buy' | 'sell' | 'neutral';
     primaryIcon: string;
-    simonsScore: number;
-    simonsLabel: string;
-    simonsType: 'strong-buy' | 'buy' | 'hold' | 'reduce' | 'sell' | '';
-    simonsComment: string;
   }>>({});
   const [signalDataDate, setSignalDataDate] = useState<string>('');;
   const [signalsLoading, setSignalsLoading] = useState(false);
@@ -67,17 +63,13 @@ export default function Portfolio() {
 
       if (mounted) {
         setSignalsLoading(true);
-        setLoadingMsg('正在連線 Simons 量化模型...');
+        setLoadingMsg('正在連線 AI 量化分析...');
       }
       
       const signals: Record<string, {
         primaryLabel: string;
         primaryType: 'buy' | 'sell' | 'neutral';
         primaryIcon: string;
-        simonsScore: number;
-        simonsLabel: string;
-        simonsType: 'strong-buy' | 'buy' | 'hold' | 'reduce' | 'sell' | '';
-        simonsComment: string;
       }> = {};
 
       if (hasAiFeature) {
@@ -88,23 +80,17 @@ export default function Portfolio() {
           setSignalDataDate(`${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`);
         }
         try {
-          // 並行取得 Simons 每日推薦清單
+          // 並行取得 AI 量化訊號
           if (mounted) setLoadingMsg(`正在分析 ${holdings.length} 支持股 AI 訊號...`);
-          const simonsItems = await fetchSimonsData().catch(() => [] as SimonsItem[]);
-          const simonsItemMap: Record<string, SimonsItem> = {};
-          simonsItems.forEach(item => { simonsItemMap[item.coid] = item; });
 
           await Promise.all(holdings.map(async (h) => {
-            const simonsItem = simonsItemMap[h.stockCode];
             const quantData = await fetchStockQuantData(h.stockCode).catch(() => null);
 
-            // ── 主訊號：原始 AI 建議（保留原邏輯）──
+            // ── 主訊號：使用 fetchStockQuantData 裡已解析的 currentSignal ──
             let primaryLabel: string;
             let primaryType: 'buy' | 'sell' | 'neutral';
             let primaryIcon: string;
 
-            // ── 主訊號：使用 fetchStockQuantData 裡已解析的 currentSignal ──
-            // (sell_sig 來自 aiQuanBackDataTradingList 最新一筆，已在 api.ts 正確解析)
             const sig = quantData?.currentSignal ?? 'neutral';
             if (sig === 'buy') {
               primaryLabel = 'AI 加碼'; primaryType = 'buy'; primaryIcon = '🚀';
@@ -114,46 +100,7 @@ export default function Portfolio() {
               primaryLabel = 'AI 中立'; primaryType = 'neutral'; primaryIcon = '⚖️';
             }
 
-            // ── 輔助訊號：Simons 量化評分 ──
-            let simonsScore = 0;
-            let simonsLabel = '';
-            let simonsType: 'strong-buy' | 'buy' | 'hold' | 'reduce' | 'sell' | '' = '';
-            let simonsComment = '';
-
-            if (simonsItem && quantData?.aiQuanBackDataComment) {
-              const result = calculateSimonsScore(simonsItem, quantData!);
-              simonsScore = result.score;
-              simonsComment = result.text.replace(/^(Simons 量化評分|綜合評分) \d+分[！。，]?\s*/, '');
-            } else if (simonsItem) {
-              const result = calculateAdvice(simonsItem);
-              simonsScore = result.score;
-              simonsComment = result.text.replace(/^(Simons 量化評分|綜合評分) \d+分[！。，]?\s*/, '');
-            } else if (quantData?.aiQuanBackDataComment) {
-              // 不在 Simons 名單但有量化資料：估算分數，不顯示「未在名單」文字
-              const remark = quantData.aiQuanBackDataComment.remark;
-              const cumRet = quantData.aiQuanBackDataComment.cum_ret || '';
-              if (remark.includes('超高')) simonsScore = 76;
-              else if (remark.includes('高度')) simonsScore = 62;
-              else if (remark.includes('中度')) simonsScore = 48;
-              else simonsScore = 33;
-              if (quantData.chipStability) {
-                const pts = parseFloat(quantData.chipStability.pts);
-                if (pts >= 8) simonsScore += 5;
-                else if (pts < 2) simonsScore -= 5;
-              }
-              simonsScore = Math.max(0, Math.min(100, simonsScore));
-              simonsComment = `AI推薦等級：${remark}${cumRet ? `，累積報酬 ${cumRet}` : ''}`;
-            }
-
-            if (simonsScore > 0) {
-              if (simonsScore >= 75) { simonsLabel = '強力加碼'; simonsType = 'strong-buy'; }
-              else if (simonsScore >= 60) { simonsLabel = '加碼'; simonsType = 'buy'; }
-              else if (simonsScore >= 45) { simonsLabel = '觀望'; simonsType = 'hold'; }
-              else if (simonsScore >= 30) { simonsLabel = '減碼'; simonsType = 'reduce'; }
-              else { simonsLabel = '出場'; simonsType = 'sell'; }
-            }
-
-            signals[h.stockCode] = { primaryLabel, primaryType, primaryIcon, simonsScore, simonsLabel, simonsType, simonsComment };
+            signals[h.stockCode] = { primaryLabel, primaryType, primaryIcon };
           }));
 
         } catch (err) {
@@ -181,11 +128,11 @@ export default function Portfolio() {
                const prevClose = closes[closes.length - 2];
                const max20 = Math.max(...closes.slice(-20));
                if (lastClose > sma60 && lastClose >= max20) {
-                 signals[h.stockCode] = { primaryLabel: '技術加碼', primaryType: 'buy', primaryIcon: '🚀', simonsScore: 0, simonsLabel: '', simonsType: '', simonsComment: '' };
+                 signals[h.stockCode] = { primaryLabel: '技術加碼', primaryType: 'buy', primaryIcon: '🚀' };
                } else if (lastClose < sma60 && prevClose < sma60Prev) {
-                 signals[h.stockCode] = { primaryLabel: '技術出場', primaryType: 'sell', primaryIcon: '🚪', simonsScore: 0, simonsLabel: '', simonsType: '', simonsComment: '' };
+                 signals[h.stockCode] = { primaryLabel: '技術出場', primaryType: 'sell', primaryIcon: '🚪' };
                } else {
-                 signals[h.stockCode] = { primaryLabel: '技術中立', primaryType: 'neutral', primaryIcon: '⚖️', simonsScore: 0, simonsLabel: '', simonsType: '', simonsComment: '' };
+                 signals[h.stockCode] = { primaryLabel: '技術中立', primaryType: 'neutral', primaryIcon: '⚖️' };
                }
              }
           } catch (e) {
@@ -298,7 +245,7 @@ export default function Portfolio() {
         <span>ℹ️ 資料來源與時間：</span>
         {hasAiFeature ? (
           <>
-            <span style={{ color: 'var(--primary)' }}>Simons 量化模型（{signalDataDate || '載入中...'}）</span>
+            <span style={{ color: 'var(--primary)' }}>AI 量化分析（{signalDataDate || '載入中...'}）</span>
             {getCacheTTL(CACHE_KEYS.PORTFOLIO_SIGNALS) > 0 && (
               <span className="pf-cache-badge">⚡ 快取中</span>
             )}
@@ -376,17 +323,7 @@ export default function Portfolio() {
                       </div>
                     </div>
                   </div>
-                  {signal && signal.simonsScore > 0 && signal.simonsType !== '' && (
-                    <div className={`holding-simons-comment simons-comment-${signal.simonsType}`}>
-                      <span className="holding-simons-score">💎 Simons {signal.simonsScore}分</span>
-                      <span className={`holding-simons-aux simons-aux-${signal.simonsType}`}>
-                        {{'strong-buy':'💹','buy':'🚀','hold':'👀','reduce':'⚠️','sell':'🚪'}[signal.simonsType]} {signal.simonsLabel}
-                      </span>
-                      {signal.simonsComment && (
-                        <><span className="holding-simons-sep"> · </span><span className="holding-simons-text">{signal.simonsComment}</span></>
-                      )}
-                    </div>
-                  )}
+
                 </div>
               );
             })

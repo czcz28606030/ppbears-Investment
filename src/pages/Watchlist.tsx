@@ -24,6 +24,7 @@ export default function Watchlist() {
   const [simonsRecMap, setSimonsRecMap] = useState<Record<string, StockRecommendation>>({});
   const [filterSignalOnly, setFilterSignalOnly] = useState(false); // 只顯示有訊號的
   const [filterWarnOnly, setFilterWarnOnly] = useState(false);   // 只顯示建議移除的
+  const [filterAiSignal, setFilterAiSignal] = useState<'all' | 'buy' | 'neutral' | 'sell'>('all'); // AI 進出場訊號篩選
   const [dataLoading, setDataLoading] = useState(false);
   const [loadingStep, setLoadingStep] = useState<string>('正在連線...');
 
@@ -199,6 +200,53 @@ export default function Watchlist() {
     }
   }
 
+  function getAiSignalBadge(stockCode: string) {
+    const qd = quantDataMap[stockCode];
+    if (!qd) return null;
+    const sig = qd.currentSignal;
+    switch (sig) {
+      case 'buy':
+        return (
+          <div className="wl-ai-icon-badge wl-ai-icon-buy">
+            <div className="wl-ai-icon-circle wl-ai-circle-buy">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
+                <polyline points="17 6 23 6 23 12" />
+              </svg>
+            </div>
+            <span className="wl-ai-icon-label">AI進場</span>
+          </div>
+        );
+      case 'sell':
+        return (
+          <div className="wl-ai-icon-badge wl-ai-icon-sell">
+            <div className="wl-ai-icon-circle wl-ai-circle-sell">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="23 18 13.5 8.5 8.5 13.5 1 6" />
+                <polyline points="17 18 23 18 23 12" />
+              </svg>
+            </div>
+            <span className="wl-ai-icon-label">AI出場</span>
+          </div>
+        );
+      default:
+        return (
+          <div className="wl-ai-icon-badge wl-ai-icon-neutral">
+            <div className="wl-ai-icon-circle wl-ai-circle-neutral">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+            </div>
+            <span className="wl-ai-icon-label">AI中立</span>
+          </div>
+        );
+    }
+  }
+
+  function getAiSignalForStock(stockCode: string): 'buy' | 'sell' | 'neutral' {
+    return quantDataMap[stockCode]?.currentSignal ?? 'neutral';
+  }
+
   function getScoreStars(score: number): string {
     if (score >= 80) return '⭐⭐⭐⭐⭐';
     if (score >= 65) return '⭐⭐⭐⭐';
@@ -279,11 +327,20 @@ export default function Watchlist() {
     .filter(w => {
       if (filterSignalOnly) return !!getSignalForStock(w.stockCode);
       if (filterWarnOnly)   return getWarningForStock(w.stockCode)?.level === 'remove';
+      if (filterAiSignal !== 'all') return getAiSignalForStock(w.stockCode) === filterAiSignal;
       return true;
     });
 
   const signalCount = watchlistSignals.length;
   const warningCount = watchlistWarnings.filter(w => w.level === 'remove').length;
+
+  // AI 訊號統計
+  const aiSignalCounts = watchlist.reduce((acc, w) => {
+    const sig = getAiSignalForStock(w.stockCode);
+    acc[sig] = (acc[sig] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+  const hasAnyQuantData = Object.keys(quantDataMap).length > 0;
 
   return (
     <div className="watchlist-page">
@@ -352,6 +409,7 @@ export default function Watchlist() {
           onClick={() => {
             setFilterSignalOnly(f => !f);
             setFilterWarnOnly(false);
+            setFilterAiSignal('all');
           }}
           style={{ cursor: 'pointer' }}
         >
@@ -373,6 +431,7 @@ export default function Watchlist() {
           onClick={() => {
             setFilterWarnOnly(f => !f);
             setFilterSignalOnly(false);
+            setFilterAiSignal('all');
           }}
           style={{ cursor: 'pointer' }}
         >
@@ -384,6 +443,59 @@ export default function Watchlist() {
             </div>
             <div className="wl-alert-desc">{filterWarnOnly ? '只顯示建議移除的股票' : '點擊只顯示建議移除的股票 →'}</div>
           </div>
+        </div>
+      )}
+
+      {/* AI 進出場訊號篩選 */}
+      {hasAnyQuantData && watchlist.length > 0 && (
+        <div className="wl-ai-filter-bar">
+          <div className="wl-ai-filter-title">🤖 Simons AI 訊號篩選</div>
+          <div className="wl-ai-filter-cards">
+            <button
+              className={`wl-ai-filter-card wl-ai-fcard-buy${filterAiSignal === 'buy' ? ' active' : ''}`}
+              onClick={() => { setFilterAiSignal(filterAiSignal === 'buy' ? 'all' : 'buy'); setFilterSignalOnly(false); setFilterWarnOnly(false); }}
+            >
+              <div className="wl-ai-fcard-icon wl-ai-ficon-buy">
+                <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
+                  <polyline points="17 6 23 6 23 12" />
+                </svg>
+              </div>
+              <div className="wl-ai-fcard-label">AI進場</div>
+              <div className="wl-ai-fcard-count">{aiSignalCounts['buy'] || 0} 檔</div>
+            </button>
+            <button
+              className={`wl-ai-filter-card wl-ai-fcard-neutral${filterAiSignal === 'neutral' ? ' active' : ''}`}
+              onClick={() => { setFilterAiSignal(filterAiSignal === 'neutral' ? 'all' : 'neutral'); setFilterSignalOnly(false); setFilterWarnOnly(false); }}
+            >
+              <div className="wl-ai-fcard-icon wl-ai-ficon-neutral">
+                <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+              </div>
+              <div className="wl-ai-fcard-label">AI中立</div>
+              <div className="wl-ai-fcard-count">{aiSignalCounts['neutral'] || 0} 檔</div>
+            </button>
+            <button
+              className={`wl-ai-filter-card wl-ai-fcard-sell${filterAiSignal === 'sell' ? ' active' : ''}`}
+              onClick={() => { setFilterAiSignal(filterAiSignal === 'sell' ? 'all' : 'sell'); setFilterSignalOnly(false); setFilterWarnOnly(false); }}
+            >
+              <div className="wl-ai-fcard-icon wl-ai-ficon-sell">
+                <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="23 18 13.5 8.5 8.5 13.5 1 6" />
+                  <polyline points="17 18 23 18 23 12" />
+                </svg>
+              </div>
+              <div className="wl-ai-fcard-label">AI出場</div>
+              <div className="wl-ai-fcard-count">{aiSignalCounts['sell'] || 0} 檔</div>
+            </button>
+          </div>
+          {filterAiSignal !== 'all' && (
+            <div className="wl-ai-filter-active-hint">
+              篩選中：{filterAiSignal === 'buy' ? '🔴 AI進場' : filterAiSignal === 'sell' ? '🟢 AI出場' : '⚪ AI中立'}
+              <button className="wl-ai-filter-clear" onClick={() => setFilterAiSignal('all')}>✕ 取消篩選</button>
+            </div>
+          )}
         </div>
       )}
 
@@ -443,6 +555,7 @@ export default function Watchlist() {
                       {simonsRec && <span className="wl-rec-stars">{getScoreStars(simonsRec.score)}</span>}
                     </div>
                     <div className="wl-rec-badges">
+                      {getAiSignalBadge(w.stockCode)}
                       {simonsRec && getAdviceBadge(simonsRec.advice)}
                       {simonsRec && <span className="wl-badge wl-badge-premium">💎 Simons量化評分 {simonsRec.score}分</span>}
                     </div>
@@ -532,7 +645,35 @@ export default function Watchlist() {
       {watchlist.length > 0 && (
         <div className="wl-legend">
           <div className="wl-legend-title">📖 訊號與警告說明</div>
-          <div className="wl-legend-section">進場訊號</div>
+          <div className="wl-legend-section">🤖 AI 進出場訊號（Simons 量化模型）</div>
+          <div className="wl-legend-item">
+            <span className="wl-ai-icon-badge wl-ai-icon-buy" style={{ transform: 'scale(0.8)', transformOrigin: 'left center' }}>
+              <span className="wl-ai-icon-circle wl-ai-circle-buy" style={{ width: 28, height: 28 }}>
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18" /><polyline points="17 6 23 6 23 12" /></svg>
+              </span>
+              <span className="wl-ai-icon-label">AI進場</span>
+            </span>
+            <span>Simons 模型判斷 AI 持倉中，量化策略認為可加碼</span>
+          </div>
+          <div className="wl-legend-item">
+            <span className="wl-ai-icon-badge wl-ai-icon-neutral" style={{ transform: 'scale(0.8)', transformOrigin: 'left center' }}>
+              <span className="wl-ai-icon-circle wl-ai-circle-neutral" style={{ width: 28, height: 28 }}>
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12" /></svg>
+              </span>
+              <span className="wl-ai-icon-label">AI中立</span>
+            </span>
+            <span>Simons 模型無明確方向，建議觀望等待更好時機</span>
+          </div>
+          <div className="wl-legend-item">
+            <span className="wl-ai-icon-badge wl-ai-icon-sell" style={{ transform: 'scale(0.8)', transformOrigin: 'left center' }}>
+              <span className="wl-ai-icon-circle wl-ai-circle-sell" style={{ width: 28, height: 28 }}>
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6" /><polyline points="17 18 23 18 23 12" /></svg>
+              </span>
+              <span className="wl-ai-icon-label">AI出場</span>
+            </span>
+            <span>Simons 模型已出場，量化策略判斷風險升高</span>
+          </div>
+          <div className="wl-legend-section" style={{ marginTop: 12 }}>技術面進場訊號</div>
           <div className="wl-legend-item">
             <span className="wl-signal-badge wl-signal-both">🔥 雙重確認</span>
             <span>MA5 支撐 + 縮量回檔同時觸發，最強進場訊號</span>

@@ -230,9 +230,9 @@
   background: linear-gradient(to right, rgba(22, 163, 74, 0.08) 0%, var(--bg-card) 60%);
 }
 
-/* 出場：橘紅警告 */
+/* 出場：綠色 */
 .holding-item.signal-sell {
-  background: linear-gradient(to right, rgba(234, 88, 12, 0.09) 0%, var(--bg-card) 60%);
+  background: linear-gradient(to right, rgba(22, 163, 74, 0.09) 0%, var(--bg-card) 60%);
 }
 
 /* Signal badge（取代舊 holding-emoji） */
@@ -241,12 +241,12 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  width: 52px;
-  height: 52px;
-  border-radius: 12px;
+  width: 72px;
+  height: 72px;
+  border-radius: 16px;
   flex-shrink: 0;
   text-align: center;
-  gap: 2px;
+  gap: 3px;
 }
 
 .signal-badge-buy {
@@ -255,8 +255,8 @@
 }
 
 .signal-badge-sell {
-  background: #ea580c;
-  box-shadow: 0 2px 8px rgba(234, 88, 12, 0.35);
+  background: #16a34a;
+  box-shadow: 0 2px 8px rgba(22, 163, 74, 0.45);
 }
 
 .signal-badge-neutral {
@@ -264,12 +264,12 @@
 }
 
 .signal-badge-icon {
-  font-size: 22px;
+  font-size: 32px;
   line-height: 1;
 }
 
 .signal-badge-text {
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 800;
   color: #ffffff;
   line-height: 1;
@@ -417,58 +417,7 @@
   flex-shrink: 0;
 }
 
-/* ── Simons 評分註解列 ──────────────────────────────── */
-.holding-simons-comment {
-  margin-top: 8px;
-  padding: 6px 10px;
-  border-radius: 8px;
-  font-size: 11.5px;
-  font-weight: 600;
-  line-height: 1.4;
-  display: flex;
-  align-items: baseline;
-  gap: 5px;
-  flex-wrap: wrap;
-}
 
-.holding-simons-score {
-  font-weight: 800;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-/* 輔助訊號標籤（強力加碼/加碼/觀望/減碼/出場） */
-.holding-simons-aux {
-  display: inline-block;
-  padding: 1px 7px;
-  border-radius: 20px;
-  font-size: 11px;
-  font-weight: 800;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.simons-aux-strong-buy { background: linear-gradient(135deg, #7F1D1D, #991B1B); color: #fff; box-shadow: 0 1px 4px rgba(127,29,29,0.35); }
-.simons-aux-buy        { background: #DC2626; color: #fff; box-shadow: 0 1px 4px rgba(220,38,38,0.35); }
-.simons-aux-hold       { background: #D97706; color: #fff; box-shadow: 0 1px 4px rgba(217,119,6,0.35); }
-.simons-aux-reduce     { background: #16A34A; color: #fff; box-shadow: 0 1px 4px rgba(22,163,74,0.35); }
-.simons-aux-sell       { background: #16A34A; color: #fff; box-shadow: 0 1px 4px rgba(22,163,74,0.35); }
-
-.holding-simons-sep {
-  color: rgba(0, 0, 0, 0.25);
-  flex-shrink: 0;
-}
-
-.holding-simons-text {
-  opacity: 0.8;
-  line-height: 1.35;
-}
-
-.simons-comment-strong-buy { background: rgba(153, 27, 27, 0.07); color: #7F1D1D; }
-.simons-comment-buy        { background: rgba(220, 38, 38, 0.06); color: #991B1B; }
-.simons-comment-hold       { background: rgba(217, 119, 6, 0.08); color: #78350F; }
-.simons-comment-reduce     { background: rgba(22, 163, 74, 0.07); color: #14532D; }
-.simons-comment-sell       { background: rgba(22, 163, 74, 0.07); color: #14532D; }
 
 /* ============================================
    Portfolio Loading Overlay

@@ -724,6 +724,240 @@
   40%            { transform: scale(1.2); opacity: 1; }
 }
 
+/* ============================================
+   AI Signal Icon Badges (Large Icon — Simons Model)
+   ============================================ */
+
+.wl-ai-icon-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px 5px 5px;
+  border-radius: var(--radius-full);
+  font-weight: 900;
+  white-space: nowrap;
+  transition: transform 0.15s ease;
+}
+
+.wl-ai-icon-badge:hover {
+  transform: scale(1.04);
+}
+
+/* Circular icon container */
+.wl-ai-icon-circle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  transition: box-shadow 0.2s ease;
+}
+
+.wl-ai-icon-label {
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.03em;
+}
+
+/* ── AI進場 (Red) ── */
+.wl-ai-icon-buy {
+  background: linear-gradient(135deg, #FEE2E2, #FFF1F0);
+  border: 1.5px solid rgba(220, 38, 38, 0.25);
+}
+.wl-ai-icon-buy .wl-ai-icon-label { color: #DC2626; }
+.wl-ai-circle-buy {
+  background: linear-gradient(135deg, #EF4444, #DC2626);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(220, 38, 38, 0.35);
+}
+
+/* ── AI中立 (Neutral / Gray) ── */
+.wl-ai-icon-neutral {
+  background: linear-gradient(135deg, #F3F4F6, #E5E7EB);
+  border: 1.5px solid rgba(156, 163, 175, 0.3);
+}
+.wl-ai-icon-neutral .wl-ai-icon-label { color: #6B7280; }
+.wl-ai-circle-neutral {
+  background: linear-gradient(135deg, #9CA3AF, #6B7280);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(107, 114, 128, 0.3);
+}
+
+/* ── AI出場 (Green) ── */
+.wl-ai-icon-sell {
+  background: linear-gradient(135deg, #DCFCE7, #D1FAE5);
+  border: 1.5px solid rgba(22, 163, 74, 0.25);
+}
+.wl-ai-icon-sell .wl-ai-icon-label { color: #16A34A; }
+.wl-ai-circle-sell {
+  background: linear-gradient(135deg, #22C55E, #16A34A);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(22, 163, 74, 0.35);
+}
+
+
+/* ============================================
+   AI Signal Filter Cards (Large Icon Style)
+   ============================================ */
+
+.wl-ai-filter-bar {
+  background: linear-gradient(135deg, #FFFBEF, #FFF7E6);
+  border: 1.5px solid rgba(255, 202, 58, 0.25);
+  border-radius: var(--radius-lg);
+  padding: 14px 18px;
+  margin-bottom: 16px;
+}
+
+.wl-ai-filter-title {
+  font-size: var(--font-size-sm);
+  font-weight: 900;
+  color: var(--text-primary);
+  margin-bottom: 12px;
+}
+
+.wl-ai-filter-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.wl-ai-filter-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 14px 8px 12px;
+  border-radius: 16px;
+  border: 2px solid rgba(0, 0, 0, 0.06);
+  background: #fff;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+  position: relative;
+  overflow: hidden;
+}
+
+.wl-ai-filter-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.1);
+}
+
+.wl-ai-filter-card:active {
+  transform: translateY(0);
+}
+
+/* Icon inside filter card */
+.wl-ai-fcard-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.wl-ai-fcard-label {
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  color: var(--text-primary);
+}
+
+.wl-ai-fcard-count {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-light);
+}
+
+/* ── AI進場 Filter Card (Red) ── */
+.wl-ai-ficon-buy {
+  background: linear-gradient(135deg, #FCA5A5, #EF4444);
+  color: #fff;
+  box-shadow: 0 3px 10px rgba(239, 68, 68, 0.3);
+}
+
+.wl-ai-fcard-buy.active {
+  background: linear-gradient(135deg, #FEE2E2, #FFF1F0);
+  border-color: #EF4444;
+  box-shadow: 0 4px 16px rgba(239, 68, 68, 0.2), 0 0 0 3px rgba(239, 68, 68, 0.1);
+}
+.wl-ai-fcard-buy.active .wl-ai-fcard-label { color: #DC2626; }
+.wl-ai-fcard-buy.active .wl-ai-ficon-buy {
+  transform: scale(1.1);
+  box-shadow: 0 4px 14px rgba(239, 68, 68, 0.4);
+}
+
+/* ── AI中立 Filter Card (Neutral) ── */
+.wl-ai-ficon-neutral {
+  background: linear-gradient(135deg, #D1D5DB, #9CA3AF);
+  color: #fff;
+  box-shadow: 0 3px 10px rgba(156, 163, 175, 0.3);
+}
+
+.wl-ai-fcard-neutral.active {
+  background: linear-gradient(135deg, #F3F4F6, #E5E7EB);
+  border-color: #9CA3AF;
+  box-shadow: 0 4px 16px rgba(156, 163, 175, 0.2), 0 0 0 3px rgba(156, 163, 175, 0.1);
+}
+.wl-ai-fcard-neutral.active .wl-ai-fcard-label { color: #4B5563; }
+.wl-ai-fcard-neutral.active .wl-ai-ficon-neutral {
+  transform: scale(1.1);
+  box-shadow: 0 4px 14px rgba(156, 163, 175, 0.4);
+}
+
+/* ── AI出場 Filter Card (Green) ── */
+.wl-ai-ficon-sell {
+  background: linear-gradient(135deg, #86EFAC, #22C55E);
+  color: #fff;
+  box-shadow: 0 3px 10px rgba(34, 197, 94, 0.3);
+}
+
+.wl-ai-fcard-sell.active {
+  background: linear-gradient(135deg, #DCFCE7, #D1FAE5);
+  border-color: #22C55E;
+  box-shadow: 0 4px 16px rgba(34, 197, 94, 0.2), 0 0 0 3px rgba(34, 197, 94, 0.1);
+}
+.wl-ai-fcard-sell.active .wl-ai-fcard-label { color: #16A34A; }
+.wl-ai-fcard-sell.active .wl-ai-ficon-sell {
+  transform: scale(1.1);
+  box-shadow: 0 4px 14px rgba(34, 197, 94, 0.4);
+}
+
+/* Active filter hint */
+.wl-ai-filter-active-hint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 8px 14px;
+  background: rgba(0, 0, 0, 0.03);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-xs);
+  font-weight: 800;
+  color: var(--text-secondary);
+}
+
+.wl-ai-filter-clear {
+  background: none;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: var(--radius-full);
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--text-light);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.wl-ai-filter-clear:hover {
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--text-primary);
+}
+
 /* Inline spinner for wl-loading-bar */
 .wl-inline-spinner {
   display: inline-block;
