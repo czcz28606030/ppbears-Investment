@@ -308,7 +308,17 @@ export default function Watchlist() {
     setRemoveConfirm(null);
   }
 
-  // 排序：有訊號 > 無訊號但無警告 > 有警告的排最後
+  // AI 推薦等級轉分數（超高度 > 高度 > 中度 > 低度）
+  function getRemarkScore(stockCode: string): number {
+    const remark = quantDataMap[stockCode]?.aiQuanBackDataComment?.remark ?? '';
+    if (remark.includes('超高')) return 4;
+    if (remark.includes('高度')) return 3;
+    if (remark.includes('中度')) return 2;
+    if (remark.includes('低度')) return 1;
+    return 0;
+  }
+
+  // 排序：有訊號 > 無訊號但無警告 > 有警告的排最後；同層內再按 AI 推薦等級（超高度→低度）排序
   const sortedWatchlist = [...watchlist]
     .sort((a, b) => {
       const sigA = getSignalForStock(a.stockCode);
@@ -322,7 +332,10 @@ export default function Watchlist() {
         if (w.level === 'caution') return 2;
         return 1; // remove
       };
-      return priority(sigB, warnB) - priority(sigA, warnA);
+      const priDiff = priority(sigB, warnB) - priority(sigA, warnA);
+      if (priDiff !== 0) return priDiff;
+      // 同優先層內：按 AI 推薦等級降冪（超高度最前）
+      return getRemarkScore(b.stockCode) - getRemarkScore(a.stockCode);
     })
     .filter(w => {
       if (filterSignalOnly) return !!getSignalForStock(w.stockCode);
