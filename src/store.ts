@@ -591,7 +591,7 @@ export const useStore = create<InvestmentStore>((set, get) => ({
                   p_amount: rule.amount,
                   p_tx_type: 'earn',
                   p_source: rule.id,
-                  p_description: TRIGGER_LABELS[rule.triggerType] ?? rule.triggerLabel ?? rule.triggerType,
+                  p_description: (TRIGGER_LABELS as Record<string, string>)[rule.triggerType] ?? rule.triggerLabel ?? rule.triggerType,
                 })),
                 12000,
                 { error: { message: 'grant_learning_coins timeout' } } as any
