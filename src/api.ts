@@ -539,19 +539,33 @@ export async function fetchStockQuantData(coid: string): Promise<StockQuantData>
     if (tradingList.length > 0) {
       const last = tradingList[tradingList.length - 1];
       const outDate: string = (last?.out_date ?? '').trim();
+      const inDate: string  = (last?.in_date   ?? '').trim();
       const sig: string     = (last?.sell_sig  ?? '').trim();
-      // 沒有出場日期 → 仍在持倉中
-      const hasOpenPosition = !outDate || outDate === 'NA' || outDate === 'null' || outDate === '-';
-      console.log(`[QuantData] ${coid} | out_date='${outDate}' | sell_sig='${sig}' | hasOpenPosition=${hasOpenPosition}`);
+      const today = _todayStr(); // YYYY-MM-DD
 
-      if (hasOpenPosition || BUY_SIGS.has(sig)) {
-        currentSignal = 'buy';    // AI 持倉中或明確進場訊號 → AI 進場
-      } else if (SELL_SIGS.has(sig)) {
-        currentSignal = 'sell';   // AI 明確出場訊號 → AI 出場
+      // ── 判斷是否「仍在持倉中」────────────────────────────────────────────
+      // ifalgo 特殊規則：進場當天 API 會將 out_date 填入「進場日當天」當佔位符
+      // 因此以下三種狀況視為「仍在持倉」：
+      //   1. out_date 為空 / NA / null / '-'  → 還沒出場
+      //   2. out_date === in_date             → 同日訊號（佔位符），尚未確認出場
+      //   3. out_date === today               → 今天剛進場，尚未確認出場
+      // 相反地，out_date < today 且 out_date !== in_date → 已明確出場
+      const isEmpty = !outDate || outDate === 'NA' || outDate === 'null' || outDate === '-';
+      const isSameDayPlaceholder = outDate === inDate;
+      const isToday = outDate === today;
+      const hasOpenPosition = isEmpty || isSameDayPlaceholder || isToday;
+
+      console.log(`[QuantData] ${coid} | in_date='${inDate}' | out_date='${outDate}' | sell_sig='${sig}' | today='${today}' | hasOpenPosition=${hasOpenPosition}`);
+
+      if (hasOpenPosition && BUY_SIGS.has(sig)) {
+        currentSignal = 'buy';    // 仍在持倉中且為進場訊號 → AI 加碼
+      } else if (SELL_SIGS.has(sig) && !hasOpenPosition) {
+        currentSignal = 'sell';   // 已明確出場 → AI 出場
       } else {
-        currentSignal = 'neutral'; // 中立或未知 → AI 中立
+        currentSignal = 'neutral'; // 中立或已出場的進場訊號 → AI 中立
       }
     }
+
 
     const result: StockQuantData = {
       aiQuanBackDataComment: stock.aiQuanBackDataComment ?? null,
