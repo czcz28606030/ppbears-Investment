@@ -61,12 +61,53 @@
       ],
       "correct_answer": 0,
       "explanation": "沒錯！👩‍🏫 老師教書就是一種工作。醫生看病、廚師做菜也都是工作，每一種工作都是用能力幫助別人。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "工作賺錢的過程叫什麼？",
+      "options": [
+        "投資",
+        "消費",
+        "勞動換報酬",
+        "借貸"
+      ],
+      "correct_answer": 2,
+      "explanation": "正確！用自己的時間和能力工作，換取薪水，這就是最基本的賺錢方式。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "錢只能靠工作賺到，沒有其他方法。",
+      "correct_answer": false,
+      "explanation": "不對！除了工作，還可以靠投資、開公司、出租房子等方式賺錢。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "下面哪個是「被動收入」？",
+      "options": [
+        "打工賺時薪",
+        "存款賺利息",
+        "幫人搬家",
+        "送外賣"
+      ],
+      "correct_answer": 1,
+      "explanation": "利息是不需要工作就能賺到的錢，叫做被動收入！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "開公司做生意也是賺錢的一種方法。",
+      "correct_answer": true,
+      "explanation": "對！創業開公司，提供產品或服務，是很多人賺錢的方式。"
     }
   ],
   "ai_prompt_context": {
     "topic": "工作與收入的基本概念",
     "age_hint": "6-8歲",
     "vocabulary_level": "simple",
-    "metaphor_suggestions": ["零用錢", "爸媽上班", "薪水", "幫忙做家事"]
+    "metaphor_suggestions": [
+      "零用錢",
+      "爸媽上班",
+      "薪水",
+      "幫忙做家事"
+    ]
   }
 }

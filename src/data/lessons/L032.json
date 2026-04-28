@@ -61,12 +61,53 @@
       ],
       "correct_answer": 1,
       "explanation": "🧙‍♂️ 巴菲特名言：「別人貪婪時要恐懼，別人恐懼時要貪婪。」意思是不要隨著群眾衝動行事。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "股票大漲的常見原因不包括？",
+      "options": [
+        "公司業績超越預期",
+        "公司宣布大額投資計畫",
+        "公司老闆換人",
+        "老闆私下說的明牌"
+      ],
+      "correct_answer": 3,
+      "explanation": "內線消息是違法的！合法影響股價的是公開財報、官方公告等正式資訊。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "整體市場（大盤）上漲，通常個股也會跟著漲。",
+      "correct_answer": true,
+      "explanation": "對！大盤漲潮時，許多股票也會跟著上漲，市場情緒會帶動整體表現。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "「法人買超」通常代表什麼？",
+      "options": [
+        "法律在買股票",
+        "外資、投信等機構投資人大量買入，通常是正面訊號",
+        "法人要倒閉了",
+        "股票快下市了"
+      ],
+      "correct_answer": 1,
+      "explanation": "法人（外資、投信）因專業分析能力強，其大量買入通常被市場視為正面訊號！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "公司宣布股票分割後，每股股價會下降但持有總價值不變。",
+      "correct_answer": true,
+      "explanation": "對！股票分割是把一股變成多股，股價等比例降低，但持有的總價值不變。"
     }
   ],
   "ai_prompt_context": {
     "topic": "股票上漲的原因與期待心理",
     "age_hint": "7-9歲",
     "vocabulary_level": "simple",
-    "metaphor_suggestions": ["好消息推動", "氣球吹太大", "多頭市場", "巴菲特名言"]
+    "metaphor_suggestions": [
+      "好消息推動",
+      "氣球吹太大",
+      "多頭市場",
+      "巴菲特名言"
+    ]
   }
 }

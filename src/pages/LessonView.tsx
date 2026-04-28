@@ -20,20 +20,31 @@ interface AnswerRecord {
   xpEarned: number;
 }
 
-// 從 preset_questions 隨機抽 2 題（choice + true_false_speed 各取一；不足就 random 取）
+// 從 preset_questions 隨機抽題（目標5題；choice 和 true_false_speed 盡量均衡分配）
 function pickQuestions(questions: LessonQuestion[]): LessonQuestion[] {
-  const choices = questions.filter(q => q.question_type === 'choice');
-  const tfs = questions.filter(q => q.question_type === 'true_false_speed');
+  const TARGET = 5; // 每次測驗出題數
+  const shuffled = [...questions].sort(() => Math.random() - 0.5);
+  const choices = shuffled.filter(q => q.question_type === 'choice');
+  const tfs = shuffled.filter(q => q.question_type === 'true_false_speed');
+
   const picked: LessonQuestion[] = [];
-  if (choices.length > 0) picked.push(choices[Math.floor(Math.random() * choices.length)]);
-  if (tfs.length > 0) picked.push(tfs[Math.floor(Math.random() * tfs.length)]);
-  // 不足 2 題時從剩餘隨機補
-  if (picked.length < 2) {
-    const rest = questions.filter(q => !picked.includes(q));
-    rest.sort(() => Math.random() - 0.5);
-    picked.push(...rest.slice(0, 2 - picked.length));
+
+  // 盡量各取一半，各至少 2 題
+  const wantChoice = Math.max(2, Math.ceil(TARGET / 2));
+  const wantTf = TARGET - wantChoice;
+
+  picked.push(...choices.slice(0, wantChoice));
+  picked.push(...tfs.slice(0, wantTf));
+
+  // 若不足 TARGET 題，從剩餘補滿
+  if (picked.length < TARGET) {
+    const used = new Set(picked);
+    const rest = shuffled.filter(q => !used.has(q));
+    picked.push(...rest.slice(0, TARGET - picked.length));
   }
-  return picked.slice(0, 2);
+
+  // 再次隨機排序（避免固定 choice 在前 tf 在後）
+  return picked.slice(0, TARGET).sort(() => Math.random() - 0.5);
 }
 
 export default function LessonView() {

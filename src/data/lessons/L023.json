@@ -61,12 +61,53 @@
       ],
       "correct_answer": 2,
       "explanation": "沒錯！💡 買股票最主要的目的是讓閒置的錢為你工作，獲得比存銀行更好的報酬，對抗通膨。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "投資股票可以賺錢的方式有哪幾種？",
+      "options": [
+        "只有等股價上漲",
+        "股價上漲賺差價、領取股利（股息）",
+        "只有領股利",
+        "只有短線交易"
+      ],
+      "correct_answer": 1,
+      "explanation": "買股票主要有兩種賺錢方式：等股價上漲後賣出、或是領取公司配發的股利！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "持有股票一定能賺錢。",
+      "correct_answer": false,
+      "explanation": "不對！股票有風險，股價也可能下跌，持有股票不保證賺錢！"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "長期持有績優公司股票的好處是？",
+      "options": [
+        "沒有任何好處",
+        "可以參與公司長期成長、領取穩定股利",
+        "保證每年賺50%",
+        "不需要繳稅"
+      ],
+      "correct_answer": 1,
+      "explanation": "長期持有好公司，可以享受公司成長帶來的股價上漲，以及穩定的股利收入！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "投資股票是達到財務自由的方法之一。",
+      "correct_answer": true,
+      "explanation": "對！許多人透過長期投資好公司的股票，累積財富，這是實現財務自由的方式之一。"
     }
   ],
   "ai_prompt_context": {
     "topic": "投資股票的理由：讓錢工作、對抗通膨",
     "age_hint": "6-8歲",
     "vocabulary_level": "simple",
-    "metaphor_suggestions": ["珍奶漲價", "錢變薄", "讓錢去工作", "閒錢vs生活費"]
+    "metaphor_suggestions": [
+      "珍奶漲價",
+      "錢變薄",
+      "讓錢去工作",
+      "閒錢vs生活費"
+    ]
   }
 }

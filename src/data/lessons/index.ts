@@ -56,6 +56,11 @@ import L052 from './L052.json';
 import L053 from './L053.json';
 import L054 from './L054.json';
 import L055 from './L055.json';
+import L056 from './L056.json';
+import L057 from './L057.json';
+import L058 from './L058.json';
+import L059 from './L059.json';
+import L060 from './L060.json';
 
 const LESSON_MAP: Record<string, LessonData> = {
   L001: L001 as LessonData,
@@ -113,6 +118,11 @@ const LESSON_MAP: Record<string, LessonData> = {
   L053: L053 as LessonData,
   L054: L054 as LessonData,
   L055: L055 as LessonData,
+  L056: L056 as LessonData,
+  L057: L057 as LessonData,
+  L058: L058 as LessonData,
+  L059: L059 as LessonData,
+  L060: L060 as LessonData,
 };
 
 export function getLesson(lessonId: string): LessonData | null {

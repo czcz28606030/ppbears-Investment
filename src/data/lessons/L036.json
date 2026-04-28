@@ -61,12 +61,53 @@
       ],
       "correct_answer": 1,
       "explanation": "對！💻 台股代號 2xxx 開頭的大多是電子業公司，這是台股最大的產業類別。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "台灣股票代號通常是幾碼數字？",
+      "options": [
+        "3碼",
+        "4碼",
+        "5碼",
+        "6碼"
+      ],
+      "correct_answer": 1,
+      "explanation": "台灣上市公司股票代號是4碼數字，如台積電2330、鴻海2317。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "股票代號2330就是台積電。",
+      "correct_answer": true,
+      "explanation": "對！台積電的股票代號是2330，每家上市公司都有唯一的數字代號！"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "通常2字頭（如2330）的股票屬於哪個產業？",
+      "options": [
+        "食品業",
+        "電子業",
+        "金融業",
+        "傳統產業"
+      ],
+      "correct_answer": 1,
+      "explanation": "台灣股票代號2開頭通常是電子業，如台積電(2330)、鴻海(2317)、聯發科(2454)！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "知道股票代號，就可以在網路上搜尋到這家公司的詳細資訊。",
+      "correct_answer": true,
+      "explanation": "對！輸入股票代號可以快速找到股價、財報、新聞等所有重要資訊！"
     }
   ],
   "ai_prompt_context": {
     "topic": "台灣股票代號系統與查詢方式",
     "age_hint": "7-9歲",
     "vocabulary_level": "simple",
-    "metaphor_suggestions": ["像朋友的暱稱", "4位數字代號", "2330台積電", "Google搜尋"]
+    "metaphor_suggestions": [
+      "像朋友的暱稱",
+      "4位數字代號",
+      "2330台積電",
+      "Google搜尋"
+    ]
   }
 }

@@ -21,6 +21,44 @@ function setDailyCache<T>(key: string, data: T): void {
   try { localStorage.setItem(key, JSON.stringify({ date: _todayStr(), data })); } catch {}
 }
 
+// ── TTL 短效快取工具（適合盤中訊號，避免全天使用過期資料）──────────────────────
+// 使用 expiry timestamp，可設定任意毫秒 TTL
+function getTTLCache<T>(key: string): T | null {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const parsed: { expiry: number; data: T } = JSON.parse(raw);
+    if (Date.now() > parsed.expiry) {
+      localStorage.removeItem(key);
+      return null;
+    }
+    return parsed.data;
+  } catch { return null; }
+}
+function setTTLCache<T>(key: string, data: T, ttlMs: number): void {
+  try {
+    localStorage.setItem(key, JSON.stringify({ expiry: Date.now() + ttlMs, data }));
+  } catch {}
+}
+/** 清除指定 key 的 TTL 快取（手動強制刷新用） */
+export function clearTTLCache(key: string): void {
+  try { localStorage.removeItem(key); } catch {}
+}
+/** 取得剩餘 TTL 秒數（0 = 已過期或不存在） */
+export function getTTLRemaining(key: string): number {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return 0;
+    const parsed: { expiry: number } = JSON.parse(raw);
+    return Math.max(0, Math.round((parsed.expiry - Date.now()) / 1000));
+  } catch { return 0; }
+}
+
+// 量化訊號快取 TTL：30 分鐘（盤中最多延遲 30 分鐘，避免錯過買賣訊號）
+const QUANT_SIGNAL_TTL_MS = 30 * 60 * 1000;
+// Simons 每日推薦快取 TTL：30 分鐘（Simons 盤後更新，但寧可多抓幾次也不錯過）
+const SIMONS_DATA_TTL_MS = 30 * 60 * 1000;
+
 // TWSE OpenAPI Base
 const TWSE_BASE = '/api/twse';
 
@@ -471,8 +509,9 @@ export interface StockQuantData {
 
 export async function fetchStockQuantData(coid: string): Promise<StockQuantData> {
   const empty: StockQuantData = { aiQuanBackDataComment: null, chipStability: null, stockInfo: null, currentSignal: 'neutral' };
-  const cacheKey = `ppbears_daily_quant4_${coid}`; // v4: 改用 out_date 判斷進出場
-  const cached = getDailyCache<StockQuantData>(cacheKey);
+  // v5: 改用 30 分鐘 TTL 快取（原每日快取會讓訊號延遲整天，盤中訊號不可接受）
+  const cacheKey = `ppbears_quant30_${coid}`;
+  const cached = getTTLCache<StockQuantData>(cacheKey);
   if (cached) return cached;
   try {
     const url = `${IFALGO_BASE}/stock?coid=${coid}`;
@@ -482,26 +521,35 @@ export async function fetchStockQuantData(coid: string): Promise<StockQuantData>
     const pos = stock?.position;
     if (!stock) return empty;
 
-    // 從 aiQuanBackDataTradingList 判斷目前訊號
-    // 邏輯：
-    //   最後一筆「沒有 out_date」             → AI 持倉中     → 顯示「AI 加碼」
-    //   最後一筆「有 out_date」+ sell_sig='出場' → AI 剛出場     → 顯示「AI 出場」
-    //   最後一筆「有 out_date」+ sell_sig='中立' → AI 已結束，無訊號 → 顯示「AI 中立」
-    //   無任何紀錄                             → 無訊號       → 顯示「AI 中立」
+    // ── 從 aiQuanBackDataTradingList 判斷目前訊號 ──────────────────────────────
+    // 判斷邏輯（優先序由高到低）：
+    //   1. 最後一筆「沒有 out_date」或 sell_sig 屬於進場類    → AI 持倉中  → 「AI 進場」
+    //   2. 最後一筆「有 out_date」且 sell_sig 屬於出場類      → AI 已出場  → 「AI 出場」
+    //   3. 其餘（sell_sig='中立'、空值、或無任何紀錄）        → 無明確方向 → 「AI 中立」
+    //
+    // ⚠️ 重要：sell_sig 實際值依 IFAlgo API 有：
+    //   進場類：'進場' | '加碼' | '買進' | 'buy'
+    //   出場類：'出場' | '賣出' | '減碼' | 'sell'
+    //   中立類：'中立' | '' | null | undefined
+    const BUY_SIGS  = new Set(['進場', '加碼', '買進', 'buy',  'Buy',  'BUY']);
+    const SELL_SIGS = new Set(['出場', '賣出', '減碼', 'sell', 'Sell', 'SELL']);
+
     const tradingList: any[] = stock.aiQuanBackDataTradingList || [];
     let currentSignal: 'buy' | 'sell' | 'neutral' = 'neutral';
     if (tradingList.length > 0) {
       const last = tradingList[tradingList.length - 1];
-      const outDate: string = last?.out_date ?? '';
-      const sig: string = last?.sell_sig ?? '';
-      const hasOpenPosition = !outDate || outDate === '' || outDate === 'NA' || outDate === 'null';
-      console.log(`[QuantData] ${coid} out_date='${outDate}' sell_sig='${sig}' hasOpenPosition=${hasOpenPosition}`);
-      if (hasOpenPosition) {
-        currentSignal = 'buy';   // AI 持倉中 → AI 加碼
-      } else if (sig === '出場' || sig === '賣出') {
-        currentSignal = 'sell';  // AI 已明確出場 → AI 出場
+      const outDate: string = (last?.out_date ?? '').trim();
+      const sig: string     = (last?.sell_sig  ?? '').trim();
+      // 沒有出場日期 → 仍在持倉中
+      const hasOpenPosition = !outDate || outDate === 'NA' || outDate === 'null' || outDate === '-';
+      console.log(`[QuantData] ${coid} | out_date='${outDate}' | sell_sig='${sig}' | hasOpenPosition=${hasOpenPosition}`);
+
+      if (hasOpenPosition || BUY_SIGS.has(sig)) {
+        currentSignal = 'buy';    // AI 持倉中或明確進場訊號 → AI 進場
+      } else if (SELL_SIGS.has(sig)) {
+        currentSignal = 'sell';   // AI 明確出場訊號 → AI 出場
       } else {
-        currentSignal = 'neutral'; // '中立' 或其他 → AI 中立
+        currentSignal = 'neutral'; // 中立或未知 → AI 中立
       }
     }
 
@@ -511,7 +559,8 @@ export async function fetchStockQuantData(coid: string): Promise<StockQuantData>
       stockInfo: pos?.stockInfo ?? null,
       currentSignal,
     };
-    setDailyCache(cacheKey, result);
+    // 寫入 30 分鐘 TTL 快取
+    setTTLCache(cacheKey, result, QUANT_SIGNAL_TTL_MS);
     return result;
   } catch (err) {
     console.error('fetchStockQuantData error:', err);
@@ -520,17 +569,30 @@ export async function fetchStockQuantData(coid: string): Promise<StockQuantData>
 }
 
 // 取得 Simons 每日推薦
+// 改用 30 分鐘 TTL 快取：Simons 資料盤後更新，但寧可多抓幾次也不用一整天的舊資料
 export async function fetchSimonsData(date?: string): Promise<SimonsItem[]> {
   const d = date || _todayStr();
-  const cacheKey = `ppbears_daily_simons_${d}`;
-  const cached = getDailyCache<SimonsItem[]>(cacheKey);
+  // 指定日期查詢（歷史資料）時仍用每日快取；今日資料用 30 分鐘 TTL
+  const isToday = !date || date === _todayStr();
+  const cacheKey = isToday
+    ? `ppbears_simons30_${d}`          // 今日：30 分鐘 TTL
+    : `ppbears_daily_simons_${d}`;     // 歷史：每日快取
+  const cached = isToday
+    ? getTTLCache<SimonsItem[]>(cacheKey)
+    : getDailyCache<SimonsItem[]>(cacheKey);
   if (cached) return cached;
   try {
     const url = `${IFALGO_BASE}/common/getSimonsData?searchDate=${d}&_t=${Date.now()}`;
     const res = await fetch(url, { cache: 'no-store' });
     const json = await res.json();
     const items: SimonsItem[] = json.data?.dataItems || [];
-    if (items.length > 0) setDailyCache(cacheKey, items);
+    if (items.length > 0) {
+      if (isToday) {
+        setTTLCache(cacheKey, items, SIMONS_DATA_TTL_MS);
+      } else {
+        setDailyCache(cacheKey, items);
+      }
+    }
     return items;
   } catch (err) {
     console.error('fetchSimonsData error:', err);

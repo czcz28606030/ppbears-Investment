@@ -61,12 +61,53 @@
       ],
       "correct_answer": 1,
       "explanation": "答對了！📱 鴻海是全球最大的電子代工廠，幫蘋果等品牌組裝手機和電腦等產品。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "「航運業」是做什麼的？",
+      "options": [
+        "製造飛機",
+        "透過船舶運送貨物的行業",
+        "賣船票給旅客",
+        "修理汽車"
+      ],
+      "correct_answer": 1,
+      "explanation": "航運業主要是用貨輪載運貨物，長榮、陽明、萬海都是台灣知名航運公司！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "台積電是台灣市值最大的上市公司。",
+      "correct_answer": true,
+      "explanation": "對！台積電（2330）市值遠超其他公司，是台灣乃至全球最重要的半導體企業！"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "「金融業」包含哪些公司？",
+      "options": [
+        "賣食物的公司",
+        "銀行、保險公司、證券商等",
+        "科技公司",
+        "建設公司"
+      ],
+      "correct_answer": 1,
+      "explanation": "金融業包含銀行、保險、證券等，富邦金、國泰金都是台灣大型金控公司！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "不同產業的股票在景氣循環中表現可能不一樣。",
+      "correct_answer": true,
+      "explanation": "對！景氣好時科技股可能大漲，景氣差時防禦性的食品股可能相對穩定。"
     }
   ],
   "ai_prompt_context": {
     "topic": "台灣上市公司的產業分類與知名企業",
     "age_hint": "7-9歲",
     "vocabulary_level": "simple",
-    "metaphor_suggestions": ["台積電", "統一超和全家", "電子業vs食品業", "產業輪替"]
+    "metaphor_suggestions": [
+      "台積電",
+      "統一超和全家",
+      "電子業vs食品業",
+      "產業輪替"
+    ]
   }
 }

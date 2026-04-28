@@ -61,12 +61,53 @@
       ],
       "correct_answer": 2,
       "explanation": "對！📊 0050 全名是「元大台灣50」，包含台灣前 50 大公司的股票，是經典的分散投資工具。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "分散投資的核心目的是？",
+      "options": [
+        "讓自己更忙",
+        "降低單一投資失敗對整體財富的衝擊",
+        "賺更多錢",
+        "讓投資更複雜"
+      ],
+      "correct_answer": 1,
+      "explanation": "分散投資是風險管理的核心！一個籃子掉了，其他籃子的蛋還在就安全！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "持有100檔股票一定比持有10檔更能有效分散風險。",
+      "correct_answer": false,
+      "explanation": "不一定！若100檔都是同一產業，相關性高，分散效果有限。跨產業比數量更重要！"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "以下哪個是有效的分散投資方式？",
+      "options": [
+        "把所有錢放在一家銀行",
+        "同時投資股票、債券、不動產等不同類型資產",
+        "只買台積電",
+        "只投資科技股"
+      ],
+      "correct_answer": 1,
+      "explanation": "跨資產類別（股票+債券+不動產等）的分散才是真正的分散，因為各類資產相關性低！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "即使是全球市值最大的公司也有倒閉的風險，所以不應該把所有資金集中在一檔。",
+      "correct_answer": true,
+      "explanation": "對！歷史上曾有「不可能倒」的大公司後來倒閉。分散投資就是防範這種黑天鵝事件！"
     }
   ],
   "ai_prompt_context": {
     "topic": "投資風險概念、分散投資與 ETF 入門",
     "age_hint": "7-9歲",
     "vocabulary_level": "simple",
-    "metaphor_suggestions": ["雞蛋籃子比喻", "ETF像便當", "0050台灣50大公司", "Stage 2 總結"]
+    "metaphor_suggestions": [
+      "雞蛋籃子比喻",
+      "ETF像便當",
+      "0050台灣50大公司",
+      "Stage 2 總結"
+    ]
   }
 }

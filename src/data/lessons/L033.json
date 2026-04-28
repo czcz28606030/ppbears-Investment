@@ -61,12 +61,53 @@
       ],
       "correct_answer": 2,
       "explanation": "🧙‍♂️ 別人恐懼時要貪婪 — 意思是市場恐慌、好公司的股票被低估時，反而是買進的好機會！"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "股票下跌的常見原因是？",
+      "options": [
+        "只有公司業績不好",
+        "業績不如預期、景氣衰退、利率上升、市場恐慌等",
+        "只有外資賣出",
+        "股票太便宜了"
+      ],
+      "correct_answer": 1,
+      "explanation": "股票下跌的原因很多：公司業績差、升息、戰爭、疫情等都可能造成下跌。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "股市下跌時，每一檔股票都一定會跌。",
+      "correct_answer": false,
+      "explanation": "不一定！大盤下跌時，有些防禦性股票（如電信、民生必需品）可能相對抗跌。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "「熊市」是指？",
+      "options": [
+        "有很多熊的市場",
+        "股市持續大幅下跌的時期",
+        "牛很多的市場",
+        "股市一直上漲"
+      ],
+      "correct_answer": 1,
+      "explanation": "熊市指股市長期下跌（通常下跌20%以上），相對的「牛市」是指長期上漲！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "歷史上每一次股市崩跌後，最終都有所回升。",
+      "correct_answer": true,
+      "explanation": "對！歷史紀錄顯示，股市雖然有崩跌，但長期來看都創下新高，耐心很重要！"
     }
   ],
   "ai_prompt_context": {
     "topic": "股票下跌的原因與正確應對心態",
     "age_hint": "7-9歲",
     "vocabulary_level": "simple",
-    "metaphor_suggestions": ["壞消息", "空頭市場", "打折買", "巴菲特恐懼與貪婪"]
+    "metaphor_suggestions": [
+      "壞消息",
+      "空頭市場",
+      "打折買",
+      "巴菲特恐懼與貪婪"
+    ]
   }
 }

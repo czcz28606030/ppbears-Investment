@@ -61,12 +61,53 @@
       ],
       "correct_answer": 2,
       "explanation": "很棒！⚠️ 數位支付因為太方便了，容易不知不覺花太多。記得要定期檢查花費紀錄！"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "下面哪個是數位支付方式？",
+      "options": [
+        "用現金",
+        "LINE Pay或街口支付",
+        "以物易物",
+        "用黃金交換"
+      ],
+      "correct_answer": 1,
+      "explanation": "LINE Pay、街口支付、Apple Pay都是數位支付，用手機就能付款！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "數位支付完全沒有任何風險。",
+      "correct_answer": false,
+      "explanation": "不對！數位支付有帳號被盜的風險，要設定強密碼並開啟雙重驗證！"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "使用數位支付的優點是？",
+      "options": [
+        "不需要帶錢包那麼方便",
+        "比較貴",
+        "要帶很多卡",
+        "需要帶大量現金"
+      ],
+      "correct_answer": 0,
+      "explanation": "對！數位支付最大的優點就是方便，不需要帶零錢和現金！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "電子票券（如悠遊卡）也是一種數位支付工具。",
+      "correct_answer": true,
+      "explanation": "正確！悠遊卡可以搭車、買東西，是台灣很普遍的電子支付工具。"
     }
   ],
   "ai_prompt_context": {
     "topic": "數位支付、電子錢包與無現金消費",
     "age_hint": "6-8歲",
     "vocabulary_level": "simple",
-    "metaphor_suggestions": ["LINE Pay", "手機嗶一下", "QR Code", "悠遊卡"]
+    "metaphor_suggestions": [
+      "LINE Pay",
+      "手機嗶一下",
+      "QR Code",
+      "悠遊卡"
+    ]
   }
 }

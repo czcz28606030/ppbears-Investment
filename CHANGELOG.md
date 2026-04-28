@@ -1,3 +1,99 @@
+# 📦 PPBears Investment — 更新日誌
+
+> **目前版本：v1.20.8**（2026-04-28）
+> 最新更新：修正「看庫存」重新整理按鈕無法觸發 loading 的 bug，並新增動畫進度條。
+
+---
+
+## [v1.20.8] - 2026-04-28
+### Fixed
+- **「看庫存」重新整理按鈕失效修正**
+  - **問題**：按下「🔄 重新抓取」後清空了 `aiSignals`，但 `useEffect` 的依賴項（`holdings`, `hasAiFeature`, `enableCustomSignal`）沒有任何變化，導致 `useEffect` **不會重新執行**，loading overlay 也永遠不會出現，頁面看起來像當掉了
+  - **修正**：新增 `refreshKey` 計數器 state，按下重新整理時遞增，強制 `useEffect` 重新執行並正常觸發 loading 流程
+  - **快取邏輯優化**：首次進頁面（`refreshKey === 0`）仍讀快取節省 API；手動重整後直接跳過快取，保證取得最新資料
+
+### Added
+- **AI 訊號載入動畫進度條**：Loading overlay 新增紅→橘漸層進度條，依每支股票分析完成即時推進（20% 起跳，每股均分至 90%，完成後推至 100%）
+  - 進度條 `0.4s` cubic-bezier 平滑過渡，視覺流暢不跳動
+  - 同步顯示「正在分析 聯電（1/10）...」逐股進度文字
+  - 完成後顯示「分析完成！100%」停留 400ms 再關閉 overlay
+
+## [v1.20.5] - 2026-04-28
+### Fixed
+- **根本解決建立副帳號的 Auth Token Lock 衝突錯誤**
+  - **錯誤訊息**：`Lock "lock:sb-...-auth-token" was released because another request stole it`
+  - **根本原因**：父帳號的主 Supabase client 持有 auth token lock，再呼叫 `signUp()` 會對同一 lock 緣，導致 lock 被就成
+  - **修正方法**：在 `createChildAccount` 中建立完全隔離的臨時 Supabase 實例专門用於 `signUp()`
+    - 臨時實例使用唯一 `storageKey`，不與主 client 共享任何 localStorage key
+    - `persistSession: false` — 註冊完即棄，不留下任何 session 痕跡
+    - `autoRefreshToken: false` — 不起背景 token 刷新線程，很從根本消除衝突可能
+    - 主 client 的 session 和父帳號登入狀態完全不受影響
+
+## [v1.20.4] - 2026-04-28
+### Added
+- **父帳號管理副帳號：編輯與刪除功能**
+  - 每個副帳號卡片新增「✏️ 編輯」按鈕：可修改子帳號暱稱和頭像
+  - 每個副帳號卡片新增「🗑️ 刪除」按鈕：含二次確認強警示對話框
+  - 刪除操作會同步清除持股、交易紀錄、學習進度、錢包流水、出金申請等關聯資料
+  - Store 新增 `updateChildProfile()` 和 `deleteChildAccount()` 函數
+  - 所有操作均有雙重安全防護（驗證 `parent_id` 屬適）
+
+## [v1.20.3] - 2026-04-28
+### Fixed
+- **建立副帳號出現 406 錯誤與父帳號失登問題**
+  - **問題一**：`loadUserData` 使用 `.single()` 查詢尚未建立的子帳號，回傳 Supabase 406 Not Acceptable
+    - 修正：改為 `.maybeSingle()`，找不到資料時回傳 null，不再丟出 406
+  - **問題二**：`supabase.auth.signUp()` 建立子帳號時可能將父帳號的 session 切換成子帳號，導致父帳號被登出
+    - 修正：`createChildAccount` 建立前先存儲父帳號 session，若 signUp 後 session 被切換，立刻呼叫 `setSession()` 恢復父帳號登入狀態
+
+## [v1.20.2] - 2026-04-28
+### Fixed
+- **重要修正：`pickQuestions()`出題區塊固定僅抽 2 題的邏輯錯誤**
+  - 舊邏輯：`return picked.slice(0, 2)` 導致無論題庫有多少題永遠只出 2 題
+  - 新邏輯：每次測驗隨機出 **5 題**（choice 至少 3 題、true_false_speed 至少 2 題）
+  - 題目顺序再次隨機排序，每次入場都會有不同組合
+  - 題庫不足 5 題時自動补充，保證題目完整出完
+
+## [v1.20.1] - 2026-04-28
+### Fixed
+- 重新部署確認 L056-L060 技術分析課程與 L043/L044 升級內容完整上線
+
+## [v1.20.0] - 2026-04-28
+### Added
+- **K線與均線完整技術分析學習區塊（L056-L060）**：新增 5 堂進階技術分析專屬課程
+  - **L056：K線圖完整解析**：蔗燭圖起源、OHLC四要素、紅黑K辨識、上下影線買賣壓力解讀（ASCII圖解內嵌）
+  - **L057：常見K線型態**：鎔頭線、射擊之星、吞噬型態、十字星，並教導型態+位置+量能三要素驗證
+  - **L058：移動平均線（MA）完整攻略**：MA5/20/60意義、多空頭排列、支撑壓力轉換、均線口抵進階技巧
+  - **L059：黃金交叉與死亡交叉**：交叉訊號原理、假訊號過濾、MA20×MA60中期訊號、四條件完美買點
+  - **L060：技術分析綜合實戰**：三層框架、四種量價關係、實戰買賣點案例、技術分析限制與正確心態
+
+### Changed
+- **L043「什麼是股利？」全面升級**：7 Cards + 10 題
+  - 新增：股利來源說明、現金股利計算公式詳解、股票股利計算方法、除息日完整流程、填息貼息圖解、股利再投資複利效果
+- **L044「殖利率完整解析+存股策略」全面升級**：7 Cards + 10 題
+  - 新增：高殖利率四大陏阱、優質存股六大指標、計算現金+股票存股綜合殖利率、定期定額策略、存股 10/20 年複利試算
+- **課程總數**：從 55 堂增加至 **60 堂**
+
+## [v1.19.0] - 2026-04-28
+### Added
+- **學習模組題庫大幅擴充**：55 課全面補充題目，每課從 3 題增加至 **7 題**
+  - 總題目數從 165 題增加至 **385 題**（增加 220 題）
+  - 每課新增 4 題，涵蓋 `choice`（四選一）與 `true_false_speed`（是非題）兩種題型
+  - 題目設計符合各課主題，並配合適齡（6-12歲）語言風格
+  - 題庫覆蓋所有55課：基礎理財（L001-L015）、公司與股票（L016-L030）、技術分析（L031-L040）、財務指標（L041-L045）、投資心理學（L046-L050）、Simons量化模型（L051-L055）
+
+## [v1.18.0] - 2026-04-28
+### Fixed
+- **根治 AI 訊號顯示錯誤（3231 緯創 顯示「AI中立」但 Simons 網站顯示進場）**
+  - **核心問題 1 — `sell_sig` 辨識不完整**：舊邏輯只判斷 `'出場'` 與 `'賣出'`，漏掉 Simons API 可能回傳的 `'進場'`、`'加碼'`、`'買進'`、`'buy'` 等進場類值；一旦 `out_date` 有填日期但 `sell_sig='進場'`，就會錯誤地落入 `neutral`。現在以 `BUY_SIGS`（進場/加碼/買進/buy/Buy/BUY）與 `SELL_SIGS`（出場/賣出/減碼/sell/Sell/SELL）兩組 Set 完整比對，不再遺漏任何進場訊號值
+  - **核心問題 2 — 量化訊號全天快取導致訊號延遲一整天**：`fetchStockQuantData` 原先使用 `getDailyCache`（每日快取，隔天才過期），盤中若 Simons 訊號改變，使用者整天看到的仍是早上快取的舊資料，可能因此錯過進場機會。現改用 **30 分鐘 TTL 快取**（`getTTLCache`），訊號最多延遲 30 分鐘（快取 key 升版為 `ppbears_quant30_*` 自動清除舊快取）
+  - **核心問題 3 — Simons 每日推薦也是全天快取**：`fetchSimonsData` 原先對當日資料也用每日快取，改為今日資料同樣使用 **30 分鐘 TTL 快取**（歷史日期查詢仍維持每日快取）
+
+### Added
+- **TTL 短效快取工具函式**：新增 `getTTLCache` / `setTTLCache` / `clearTTLCache` / `getTTLRemaining` 四個通用工具，支援任意毫秒 TTL，供盤中高頻更新的資料使用
+- **重新抓取按鈕同步清除 TTL 快取**：Watchlist「🔄 重新抓取」與 Portfolio「🔄 重新抓取」按鈕現在同時清除對應股票的 `localStorage` TTL 快取（`ppbears_quant30_*`），確保手動刷新後一定抓到最新資料
+- **完整的 sell_sig 兜底日誌**：Console 日誌格式升級為 `[QuantData] {code} | out_date='...' | sell_sig='...' | hasOpenPosition=...`，方便後續排查任何訊號異常
+
 ## [v1.17.1] - 2026-04-26
 ### Fixed
 - **學習幣永遠為 0 的根本原因修正**：`completeLesson` 函式從 `reward_rules` 查到的原始 DB 資料（欄位名為蛇形命名法 `trigger_type`），被直接強制轉型為 TypeScript 的 `RewardRule[]`（期望駝峰命名法 `triggerType`），導致 `rule.triggerType` 永遠是 `undefined`，任何觸發條件都無法匹配，`grant_learning_coins` RPC 從未被呼叫

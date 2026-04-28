@@ -61,12 +61,53 @@
       ],
       "correct_answer": 2,
       "explanation": "💡 買彩券是靠運氣的「賭博」，不是投資。投資是根據分析和判斷來做決策，不靠運氣。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "「投資」和「投機」最大的差別是？",
+      "options": [
+        "投資需要很多錢",
+        "投資是長期看公司基本面，投機是短期賭股價漲跌",
+        "投機比較安全",
+        "沒有差別"
+      ],
+      "correct_answer": 1,
+      "explanation": "投資看的是公司長期價值，投機是短期賭漲跌，兩者風險和心態差很多！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "投資一定要有耐心，不能期待馬上賺大錢。",
+      "correct_answer": true,
+      "explanation": "對！巴菲特說過：「股市是把錢從沒耐心的人轉移到有耐心的人」！"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "「資產配置」是什麼？",
+      "options": [
+        "只買一種股票",
+        "把資金分散投資在不同類型的資產，降低風險",
+        "只存現金",
+        "賣掉所有資產"
+      ],
+      "correct_answer": 1,
+      "explanation": "資產配置就是把錢分散放在股票、債券、現金等不同地方，降低整體風險！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "投資需要先了解自己的風險承受能力。",
+      "correct_answer": true,
+      "explanation": "對！每個人對風險的接受程度不同，了解自己再選擇適合的投資方式最重要！"
     }
   ],
   "ai_prompt_context": {
     "topic": "投資的定義、種類和基本原則",
     "age_hint": "6-8歲",
     "vocabulary_level": "simple",
-    "metaphor_suggestions": ["種樹", "雲霄飛車", "雞蛋和籃子", "時間是好朋友"]
+    "metaphor_suggestions": [
+      "種樹",
+      "雲霄飛車",
+      "雞蛋和籃子",
+      "時間是好朋友"
+    ]
   }
 }

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore, formatPrice } from '../store';
-import { fetchSimonsData, fetchStockData, fetchStockQuantData, toRecommendation } from '../api';
+import { fetchSimonsData, fetchStockData, fetchStockQuantData, toRecommendation, clearTTLCache } from '../api';
 import type { StockQuantData } from '../api';
 import type { AIAdvice, SimonsItem, StockRecommendation, WatchlistSignal, WatchlistWarning } from '../types';
 import { getCache, setCache, clearCache, getCacheTTL, CACHE_KEYS } from '../cache';
@@ -398,6 +398,12 @@ export default function Watchlist() {
                 title="重新抓取最新資料"
                 onClick={() => {
                   clearCache(CACHE_KEYS.WATCHLIST_FULL);
+                  // 同時清除每支股票的 localStorage TTL 快取（量化訊號 + Simons）
+                  const todayStr = new Date().toISOString().split('T')[0];
+                  watchlist.forEach(w => {
+                    clearTTLCache(`ppbears_quant30_${w.stockCode}`);
+                  });
+                  clearTTLCache(`ppbears_simons30_${todayStr.replace(/-/g, '-')}`);
                   setLastAnalyzedAt(null);
                   setLiveQuotes({});
                   setQuantDataMap({});

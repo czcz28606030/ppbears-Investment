@@ -61,12 +61,53 @@
       ],
       "correct_answer": 1,
       "explanation": "對！🐷 把錢存起來就是「儲蓄」。儲蓄讓你以後可以買更大的東西！"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "「消費」是指什麼？",
+      "options": [
+        "把錢存到銀行",
+        "用錢買東西或服務",
+        "把錢拿去投資",
+        "把錢借給別人"
+      ],
+      "correct_answer": 1,
+      "explanation": "對！消費就是花錢購買商品或服務，是錢最直接的用途。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "投資有可能讓錢變少。",
+      "correct_answer": true,
+      "explanation": "正確！投資有風險，錢可能變多也可能變少，所以要謹慎選擇。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "下面哪個屬於「投資」？",
+      "options": [
+        "買飲料喝",
+        "存錢在存錢筒",
+        "買股票",
+        "去超市買菜"
+      ],
+      "correct_answer": 2,
+      "explanation": "對！買股票是投資，希望未來股價上漲賺取報酬。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "儲蓄和投資都可以讓你未來有更多的錢可以用。",
+      "correct_answer": true,
+      "explanation": "正確！儲蓄安全但成長慢，投資風險高但潛在報酬大，兩個都很重要。"
     }
   ],
   "ai_prompt_context": {
     "topic": "錢的三種用途：消費、儲蓄、投資",
     "age_hint": "6-8歲",
     "vocabulary_level": "simple",
-    "metaphor_suggestions": ["蘋果樹", "松鼠存堅果", "超能力", "存錢筒"]
+    "metaphor_suggestions": [
+      "蘋果樹",
+      "松鼠存堅果",
+      "超能力",
+      "存錢筒"
+    ]
   }
 }

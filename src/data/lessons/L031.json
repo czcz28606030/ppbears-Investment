@@ -61,12 +61,53 @@
       ],
       "correct_answer": 1,
       "explanation": "沒錯！🎉 推出受歡迎的新產品 → 大家看好公司未來 → 更多人想買 → 股價上漲！"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "股票價格是由什麼決定的？",
+      "options": [
+        "政府規定",
+        "市場上買方和賣方的供需關係",
+        "公司老闆決定",
+        "每天固定不變"
+      ],
+      "correct_answer": 1,
+      "explanation": "股價由市場供需決定！想買的人多股價漲，想賣的人多股價跌。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "一家公司的股價越高，代表公司越好。",
+      "correct_answer": false,
+      "explanation": "不一定！高股價不等於好公司，還要看本益比、EPS等財務指標才能判斷。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "影響股票價格的因素有哪些？",
+      "options": [
+        "只有公司業績",
+        "公司業績、整體經濟、市場情緒、政治事件等",
+        "只有投資人情緒",
+        "只有外資買賣"
+      ],
+      "correct_answer": 1,
+      "explanation": "股價受很多因素影響：公司基本面、總體經濟、利率、投資人情緒都會影響！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "公司業績好，長期來看股價通常也會上漲。",
+      "correct_answer": true,
+      "explanation": "對！長期而言，公司賺錢能力是股價最重要的支撐力量！"
     }
   ],
   "ai_prompt_context": {
     "topic": "股票價格的決定機制：供給與需求",
     "age_hint": "7-9歲",
     "vocabulary_level": "simple",
-    "metaphor_suggestions": ["夜市喊價", "拍賣會", "供需法則", "搶購vs拋售"]
+    "metaphor_suggestions": [
+      "夜市喊價",
+      "拍賣會",
+      "供需法則",
+      "搶購vs拋售"
+    ]
   }
 }

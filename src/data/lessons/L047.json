@@ -61,12 +61,53 @@
       ],
       "correct_answer": 1,
       "explanation": "對！📋 提前設定停損點（跌到多少就賣），用計畫代替情緒，是克服損失趨避最好的方法。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "「損失趨避」是什麼心理現象？",
+      "options": [
+        "投資人不喜歡賺錢",
+        "損失的痛苦感遠大於同等金額獲利的快樂感",
+        "投資人喜歡虧錢",
+        "害怕賺太多錢"
+      ],
+      "correct_answer": 1,
+      "explanation": "研究顯示，虧100元的痛苦約是賺100元快樂的2倍！這讓投資人容易做出非理性決定。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "「不敢停損賣出虧損股票」是損失趨避的典型表現。",
+      "correct_answer": true,
+      "explanation": "對！因為不想「確認虧損」，很多人會一直抱著虧損的股票，錯過停損時機！"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "克服損失趨避的好方法是？",
+      "options": [
+        "完全不看股票",
+        "事先設定停損點，並嚴格執行",
+        "永遠不要賣股票",
+        "只買不會跌的股票"
+      ],
+      "correct_answer": 1,
+      "explanation": "事先設定停損（如跌15%就賣），用規則代替情緒決策，是克服損失趨避的關鍵！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "「沉沒成本謬誤」是指因為已經投入的錢而不願意停損。",
+      "correct_answer": true,
+      "explanation": "對！「我已經虧了那麼多，再等等看」就是沉沒成本謬誤，往往讓虧損越來越大！"
     }
   ],
   "ai_prompt_context": {
     "topic": "損失趨避效應與沉沒成本謬誤",
     "age_hint": "7-9歲",
     "vocabulary_level": "simple",
-    "metaphor_suggestions": ["撿100元vs掉100元", "夾娃娃機不甘心", "停損停利計畫", "用規則對抗情緒"]
+    "metaphor_suggestions": [
+      "撿100元vs掉100元",
+      "夾娃娃機不甘心",
+      "停損停利計畫",
+      "用規則對抗情緒"
+    ]
   }
 }

@@ -61,12 +61,53 @@
       ],
       "correct_answer": 1,
       "explanation": "沒錯！💳 使用 ATM 需要提款卡（插卡）和密碼（輸入），這兩個缺一不可！"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "ATM 可以做哪些事？",
+      "options": [
+        "只能提款",
+        "存款、提款、轉帳等多種功能",
+        "只能查詢餘額",
+        "只能給VIP使用"
+      ],
+      "correct_answer": 1,
+      "explanation": "對！現代ATM功能很多，存款、提款、轉帳、繳費都可以在ATM完成！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "在別家銀行的ATM提款可能需要手續費。",
+      "correct_answer": true,
+      "explanation": "正確！使用非本行ATM通常要收手續費，選擇自家銀行ATM可以省手續費。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "忘記提款卡密碼該怎麼辦？",
+      "options": [
+        "多試幾次猜猜看",
+        "去銀行臨櫃申請重設密碼",
+        "砸爛ATM",
+        "找路人幫忙"
+      ],
+      "correct_answer": 1,
+      "explanation": "密碼連續輸錯會被鎖卡！要去銀行臨櫃辦理，並記住要帶身分證件。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "ATM在晚上也可以使用。",
+      "correct_answer": true,
+      "explanation": "對！ATM大部分24小時都可以使用，非常方便！但要注意安全。"
     }
   ],
   "ai_prompt_context": {
     "topic": "ATM自動提款機的功能與安全使用",
     "age_hint": "6-8歲",
     "vocabulary_level": "simple",
-    "metaphor_suggestions": ["迷你銀行", "帳戶的鑰匙", "便利商店前的機器", "密碼保護"]
+    "metaphor_suggestions": [
+      "迷你銀行",
+      "帳戶的鑰匙",
+      "便利商店前的機器",
+      "密碼保護"
+    ]
   }
 }

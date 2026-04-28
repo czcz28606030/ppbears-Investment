@@ -11,7 +11,7 @@ const AVATARS = ['🐻', '🐼', '🐨', '🦁', '🦊', '🐯', '🐸', '🦄']
 
 export default function ManageChildren() {
   const navigate = useNavigate();
-  const { children, createChildAccount, setChildBalance } = useStore();
+  const { children, createChildAccount, setChildBalance, updateChildProfile, deleteChildAccount } = useStore();
 
   // 子帳號資產資料
   const [childrenHoldings, setChildrenHoldings] = useState<Record<string, Holding[]>>({});
@@ -85,6 +85,56 @@ export default function ManageChildren() {
   const [balanceError, setBalanceError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
+  // ── 編輯子帳號 Modal ──
+  const [editModalChildId, setEditModalChildId] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editAvatar, setEditAvatar] = useState('🐼');
+  const [editError, setEditError] = useState('');
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+
+  const openEditModal = (child: { id: string; displayName: string; avatar: string }) => {
+    setEditModalChildId(child.id);
+    setEditName(child.displayName);
+    setEditAvatar(child.avatar || '🐼');
+    setEditError('');
+  };
+
+  const handleEditSave = async () => {
+    if (!editName.trim()) { setEditError('暱稱不能為空'); return; }
+    setIsSavingEdit(true);
+    const result = await updateChildProfile(editModalChildId!, editName.trim(), editAvatar);
+    setIsSavingEdit(false);
+    if (result.error) {
+      setEditError(result.error);
+    } else {
+      setEditModalChildId(null);
+    }
+  };
+
+  // ── 刪除子帳號 確認 Modal ──
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [deleteConfirmName, setDeleteConfirmName] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+
+  const openDeleteConfirm = (child: { id: string; displayName: string }) => {
+    setDeleteConfirmId(child.id);
+    setDeleteConfirmName(child.displayName);
+    setDeleteError('');
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteConfirmId) return;
+    setIsDeleting(true);
+    const result = await deleteChildAccount(deleteConfirmId);
+    setIsDeleting(false);
+    if (result.error) {
+      setDeleteError(result.error);
+    } else {
+      setDeleteConfirmId(null);
+    }
+  };
+
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     setCreateError('');
@@ -126,6 +176,7 @@ export default function ManageChildren() {
       setBalanceAmount('');
     }
   };
+
 
   return (
     <div className="manage-page">
@@ -291,12 +342,36 @@ export default function ManageChildren() {
                 </div>
               </div>
             ) : (
-              <button className="set-balance-btn" onClick={() => { setEditingChildId(child.id); setBalanceError(''); setBalanceAmount(''); }} style={{ marginTop: '4px' }}>
-                💰 調整現金餘額
-              </button>
+              <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                <button className="set-balance-btn" style={{ flex: 1 }}
+                  onClick={() => { setEditingChildId(child.id); setBalanceError(''); setBalanceAmount(''); }}>
+                  💰 調整現金餘額
+                </button>
+                <button
+                  onClick={() => openEditModal(child)}
+                  style={{
+                    flex: '0 0 auto', padding: '10px 14px', borderRadius: '12px',
+                    border: '1.5px solid rgba(99,102,241,0.3)', background: 'rgba(99,102,241,0.08)',
+                    color: '#6366f1', fontWeight: 700, fontSize: '13px', cursor: 'pointer',
+                  }}
+                >
+                  ✏️ 編輯
+                </button>
+                <button
+                  onClick={() => openDeleteConfirm(child)}
+                  style={{
+                    flex: '0 0 auto', padding: '10px 14px', borderRadius: '12px',
+                    border: '1.5px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.08)',
+                    color: '#ef4444', fontWeight: 700, fontSize: '13px', cursor: 'pointer',
+                  }}
+                >
+                  🗑️ 刪除
+                </button>
+              </div>
             )}
           </div>
-        )})}
+        );
+      })}
       </div>
 
       {/* 建立副帳號按鈕 */}
@@ -422,6 +497,84 @@ export default function ManageChildren() {
                 style={{ padding: '16px', fontSize: 16 }}
               >
                 我知道了 ✅
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ── 編輯子帳號 Modal ── */}
+      {editModalChildId && (
+        <div className="modal-overlay" style={{ alignItems: 'center' }}>
+          <div className="modal-content" style={{ borderRadius: '24px', maxWidth: '400px', margin: '0 20px', padding: '28px 24px' }}>
+            <h2 style={{ fontSize: 20, fontWeight: 900, marginBottom: 20, color: '#2B2118' }}>✏️ 編輯副帳號資料</h2>
+
+            <div className="form-group" style={{ marginBottom: 16 }}>
+              <label className="form-label">😊 暱稱</label>
+              <input
+                type="text" className="form-input"
+                value={editName}
+                onChange={e => setEditName(e.target.value)}
+                maxLength={15}
+                placeholder="例如：小熊寶寶"
+              />
+            </div>
+
+            <div className="form-group" style={{ marginBottom: 20 }}>
+              <label className="form-label">🐻 選擇頭像</label>
+              <div className="avatar-picker">
+                {AVATARS.map(a => (
+                  <button key={a} type="button"
+                    className={`avatar-pick-btn ${editAvatar === a ? 'active' : ''}`}
+                    onClick={() => setEditAvatar(a)}>
+                    {a}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {editError && <div className="error-msg" style={{ marginBottom: 12 }}>{editError}</div>}
+
+            <div className="form-actions">
+              <button className="btn-cancel" onClick={() => setEditModalChildId(null)}>取消</button>
+              <button className="btn-save" onClick={handleEditSave} disabled={isSavingEdit}>
+                {isSavingEdit ? '儲存中...' : '儲存 ✅'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── 刪除確認 Modal ── */}
+      {deleteConfirmId && (
+        <div className="modal-overlay" style={{ alignItems: 'center' }}>
+          <div className="modal-content" style={{ borderRadius: '24px', maxWidth: '380px', margin: '0 20px', padding: '28px 24px', textAlign: 'center' }}>
+            <div style={{ fontSize: 56, marginBottom: 12 }}>⚠️</div>
+            <h2 style={{ fontSize: 20, fontWeight: 900, marginBottom: 8, color: '#2B2118' }}>確認刪除副帳號？</h2>
+            <p style={{ fontSize: 14, color: '#7A6A55', marginBottom: 8 }}>
+              即將刪除 <strong style={{ color: '#ef4444' }}>{deleteConfirmName}</strong> 的帳號
+            </p>
+            <p style={{ fontSize: 13, color: '#BFB09A', marginBottom: 24, lineHeight: 1.6 }}>
+              ⚠️ 此操作無法復原！<br />
+              該帳號的持股、交易紀錄、學習進度將一併刪除。
+            </p>
+
+            {deleteError && <div className="error-msg" style={{ marginBottom: 12 }}>{deleteError}</div>}
+
+            <div className="form-actions">
+              <button className="btn-cancel" onClick={() => setDeleteConfirmId(null)} disabled={isDeleting}>
+                取消
+              </button>
+              <button
+                onClick={handleDeleteConfirm}
+                disabled={isDeleting}
+                style={{
+                  flex: 1, padding: '12px', borderRadius: '12px',
+                  background: isDeleting ? '#ccc' : '#ef4444',
+                  color: '#fff', fontWeight: 800, fontSize: '15px',
+                  border: 'none', cursor: isDeleting ? 'not-allowed' : 'pointer',
+                }}
+              >
+                {isDeleting ? '刪除中...' : '確認刪除 🗑️'}
               </button>
             </div>
           </div>

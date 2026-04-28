@@ -61,12 +61,53 @@
       ],
       "correct_answer": 1,
       "explanation": "對！📉 綠色加上「-」號，代表今天的價格比昨天低了 1.5%，也就是跌了。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "台灣股票漲的時候K線是什麼顏色？",
+      "options": [
+        "綠色",
+        "紅色",
+        "藍色",
+        "黃色"
+      ],
+      "correct_answer": 1,
+      "explanation": "台灣（和中國）股市：漲=紅色，跌=綠色。與美國相反（美國漲=綠，跌=紅）！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "台灣和美國股市的漲跌顏色是一樣的。",
+      "correct_answer": false,
+      "explanation": "不一樣！台灣漲紅跌綠，美國漲綠跌紅，看外國股票要特別注意顏色定義！"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "「上影線」（K線上方的細線）代表什麼？",
+      "options": [
+        "股票快要漲停了",
+        "當天最高點比收盤價高，說明有賣壓把股價壓下來了",
+        "股票今天沒有交易",
+        "開盤就漲停"
+      ],
+      "correct_answer": 1,
+      "explanation": "上影線越長，代表當天高點和收盤差距越大，顯示高點有強烈賣壓！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "K線的「實體」越長，代表當天漲跌幅越大。",
+      "correct_answer": true,
+      "explanation": "對！K線實體（開盤和收盤之間的方塊）越長，代表當天漲跌幅越大，力道越強！"
     }
   ],
   "ai_prompt_context": {
     "topic": "台灣股市紅漲綠跌的顏色慣例",
     "age_hint": "7-9歲",
     "vocabulary_level": "simple",
-    "metaphor_suggestions": ["紅色=喜氣=漲", "綠色=跌", "跟美國相反", "紅綠燈比喻"]
+    "metaphor_suggestions": [
+      "紅色=喜氣=漲",
+      "綠色=跌",
+      "跟美國相反",
+      "紅綠燈比喻"
+    ]
   }
 }

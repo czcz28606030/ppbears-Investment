@@ -61,12 +61,53 @@
       ],
       "correct_answer": 1,
       "explanation": "對！🧠 做功課、了解自己的判斷理由，才是避免從眾心理最好的方法。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "「從眾心理」在投資中指的是？",
+      "options": [
+        "跟著別人一起運動",
+        "因為看到別人都買，就跟著買，不管自己有沒有研究過",
+        "跟著老師學習",
+        "一起去旅遊"
+      ],
+      "correct_answer": 1,
+      "explanation": "從眾心理讓人盲目跟風，股市泡沫通常就是這樣形成的！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "「大家都在買」是一個可靠的投資理由。",
+      "correct_answer": false,
+      "explanation": "不對！大家都在買可能已是高點，要有自己的分析，不能只跟著群眾走！"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "巴菲特說「別人貪婪時我恐懼」，這代表什麼投資哲學？",
+      "options": [
+        "不要投資股票",
+        "當大家都瘋狂買進時，要謹慎；當大家都恐慌賣出時，可能是機會",
+        "要跟著大家一起買",
+        "要把所有錢放在現金"
+      ],
+      "correct_answer": 1,
+      "explanation": "這是反從眾的智慧！在別人瘋狂追高時保持冷靜，在別人恐慌時找機會！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "即使親友都在買某檔股票，自己也應該先做功課再決定。",
+      "correct_answer": true,
+      "explanation": "對！親友的推薦可以是參考，但投資前一定要自己研究，不能盲目跟風！"
     }
   ],
   "ai_prompt_context": {
     "topic": "投資中的從眾心理與如何獨立判斷",
     "age_hint": "7-9歲",
     "vocabulary_level": "simple",
-    "metaphor_suggestions": ["排隊飲料店", "泡泡會破", "巴菲特名言", "用腦袋不用情緒"]
+    "metaphor_suggestions": [
+      "排隊飲料店",
+      "泡泡會破",
+      "巴菲特名言",
+      "用腦袋不用情緒"
+    ]
   }
 }

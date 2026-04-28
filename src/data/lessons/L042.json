@@ -61,12 +61,52 @@
       ],
       "correct_answer": 1,
       "explanation": "對！🧮 A 的本益比 = 300÷15 = 20 倍，B 的本益比 = 200÷20 = 10 倍。B 的本益比比較低。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "本益比（P/E）的計算方式是？",
+      "options": [
+        "EPS÷股價",
+        "股價÷EPS",
+        "股利÷股價",
+        "市值÷淨資產"
+      ],
+      "correct_answer": 1,
+      "explanation": "本益比 = 股價 ÷ EPS，代表投資人願意為每1元盈餘付多少錢！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "本益比越低，代表股票相對便宜。",
+      "correct_answer": true,
+      "explanation": "一般來說本益比低表示投資人付出較少就能買到每元盈餘，相對較划算！"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "如果一家公司股價100元，EPS=10元，本益比是多少？",
+      "options": [
+        "5倍",
+        "10倍",
+        "15倍",
+        "20倍"
+      ],
+      "correct_answer": 1,
+      "explanation": "本益比 = 100 ÷ 10 = 10倍！代表投資人願意為這家公司每賺1元付出10元。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "成長型公司（如科技股）通常本益比比傳統產業高。",
+      "correct_answer": true,
+      "explanation": "對！成長股的未來獲利預期高，投資人願意付更高的本益比，例如AI相關股票！"
     }
   ],
   "ai_prompt_context": {
     "topic": "本益比 P/E Ratio 的計算與判斷方式",
     "age_hint": "7-9歲",
     "vocabulary_level": "simple",
-    "metaphor_suggestions": ["買會下蛋的雞", "幾年賺回來", "同行比較才有意義"]
+    "metaphor_suggestions": [
+      "買會下蛋的雞",
+      "幾年賺回來",
+      "同行比較才有意義"
+    ]
   }
 }

@@ -61,12 +61,53 @@
       ],
       "correct_answer": 1,
       "explanation": "太棒了！🌟 比價再買是聰明的花錢方法。省下的錢，就是你賺到的！"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "「比價」是什麼意思？",
+      "options": [
+        "比誰的錢多",
+        "在購買前比較不同地方的價格",
+        "比誰買得快",
+        "比誰花得多"
+      ],
+      "correct_answer": 1,
+      "explanation": "對！購買前多比幾家的價格，找到最划算的選擇，這就是聰明花錢！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "買東西時，越貴的一定越好。",
+      "correct_answer": false,
+      "explanation": "不對！貴的不一定適合你。要根據自己的需求選擇「最適合」的，不是最貴的。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "下面哪個是「衝動購物」？",
+      "options": [
+        "計畫好要買的東西",
+        "因為看到打折就買了不需要的東西",
+        "存錢買一直想要的東西",
+        "仔細比價後購買"
+      ],
+      "correct_answer": 1,
+      "explanation": "衝動購物是沒有計畫就買了不需要的東西，容易讓錢白白浪費！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "購物清單可以幫助你避免買到不需要的東西。",
+      "correct_answer": true,
+      "explanation": "對！出門前列清單，只買清單上的東西，是避免亂花錢的好方法！"
     }
   ],
   "ai_prompt_context": {
     "topic": "聰明消費技巧：比價、等特價、避免衝動購物",
     "age_hint": "6-8歲",
     "vocabulary_level": "simple",
-    "metaphor_suggestions": ["便利商店vs超市", "週年慶", "3天冷靜法", "比價"]
+    "metaphor_suggestions": [
+      "便利商店vs超市",
+      "週年慶",
+      "3天冷靜法",
+      "比價"
+    ]
   }
 }

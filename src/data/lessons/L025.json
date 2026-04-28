@@ -61,12 +61,53 @@
       ],
       "correct_answer": 1,
       "explanation": "答對了！🛟 緊急備用金是預留 3~6 個月的生活費，以防突然需要用錢時有保障。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "儲蓄和投資最主要的差別是？",
+      "options": [
+        "儲蓄要很多錢",
+        "儲蓄風險低但報酬低，投資風險高但潛在報酬高",
+        "投資一定比儲蓄安全",
+        "沒有差別"
+      ],
+      "correct_answer": 1,
+      "explanation": "儲蓄很安全，但利息少；投資可能賺更多，但也有虧損風險！各有優缺點。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "存款利率通常比股票長期報酬率高。",
+      "correct_answer": false,
+      "explanation": "不對！長期來看，好的股票投資報酬率通常遠高於銀行存款利率。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "建議先做哪件事再開始投資？",
+      "options": [
+        "先借一大筆錢",
+        "先存好緊急預備金（3-6個月生活費）",
+        "把所有錢都投入",
+        "等有空再說"
+      ],
+      "correct_answer": 1,
+      "explanation": "正確！要先準備好緊急備用金，才能用閒置資金投資，不會因急需錢而被迫低價賣出！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "儲蓄和投資可以同時進行。",
+      "correct_answer": true,
+      "explanation": "對！可以把收入分成幾份，一部分儲蓄、一部分投資，兩種都做！"
     }
   ],
   "ai_prompt_context": {
     "topic": "投資與存錢的比較、各自優缺點",
     "age_hint": "6-8歲",
     "vocabulary_level": "simple",
-    "metaphor_suggestions": ["走路vs跑步", "緊急備用金", "兩個都做", "閒錢投資"]
+    "metaphor_suggestions": [
+      "走路vs跑步",
+      "緊急備用金",
+      "兩個都做",
+      "閒錢投資"
+    ]
   }
 }

@@ -61,12 +61,53 @@
       ],
       "correct_answer": 1,
       "explanation": "對！📚 自己做功課、了解公司基本面才是負責任的投資方式。不要盲目跟風！"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "為什麼不應該聽「明牌」投資？",
+      "options": [
+        "因為明牌都是假的",
+        "資訊來源不確定、自己沒有研究，遇到問題不知道如何應對",
+        "因為明牌太貴",
+        "因為法律禁止"
+      ],
+      "correct_answer": 1,
+      "explanation": "聽明牌沒有自己的分析，股票一跌就不知道該抱還是賣，往往做出最壞的決定！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "「內線交易」（靠非公開的內部消息買賣股票）在台灣是違法的。",
+      "correct_answer": true,
+      "explanation": "對！內線交易在台灣屬於刑事犯罪，最重可判處10年有期徒刑，一定要避免！"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "哪種資訊來源比較可靠？",
+      "options": [
+        "朋友傳的LINE訊息",
+        "上市公司公開的財報、法說會記錄、官方公告",
+        "路邊聽到的消息",
+        "社群媒體的匿名帳號"
+      ],
+      "correct_answer": 1,
+      "explanation": "公開、可查證的官方資訊最可靠！財報、法說會、重大訊息公告都是可信的資訊來源。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "做好自己的研究，才能在股價波動時有信心繼續持有。",
+      "correct_answer": true,
+      "explanation": "對！了解自己買的公司，才能在下跌時判斷「是機會還是真的出問題了」！"
     }
   ],
   "ai_prompt_context": {
     "topic": "為什麼不應該聽信股票明牌，認識拉高出貨騙局",
     "age_hint": "7-9歲",
     "vocabulary_level": "simple",
-    "metaphor_suggestions": ["白吃的午餐不存在", "拉高出貨騙局", "做自己的主人", "自己懂才是好投資"]
+    "metaphor_suggestions": [
+      "白吃的午餐不存在",
+      "拉高出貨騙局",
+      "做自己的主人",
+      "自己懂才是好投資"
+    ]
   }
 }

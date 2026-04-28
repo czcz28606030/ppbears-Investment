@@ -61,12 +61,52 @@
       ],
       "correct_answer": 1,
       "explanation": "對！⚠️ PSR 高但強度低，代表市場熱鬧但缺乏大資金支撐，可能是散戶情緒性追價，要特別小心追高的風險。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "強度指標（Strength）主要衡量什麼？",
+      "options": [
+        "公司的體育成績",
+        "籌碼（資金）推動股價的力道強弱",
+        "公司的建築強度",
+        "員工的工作強度"
+      ],
+      "correct_answer": 1,
+      "explanation": "強度指標衡量市場買盤的力道，強度高代表有強勁的資金在推動這檔股票！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "強度指標高代表有大量資金持續流入該股票。",
+      "correct_answer": true,
+      "explanation": "對！強度高表示籌碼集中、買盤強勁，通常是看多的訊號！"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "強度指標從強轉弱，可能代表什麼？",
+      "options": [
+        "股票快漲停了",
+        "買盤力道減弱，可能有資金撤退的風險",
+        "公司要發股利了",
+        "可以立刻買入"
+      ],
+      "correct_answer": 1,
+      "explanation": "強度由強轉弱是警訊，說明原本支撐股價的買盤力道在消退，要特別注意！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "強度指標和成交量都是衡量市場資金動能的工具。",
+      "correct_answer": true,
+      "explanation": "對！兩者都從不同角度反映市場資金的活躍度，可以互相印證！"
     }
   ],
   "ai_prompt_context": {
     "topic": "Simons 強度指標的定義、等級劃分、籌碼概念、與PSR搭配使用",
     "age_hint": "9-12歲",
     "vocabulary_level": "intermediate",
-    "metaphor_suggestions": ["船的引擎推力比喻", "籌碼=誰持有股票", "PSR+強度組合判讀"]
+    "metaphor_suggestions": [
+      "船的引擎推力比喻",
+      "籌碼=誰持有股票",
+      "PSR+強度組合判讀"
+    ]
   }
 }

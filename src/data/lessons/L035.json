@@ -61,12 +61,53 @@
       ],
       "correct_answer": 1,
       "explanation": "沒錯！📊 定期定額就是每個月固定投入一筆錢買股票，不管股價高低，是穩健投資的好方法！"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "台灣股票一張等於幾股？",
+      "options": [
+        "100股",
+        "500股",
+        "1000股",
+        "10股"
+      ],
+      "correct_answer": 2,
+      "explanation": "台灣股市規定一張（一個交易單位）= 1000股，買股票通常以「張」為單位！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "台灣股市可以買「零股」，也就是不足一張的股票。",
+      "correct_answer": true,
+      "explanation": "對！台灣自2020年起開放盤中零股交易，只買幾股也可以，適合小資族！"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "如果一張股票1000股，股價100元，買一張要多少錢？",
+      "options": [
+        "1000元",
+        "10,000元",
+        "100,000元",
+        "1,000,000元"
+      ],
+      "correct_answer": 2,
+      "explanation": "100元 × 1000股 = 100,000元（10萬元）！台股很多熱門股一張就要好幾萬喔。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "零股交易讓小額投資人也能投資高價股。",
+      "correct_answer": true,
+      "explanation": "對！台積電一張要好幾萬，但買零股只要幾百元，讓投資門檻大幅降低！"
     }
   ],
   "ai_prompt_context": {
     "topic": "台灣股票的交易單位：整張、零股與定期定額",
     "age_hint": "7-9歲",
     "vocabulary_level": "simple",
-    "metaphor_suggestions": ["1張=1000股", "零股像零食", "存股像存錢", "定期定額"]
+    "metaphor_suggestions": [
+      "1張=1000股",
+      "零股像零食",
+      "存股像存錢",
+      "定期定額"
+    ]
   }
 }

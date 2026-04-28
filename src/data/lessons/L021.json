@@ -61,12 +61,53 @@
       ],
       "correct_answer": 1,
       "explanation": "對！🍕 股票就像比薩的一小片 — 你買了一張股票，就擁有公司的一小部分。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "買一張股票代表什麼？",
+      "options": [
+        "借錢給公司",
+        "擁有這家公司的一小部分",
+        "成為公司的員工",
+        "購買公司的產品"
+      ],
+      "correct_answer": 1,
+      "explanation": "對！買股票就是成為這家公司的小股東，擁有公司的一部分所有權！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "股票可以在股票交易市場上自由買賣。",
+      "correct_answer": true,
+      "explanation": "正確！上市股票可以在交易時間內自由買賣，價格由市場供需決定。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "台灣股市的交易時間是？",
+      "options": [
+        "24小時都可以",
+        "週一到週五早上9點到下午1點半",
+        "每天晚上8點到12點",
+        "只有週末"
+      ],
+      "correct_answer": 1,
+      "explanation": "台灣股市在週一至週五，上午9:00到下午1:30進行交易，例假日休市。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "股票的價格每天都會變動。",
+      "correct_answer": true,
+      "explanation": "對！股票價格根據供需每天甚至每秒都在變動，這也是投資的魅力所在！"
     }
   ],
   "ai_prompt_context": {
     "topic": "股票的定義、基本單位與獲利方式",
     "age_hint": "6-8歲",
     "vocabulary_level": "simple",
-    "metaphor_suggestions": ["比薩切片", "1張=1000股", "賺價差", "領股利"]
+    "metaphor_suggestions": [
+      "比薩切片",
+      "1張=1000股",
+      "賺價差",
+      "領股利"
+    ]
   }
 }

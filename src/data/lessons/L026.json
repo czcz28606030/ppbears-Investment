@@ -61,12 +61,53 @@
       ],
       "correct_answer": 1,
       "explanation": "對！📈 上市公司就是它的股票可以在台灣證券交易所公開買賣，任何人都能投資。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "如果你很喜歡喝星巴克，從投資角度你可能會？",
+      "options": [
+        "不考慮投資",
+        "研究星巴克公司的股票",
+        "只喝不買股票",
+        "告訴朋友去買"
+      ],
+      "correct_answer": 1,
+      "explanation": "巴菲特說：投資你了解的公司！身為消費者，你對喜愛品牌的了解是投資優勢！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "了解一個品牌的消費者，也可能是好的投資研究起點。",
+      "correct_answer": true,
+      "explanation": "對！彼得．林奇說過，消費者對品牌的直接體驗是很有價值的投資洞察！"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "研究一家公司是否值得投資，應該看哪些面向？",
+      "options": [
+        "只看廣告好不好看",
+        "產品競爭力、財務狀況、管理團隊、成長潛力",
+        "只看公司名字好不好聽",
+        "只看股價高低"
+      ],
+      "correct_answer": 1,
+      "explanation": "評估公司需要多方面分析：產品力、財務健康、管理層品質、行業前景等。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "光因為喜歡一個品牌就買它的股票是不夠的。",
+      "correct_answer": true,
+      "explanation": "對！喜歡品牌只是起點，還需要研究公司的財務和競爭力，才算完整的投資分析。"
     }
   ],
   "ai_prompt_context": {
     "topic": "日常品牌與背後的上市公司",
     "age_hint": "7-9歲",
     "vocabulary_level": "simple",
-    "metaphor_suggestions": ["7-ELEVEN統一超", "從客人變股東", "巴菲特名言", "台積電晶片"]
+    "metaphor_suggestions": [
+      "7-ELEVEN統一超",
+      "從客人變股東",
+      "巴菲特名言",
+      "台積電晶片"
+    ]
   }
 }

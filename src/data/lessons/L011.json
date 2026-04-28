@@ -61,12 +61,53 @@
       ],
       "correct_answer": 2,
       "explanation": "銀行不會幫你做作業啦 📝😂 但是銀行會幫你保管存款、轉帳、借貸，是很重要的金融機構喔！"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "銀行的主要功能是？",
+      "options": [
+        "只是存錢的地方",
+        "保管存款、提供貸款和各種金融服務",
+        "只幫有錢人服務",
+        "賣股票的地方"
+      ],
+      "correct_answer": 1,
+      "explanation": "對！銀行不只保管你的錢，還提供貸款（借錢給需要的人）和各種金融服務。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "把錢存在銀行比放在家裡更安全。",
+      "correct_answer": true,
+      "explanation": "正確！銀行有嚴密的安全系統，而且有存款保險保障，比放在家裡更安全。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "中央銀行和一般商業銀行最大的不同是？",
+      "options": [
+        "中央銀行比較小",
+        "中央銀行負責管理全國貨幣政策，不直接服務一般民眾",
+        "中央銀行只服務外國人",
+        "沒有差別"
+      ],
+      "correct_answer": 1,
+      "explanation": "中央銀行（台灣叫中央銀行）是銀行的銀行，負責管理貨幣和利率政策。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "台灣的銀行存款受到存款保險的保障。",
+      "correct_answer": true,
+      "explanation": "對！台灣的「中央存款保險」最高保障每人300萬元，讓存款更有保障！"
     }
   ],
   "ai_prompt_context": {
     "topic": "銀行的基本功能與運作方式",
     "age_hint": "6-8歲",
     "vocabulary_level": "simple",
-    "metaphor_suggestions": ["保險箱", "錢管家", "郵局", "利息差額"]
+    "metaphor_suggestions": [
+      "保險箱",
+      "錢管家",
+      "郵局",
+      "利息差額"
+    ]
   }
 }

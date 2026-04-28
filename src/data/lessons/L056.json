@@ -1,0 +1,120 @@
+{
+  "lesson_id": "L056",
+  "stage": 3,
+  "level": 6,
+  "domain": "technical",
+  "title": "K線圖完整解析 — 一根蠟燭的秘密",
+  "summary": "深入學習K線（蠟燭圖）的組成、四個要素、紅黑K的意義與上下影線的解讀。",
+  "cards": [
+    {
+      "type": "text_image",
+      "title": "K線是什麼？從日本來的發明！",
+      "body": "K線圖（蠟燭圖）是18世紀日本米商本間宗久發明的 📜\n\n他用來記錄每天米的價格變動，後來被引入股市，成為全球最通用的技術分析工具！\n\n為什麼叫「蠟燭圖」？\n因為每一根K線的形狀像一根蠟燭 🕯️：\n• 中間的粗方塊 = 燭身（實體）\n• 上下的細線   = 燭芯（影線）\n\nK線的強大之處：一根K線同時告訴你「開盤」「收盤」「最高」「最低」四個價格！",
+      "image_key": "lesson_056_card_01"
+    },
+    {
+      "type": "text_image",
+      "title": "K線的四個關鍵價格（OHLC）",
+      "body": "每一根K線包含四個價格，英文縮寫 OHLC：\n\n O = Open    開盤價（當天第一筆成交）\n H = High    最高價（當天最高成交）\n L = Low     最低價（當天最低成交）\n C = Close   收盤價（當天最後成交）\n\n🕯️ K線圖解：\n\n    ┃   ← 上影線（H，最高點）\n  ┌─┸─┐\n  │   │ ← 實體（O和C之間）\n  └─┰─┘\n    ┃   ← 下影線（L，最低點）\n\n記憶口訣：開高低收，四個數字一根K！",
+      "image_key": "lesson_056_card_02"
+    },
+    {
+      "type": "text_image",
+      "title": "紅K（陽線）vs 黑K（陰線）",
+      "body": "看K線顏色，立刻知道今天漲還是跌！\n\n🔴 紅K（陽線）= 今天上漲\n• 收盤價 > 開盤價\n• 實體是紅色（台灣慣例）\n\n    ┃   最高\n  ╔═╧═╗\n  ║ 紅 ║  ← 收盤（上方）\n  ║ K ║  ← 開盤（下方）\n  ╚═╤═╝\n    ┃   最低\n\n⬛ 黑K（陰線）= 今天下跌\n• 收盤價 < 開盤價\n• 實體是黑/綠色（台灣慣例）\n\n    ┃   最高\n  ╔═╧═╗\n  ║ 黑 ║  ← 開盤（上方）\n  ║ K ║  ← 收盤（下方）\n  ╚═╤═╝\n    ┃   最低",
+      "image_key": "lesson_056_card_03"
+    },
+    {
+      "type": "text_image",
+      "title": "上影線和下影線的秘密",
+      "body": "影線是K線上下的細線，藏著重要的買賣力量訊號！\n\n📊 上影線（K線上方）：\n• 代表當天曾漲到那個高點，但後來被「賣壓」壓下來\n• 上影線越長 = 高點賣壓越重 ⚠️\n• 暗示股價上漲遇到阻力\n\n📊 下影線（K線下方）：\n• 代表當天曾跌到那個低點，但後來被「買盤」撐起來\n• 下影線越長 = 低點有強力支撐 ✅\n• 暗示股價下跌遇到強烈買氣\n\n🔑 重要觀念：\n沒有影線的K線叫「光頭光腳」，代表多方或空方完全控盤！",
+      "image_key": "lesson_056_card_04"
+    },
+    {
+      "type": "text_image",
+      "title": "K線實戰讀圖練習",
+      "body": "學會四種最常見的K線形態：\n\n1️⃣ 大紅K（光頭光腳陽線）\n   開=最低，收=最高，全天強勢上漲\n   → 多方完全控盤，極強訊號 🔴🔴\n\n2️⃣ 大黑K（光頭光腳陰線）\n   開=最高，收=最低，全天弱勢下跌\n   → 空方完全控盤，極弱訊號 ⬛⬛\n\n3️⃣ 上影長紅K\n   實體在下，上影線很長\n   → 漲上去又被打下來，多方力道不足\n\n4️⃣ 下影長紅K\n   實體在上，下影線很長\n   → 跌下去又被撐上來，支撐強勁 ✅",
+      "image_key": "lesson_056_card_05"
+    },
+    {
+      "type": "text_image",
+      "title": "K線時間週期的選擇",
+      "body": "K線不只有「日K」，有很多時間週期可以選！📅\n\n⏰ 分鐘K（1分/5分/15分/60分）\n• 短線交易者用，看當天盤中走勢\n• 雜訊較多，容易干擾判斷\n\n📅 日K（最常用！）\n• 每根K線 = 一天的開高低收\n• 適合一般投資人，噪音少\n\n📅 週K\n• 每根K線 = 一週的開高低收\n• 更能看出中期趨勢\n\n📅 月K\n• 每根K線 = 一個月\n• 長線投資人用，看大方向\n\n🔑 建議：先學日K，再進階到週K！",
+      "image_key": "lesson_056_card_06"
+    }
+  ],
+  "preset_questions": [
+    {
+      "question_type": "choice",
+      "question_text": "K線圖最早是由哪個國家的商人發明的？",
+      "options": ["美國", "中國", "日本", "英國"],
+      "correct_answer": 2,
+      "explanation": "K線是18世紀日本米商本間宗久發明的，後來被引入股市，成為全球最通用的技術分析工具！"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "K線的四個關鍵價格（OHLC）是？",
+      "options": ["開盤、最高、最低、收盤", "開盤、成交量、平均、收盤", "最高、最低、成交量、平均", "開盤、收盤、漲停、跌停"],
+      "correct_answer": 0,
+      "explanation": "OHLC = Open開盤、High最高、Low最低、Close收盤，四個數字構成一根完整的K線！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "台灣股市中，紅色K線代表股票當天下跌。",
+      "correct_answer": false,
+      "explanation": "不對！台灣股市：紅K=漲（收盤>開盤），黑/綠K=跌（收盤<開盤）。美國習慣和台灣相反！"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "K線上方的「上影線」代表什麼？",
+      "options": ["當天最低曾跌到那個點", "當天最高曾漲到那個點，但後來被賣壓壓下來", "開盤價的位置", "成交量大小"],
+      "correct_answer": 1,
+      "explanation": "上影線越長，代表高點有越強的賣壓！說明股價上漲時遇到了阻力，要特別注意。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "K線的「下影線」越長，代表低點有越強的買盤支撐。",
+      "correct_answer": true,
+      "explanation": "對！下影線長說明股價跌到低點後，強勁的買盤把它撐起來了，是支撐強勁的訊號！"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "「大紅K（光頭光腳陽線）」代表什麼？",
+      "options": ["開盤最高、收盤最低（大跌）", "開盤最低、收盤最高（全天強勢上漲）", "股票漲停", "當天沒有成交"],
+      "correct_answer": 1,
+      "explanation": "光頭光腳大紅K：開盤=最低點，收盤=最高點，全天一路上漲不回頭，是多方最強的K線！"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "一般投資人最建議從哪種週期的K線開始學習？",
+      "options": ["1分鐘K（最短）", "日K", "月K", "年K"],
+      "correct_answer": 1,
+      "explanation": "日K最適合入門！每根代表一天，噪音少、規律清晰，是學習技術分析的最佳起點！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "週K線和月K線比日K線更適合分析長期趨勢。",
+      "correct_answer": true,
+      "explanation": "對！週K和月K排除了短期日常波動的干擾，更能清楚看出股票的中長期趨勢方向！"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "如果一根K線沒有上影線和下影線，叫做什麼？",
+      "options": ["空心K線", "光頭光腳K線", "十字K線", "影線消失K"],
+      "correct_answer": 1,
+      "explanation": "「光頭光腳」！沒有上影線代表收盤=最高點（多方控盤到底），沒有下影線代表開盤=最低點！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "K線圖可以同時反映「開盤、最高、最低、收盤」四個價格資訊。",
+      "correct_answer": true,
+      "explanation": "正確！這正是K線的強大之處，一根K線比折線圖包含更多資訊，是技術分析的核心工具！"
+    }
+  ],
+  "ai_prompt_context": {
+    "topic": "K線歷史起源、OHLC四要素、紅黑K辨識、上下影線買賣壓力解讀、不同週期K線應用",
+    "age_hint": "9-12歲",
+    "vocabulary_level": "intermediate",
+    "metaphor_suggestions": ["蠟燭形狀比喻", "ASCII K線圖解", "光頭光腳強勢K", "上下影線買賣壓力"]
+  }
+}

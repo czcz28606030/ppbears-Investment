@@ -61,12 +61,53 @@
       ],
       "correct_answer": 2,
       "explanation": "對！💻 軟體公司開發完產品後，複製成本幾乎為零，所以毛利率通常很高（80-90%）。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "毛利率的計算方式是？",
+      "options": [
+        "淨利÷收入",
+        "（收入-直接成本）÷收入×100%",
+        "總資產÷收入",
+        "員工薪資÷收入"
+      ],
+      "correct_answer": 1,
+      "explanation": "毛利率 = 毛利 ÷ 收入 × 100%，顯示每賺100元收入中，扣掉直接成本後剩多少！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "毛利率越高，代表公司的產品或服務越有競爭力和定價能力。",
+      "correct_answer": true,
+      "explanation": "對！毛利率高的公司（如台積電、蘋果）通常有強大的技術或品牌護城河！"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "哪種公司通常毛利率最高？",
+      "options": [
+        "傳統製造業",
+        "高科技/軟體公司（如晶片設計、軟體）",
+        "農產品公司",
+        "航運公司"
+      ],
+      "correct_answer": 1,
+      "explanation": "軟體和高科技公司毛利率極高，因為產品邊際成本很低（如軟體複製成本幾乎為零）！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "毛利率很高但淨利率很低，可能代表公司管銷費用太高。",
+      "correct_answer": true,
+      "explanation": "對！毛利高但淨利低，通常是因為廣告費、人事費、研發費等管銷費用吃掉了獲利！"
     }
   ],
   "ai_prompt_context": {
     "topic": "毛利率的概念與不同產業的差異",
     "age_hint": "7-9歲",
     "vocabulary_level": "simple",
-    "metaphor_suggestions": ["奶茶攤扣成本", "名牌包高毛利", "毛利不等於淨利", "品牌技術的價值"]
+    "metaphor_suggestions": [
+      "奶茶攤扣成本",
+      "名牌包高毛利",
+      "毛利不等於淨利",
+      "品牌技術的價值"
+    ]
   }
 }

@@ -61,12 +61,53 @@
       ],
       "correct_answer": 2,
       "explanation": "太棒了！📊 記錄進度可以看到自己離目標越來越近，這會讓你更有動力堅持存錢！"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "制訂儲蓄計畫的第一步是？",
+      "options": [
+        "馬上去銀行",
+        "設定一個明確的存錢目標",
+        "隨便存一點",
+        "等有錢再說"
+      ],
+      "correct_answer": 1,
+      "explanation": "對！先設定目標（例如3個月後存到1000元），才能計畫每天、每週要存多少。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "儲蓄計畫越具體，越容易達成目標。",
+      "correct_answer": true,
+      "explanation": "正確！「每週存100元」比「想到就存」更容易成功，具體計畫是關鍵！"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "如果每週存50元，8週後能存多少？",
+      "options": [
+        "200元",
+        "300元",
+        "400元",
+        "500元"
+      ],
+      "correct_answer": 2,
+      "explanation": "50元 × 8週 = 400元！數學好的你算對了嗎？😄"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "存錢目標達成後，就不需要再繼續儲蓄了。",
+      "correct_answer": false,
+      "explanation": "不對！達成一個目標後可以設定下一個，保持儲蓄習慣是終身受益的事！"
     }
   ],
   "ai_prompt_context": {
     "topic": "實際制定儲蓄計畫的方法",
     "age_hint": "6-8歲",
     "vocabulary_level": "simple",
-    "metaphor_suggestions": ["進度條", "零用錢分配", "存錢買遊戲機", "12週挑戰"]
+    "metaphor_suggestions": [
+      "進度條",
+      "零用錢分配",
+      "存錢買遊戲機",
+      "12週挑戰"
+    ]
   }
 }

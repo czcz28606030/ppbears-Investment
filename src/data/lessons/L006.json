@@ -61,12 +61,53 @@
       ],
       "correct_answer": 1,
       "explanation": "沒錯！✨ 積少成多就是每次存一點點，經過時間的累積，就會變成很大一筆錢。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "存錢筒的主要作用是？",
+      "options": [
+        "裝玩具",
+        "幫你培養存錢習慣",
+        "賺利息",
+        "買股票"
+      ],
+      "correct_answer": 1,
+      "explanation": "存錢筒是培養儲蓄習慣的好工具，讓你學會把錢留下來！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "每天存一點點零錢，時間久了也能存到一大筆。",
+      "correct_answer": true,
+      "explanation": "對！這就是「積少成多」的力量，每天存10元，一年就有3650元！"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "設定存錢目標的好處是？",
+      "options": [
+        "沒有好處",
+        "讓你更有動力存錢",
+        "讓錢自動變多",
+        "不需要工作就有錢"
+      ],
+      "correct_answer": 1,
+      "explanation": "有目標才有動力！例如存錢買一個玩具，會讓你更願意堅持存錢。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "存錢筒裡的錢沒辦法賺到利息。",
+      "correct_answer": true,
+      "explanation": "對！存錢筒不會給你利息，如果想要利息，要存到銀行才行喔！"
     }
   ],
   "ai_prompt_context": {
     "topic": "儲蓄的概念與積少成多",
     "age_hint": "6-8歲",
     "vocabulary_level": "simple",
-    "metaphor_suggestions": ["存錢筒", "撲滿", "每天存10元", "買漫畫的目標"]
+    "metaphor_suggestions": [
+      "存錢筒",
+      "撲滿",
+      "每天存10元",
+      "買漫畫的目標"
+    ]
   }
 }

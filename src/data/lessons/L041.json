@@ -61,12 +61,52 @@
       ],
       "correct_answer": 1,
       "explanation": "對！🧮 EPS = 200 億 ÷ 20 億股 = 10 元。每一股幫你賺了 10 元！"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "EPS 的公式是？",
+      "options": [
+        "股價÷每股盈餘",
+        "公司淨利÷總發行股數",
+        "收入÷員工人數",
+        "市值÷資產"
+      ],
+      "correct_answer": 1,
+      "explanation": "EPS = 公司淨利 ÷ 總發行股數，代表每一股為股東賺了多少錢！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "EPS 逐年成長，通常對公司股票是正面訊號。",
+      "correct_answer": true,
+      "explanation": "對！EPS持續成長代表公司獲利能力越來越強，長期來看股價也傾向上升！"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "某公司去年EPS=5元，今年EPS=8元，代表什麼？",
+      "options": [
+        "公司變差了",
+        "公司獲利成長了60%，是正面訊號",
+        "公司員工增加了",
+        "股價一定上漲"
+      ],
+      "correct_answer": 1,
+      "explanation": "EPS從5漲到8，成長了60%！獲利成長是正面訊號，但股價不一定馬上反應。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "只看EPS就足以判斷一支股票是否值得投資。",
+      "correct_answer": false,
+      "explanation": "不夠！還要看本益比、殖利率、競爭優勢等多個指標，綜合分析才完整！"
     }
   ],
   "ai_prompt_context": {
     "topic": "每股盈餘 EPS 的意義與計算方式",
     "age_hint": "7-9歲",
     "vocabulary_level": "simple",
-    "metaphor_suggestions": ["檸檬汁攤分錢", "EPS=每股賺多少", "公司成績單"]
+    "metaphor_suggestions": [
+      "檸檬汁攤分錢",
+      "EPS=每股賺多少",
+      "公司成績單"
+    ]
   }
 }

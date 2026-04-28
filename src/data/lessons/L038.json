@@ -61,12 +61,53 @@
       ],
       "correct_answer": 2,
       "explanation": "對！📊 說股票漲跌，通常是比較「今天收盤價」和「昨天收盤價」的差異。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "「開盤價」是指？",
+      "options": [
+        "當天最高的成交價格",
+        "當天第一筆成交的股票價格",
+        "前一天的收盤價",
+        "中午的股票價格"
+      ],
+      "correct_answer": 1,
+      "explanation": "開盤價是每個交易日開始的第一筆成交價格，反映市場隔夜消化訊息後的第一反應！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "收盤價是當天最後一筆成交的股票價格。",
+      "correct_answer": true,
+      "explanation": "對！收盤價是一天交易結束時最後的成交價，是最常被引用的股價數字！"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "「昨日收盤價」對今天有什麼用？",
+      "options": [
+        "沒有用",
+        "是今天漲跌停的基準，也是今天漲跌幅度的參考基礎",
+        "決定今天的開盤價",
+        "決定公司今年的業績"
+      ],
+      "correct_answer": 1,
+      "explanation": "今天的漲跌停限制（±10%）是以昨日收盤價計算的，非常重要的參考數字！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "同一天的開盤價一定等於昨天的收盤價。",
+      "correct_answer": false,
+      "explanation": "不一定！隔夜有重大消息時，今天開盤價可能比昨天收盤價高很多或低很多！"
     }
   ],
   "ai_prompt_context": {
     "topic": "股票開盤價與收盤價的基本概念",
     "age_hint": "7-9歲",
     "vocabulary_level": "simple",
-    "metaphor_suggestions": ["像商店營業時間", "起跑線=開盤價", "最終成績=收盤價", "四個重要數字"]
+    "metaphor_suggestions": [
+      "像商店營業時間",
+      "起跑線=開盤價",
+      "最終成績=收盤價",
+      "四個重要數字"
+    ]
   }
 }

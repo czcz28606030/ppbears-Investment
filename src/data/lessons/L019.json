@@ -61,12 +61,53 @@
       ],
       "correct_answer": 2,
       "explanation": "太棒了！📜 公司把出資權利拆成很多小份賣給大眾，每一份就是一張「股票」！"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "公司發行股票是為了？",
+      "options": [
+        "好玩",
+        "向社會大眾募集資金，用於擴大業務",
+        "避稅",
+        "控制員工"
+      ],
+      "correct_answer": 1,
+      "explanation": "對！公司上市發行股票，讓大眾購買，換取資金用於擴張、研發等業務！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "公司也可以向銀行借錢來籌資。",
+      "correct_answer": true,
+      "explanation": "對！公司籌資有兩種主要方式：向銀行借款（債務融資）和發行股票（股權融資）。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "公司向大眾發行股票並在交易所掛牌，叫做？",
+      "options": [
+        "倒閉",
+        "上市",
+        "分紅",
+        "降價"
+      ],
+      "correct_answer": 1,
+      "explanation": "「上市」就是公司申請在股票交易所掛牌交易，讓一般人也能買賣公司的股票！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "所有公司都可以直接上市發行股票。",
+      "correct_answer": false,
+      "explanation": "不對！上市需要符合財務、規模等嚴格條件，審核通過才能在交易所掛牌。"
     }
   ],
   "ai_prompt_context": {
     "topic": "公司為什麼需要募集資金，股票的起源概念",
     "age_hint": "6-8歲",
     "vocabulary_level": "simple",
-    "metaphor_suggestions": ["雞排店擴張", "合夥開店", "出資的權利拆成小份", "一起當老闆"]
+    "metaphor_suggestions": [
+      "雞排店擴張",
+      "合夥開店",
+      "出資的權利拆成小份",
+      "一起當老闆"
+    ]
   }
 }

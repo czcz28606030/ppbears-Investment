@@ -61,12 +61,53 @@
       ],
       "correct_answer": 1,
       "explanation": "對！😢 如果成本 > 營收，公司就會虧損，賺的錢不夠付成本。長期虧損的公司可能會倒閉。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "公司賺錢最基本的方式是？",
+      "options": [
+        "向政府要錢",
+        "賣出產品或服務收入扣掉成本",
+        "借錢",
+        "發行股票"
+      ],
+      "correct_answer": 1,
+      "explanation": "對！收入扣掉成本就是利潤，這是公司賺錢最基本的原理！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "公司賣的東西越多，賺的錢就一定越多。",
+      "correct_answer": false,
+      "explanation": "不一定！如果成本也很高，賣很多也不一定賺錢。利潤=收入-成本。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "什麼是公司的「營收」？",
+      "options": [
+        "公司花掉的錢",
+        "公司賺到的全部收入（還沒扣成本）",
+        "公司的利潤",
+        "員工薪水"
+      ],
+      "correct_answer": 1,
+      "explanation": "營收是公司所有收入的總和，還沒扣掉各種成本費用，就是「做了多少生意」。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "服務業（如餐廳）也是靠提供服務換取收入的公司。",
+      "correct_answer": true,
+      "explanation": "對！餐廳提供餐點和服務，收取費用，也是公司賺錢的方式！"
     }
   ],
   "ai_prompt_context": {
     "topic": "公司的營收、成本與利潤",
     "age_hint": "6-8歲",
     "vocabulary_level": "simple",
-    "metaphor_suggestions": ["雞排店", "營收=賣東西的錢", "成本=花出去的錢", "利潤=真正賺到的"]
+    "metaphor_suggestions": [
+      "雞排店",
+      "營收=賣東西的錢",
+      "成本=花出去的錢",
+      "利潤=真正賺到的"
+    ]
   }
 }

@@ -61,12 +61,52 @@
       ],
       "correct_answer": 2,
       "explanation": "對！💤 PSR 小於 0.5 屬於「相對冷門」，代表市場關注度很低，動能較弱，需要其他指標輔助判斷。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "PSR（熱度值）主要反映什麼？",
+      "options": [
+        "公司員工人數",
+        "市場對這檔股票的關注度和資金熱度",
+        "股利發放金額",
+        "公司的辦公室大小"
+      ],
+      "correct_answer": 1,
+      "explanation": "PSR是衡量市場人氣和資金流向熱度的指標，越高代表越多人關注和買入！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "PSR值越高，代表市場對這檔股票越熱絡。",
+      "correct_answer": true,
+      "explanation": "對！PSR高表示市場關注度高、買氣旺，但也要注意是否已過熱！"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "PSR突然大幅上升可能代表什麼？",
+      "options": [
+        "公司要倒閉",
+        "有重大利多消息吸引大量資金湧入",
+        "只是巧合",
+        "股票便宜了"
+      ],
+      "correct_answer": 1,
+      "explanation": "PSR急升通常伴隨重大利多（如大訂單、新產品），是資金快速流入的訊號！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "只看PSR就足以決定要不要買一檔股票。",
+      "correct_answer": false,
+      "explanation": "不夠！PSR是其中一個指標，還要配合強度、氣動指數、籌碼等多個面向綜合判斷！"
     }
   ],
   "ai_prompt_context": {
     "topic": "PSR 熱度值的定義、等級劃分、使用限制與正確搭配方法",
     "age_hint": "9-12歲",
     "vocabulary_level": "intermediate",
-    "metaphor_suggestions": ["夜市排隊比喻", "熱門≠一定賺", "PSR搭配其他指標"]
+    "metaphor_suggestions": [
+      "夜市排隊比喻",
+      "熱門≠一定賺",
+      "PSR搭配其他指標"
+    ]
   }
 }

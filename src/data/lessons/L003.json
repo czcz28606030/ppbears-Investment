@@ -61,12 +61,53 @@
       ],
       "correct_answer": 0,
       "explanation": "對！✨ 把一種貨幣換成另一種貨幣叫做「換匯」，而換算的比例叫做「匯率」。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "美國使用的貨幣叫什麼？",
+      "options": [
+        "日圓",
+        "美元",
+        "歐元",
+        "英鎊"
+      ],
+      "correct_answer": 1,
+      "explanation": "對！美國的貨幣是美元（USD），是全世界最通用的貨幣之一。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "全世界每個國家都使用同一種貨幣。",
+      "correct_answer": false,
+      "explanation": "不對！每個國家通常有自己的貨幣，例如台灣用新台幣、日本用日圓。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "匯率是什麼？",
+      "options": [
+        "不同國家貨幣之間的交換比例",
+        "銀行收的手續費",
+        "存款的利息",
+        "股票的價格"
+      ],
+      "correct_answer": 0,
+      "explanation": "對！匯率就是兩種貨幣的換算比例，例如1美元換30元新台幣。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "去日本旅行前，需要把新台幣換成日圓。",
+      "correct_answer": true,
+      "explanation": "對！出國旅行通常需要換成當地貨幣，這個過程叫「換匯」。"
     }
   ],
   "ai_prompt_context": {
     "topic": "不同國家的貨幣與匯率概念",
     "age_hint": "6-8歲",
     "vocabulary_level": "simple",
-    "metaphor_suggestions": ["出國旅遊", "便利商店", "新台幣硬幣", "各國國旗"]
+    "metaphor_suggestions": [
+      "出國旅遊",
+      "便利商店",
+      "新台幣硬幣",
+      "各國國旗"
+    ]
   }
 }

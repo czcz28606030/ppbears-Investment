@@ -61,12 +61,52 @@
       ],
       "correct_answer": 1,
       "explanation": "對！🧠 股價圖告訴我們過去的表現，不能保證未來。說「最近表現不錯」是正確的理解態度。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "K線圖（蠟燭圖）主要用來看什麼？",
+      "options": [
+        "公司有幾個員工",
+        "股票的開盤、收盤、最高、最低價格走勢",
+        "公司的倉庫大小",
+        "股東人數"
+      ],
+      "correct_answer": 1,
+      "explanation": "K線包含四個價格：開盤價、收盤價、最高價、最低價，是技術分析的基礎！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "K線圖可以讓投資人看出股價的歷史走勢。",
+      "correct_answer": true,
+      "explanation": "對！K線圖就是股價的歷史紀錄，可以幫助分析趨勢和找出買賣時機。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "「移動平均線（MA）」主要用來判斷什麼？",
+      "options": [
+        "公司的平均工資",
+        "一段時間內的平均股價，用來判斷趨勢",
+        "股東的平均年齡",
+        "公司平均大小"
+      ],
+      "correct_answer": 1,
+      "explanation": "MA5是5日平均線，MA20是20日平均線，常用來判斷短中長期趨勢方向！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "技術分析可以100%準確預測股票未來走勢。",
+      "correct_answer": false,
+      "explanation": "不對！技術分析是輔助工具，有機率性但沒有100%準確，投資要多方評估！"
     }
   ],
   "ai_prompt_context": {
     "topic": "股價走勢圖的基本閱讀方式",
     "age_hint": "7-9歲",
     "vocabulary_level": "simple",
-    "metaphor_suggestions": ["線往上走=漲", "折線圖最簡單", "看圖是參考不是算命"]
+    "metaphor_suggestions": [
+      "線往上走=漲",
+      "折線圖最簡單",
+      "看圖是參考不是算命"
+    ]
   }
 }

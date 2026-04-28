@@ -61,12 +61,53 @@
       ],
       "correct_answer": 2,
       "explanation": "對！⚠️ 一直虧損又借很多錢的公司，可能撐不了太久。投資前一定要避開這種公司。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "一家好公司通常具備哪些特質？",
+      "options": [
+        "只要名字好聽",
+        "穩定的獲利能力、好的管理層、有競爭優勢",
+        "股價一直在漲",
+        "廣告打很多"
+      ],
+      "correct_answer": 1,
+      "explanation": "好公司的核心是：能持續賺錢、管理層值得信任、有護城河（競爭優勢）！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "公司的「護城河」是指很難被競爭對手超越的競爭優勢。",
+      "correct_answer": true,
+      "explanation": "對！品牌力、技術壁壘、規模優勢都是護城河，讓公司長期保持競爭力！"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "下面哪個是公司「長期競爭優勢」的例子？",
+      "options": [
+        "一次大促銷",
+        "台積電的先進製程技術領先",
+        "降價促銷",
+        "換了新廣告"
+      ],
+      "correct_answer": 1,
+      "explanation": "台積電的製程技術需要多年積累，難以複製，這就是強大的技術護城河！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "公司管理層的誠信和能力對長期投資很重要。",
+      "correct_answer": true,
+      "explanation": "對！再好的公司也需要好的領導人，管理層的決策影響公司的長期發展！"
     }
   ],
   "ai_prompt_context": {
     "topic": "判斷好公司的基本標準與護城河概念",
     "age_hint": "7-9歲",
     "vocabulary_level": "simple",
-    "metaphor_suggestions": ["護城河", "便利商店排隊", "巴菲特名言", "品牌力"]
+    "metaphor_suggestions": [
+      "護城河",
+      "便利商店排隊",
+      "巴菲特名言",
+      "品牌力"
+    ]
   }
 }

@@ -549,3 +549,29 @@
   0%, 80%, 100% { transform: scale(0.6); opacity: 0.5; }
   40%            { transform: scale(1.2); opacity: 1; }
 }
+
+/* Progress bar */
+.pf-progress-bar-wrap {
+  width: 220px;
+  height: 10px;
+  background: rgba(220, 38, 38, 0.12);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-top: 2px;
+}
+
+.pf-progress-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #DC2626 0%, #F59E0B 100%);
+  box-shadow: 0 0 8px rgba(220, 38, 38, 0.45);
+  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.pf-progress-pct {
+  font-size: 13px;
+  font-weight: 800;
+  color: #DC2626;
+  letter-spacing: 0.03em;
+  margin-top: 2px;
+}

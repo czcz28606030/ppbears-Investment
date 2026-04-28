@@ -61,12 +61,53 @@
       ],
       "correct_answer": 1,
       "explanation": "對！⚠️ 成交量小代表參與交易的人少，想賣的時候可能不容易找到買家，流動性較差。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "成交量大代表什麼？",
+      "options": [
+        "股票價格很高",
+        "當天買賣這檔股票的人很多，市場很熱絡",
+        "沒有特別意義",
+        "公司員工很多"
+      ],
+      "correct_answer": 1,
+      "explanation": "成交量代表市場的活躍程度！成交量大=有很多人買賣，市場關注度高！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "「量價齊升」（成交量和股價一起上漲）是健康的上漲訊號。",
+      "correct_answer": true,
+      "explanation": "對！量增價漲代表有真實的買氣支撐，上漲有力道，是比較健康的走勢！"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "「縮量下跌」（成交量少、股價下跌）可能代表什麼？",
+      "options": [
+        "一定要立刻賣出",
+        "賣壓不重，可能只是整理，不一定是壞事",
+        "公司要倒閉",
+        "是大漲的前兆"
+      ],
+      "correct_answer": 1,
+      "explanation": "縮量下跌說明沒有大量拋售，只是自然整理，反而可能是低點買入的機會！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "成交量是判斷股票趨勢強弱的重要輔助指標。",
+      "correct_answer": true,
+      "explanation": "對！技術分析裡，「量」是「價」的先行指標，看股價一定要配合看成交量！"
     }
   ],
   "ai_prompt_context": {
     "topic": "股票成交量的意義與重要性",
     "age_hint": "7-9歲",
     "vocabulary_level": "simple",
-    "metaphor_suggestions": ["夜市人潮", "投票比喻", "1張=1000股", "熱門店vs冷清店"]
+    "metaphor_suggestions": [
+      "夜市人潮",
+      "投票比喻",
+      "1張=1000股",
+      "熱門店vs冷清店"
+    ]
   }
 }

@@ -61,12 +61,53 @@
       ],
       "correct_answer": 1,
       "explanation": "對！🏃 投資像馬拉松，需要耐心和堅持。不是比誰跑得快，而是比誰堅持得久！"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "「複利」的力量為什麼驚人？",
+      "options": [
+        "利息很高",
+        "時間越長，報酬率的累積效果呈指數成長",
+        "銀行很慷慨",
+        "股票一直漲"
+      ],
+      "correct_answer": 1,
+      "explanation": "愛因斯坦稱複利是「世界第八大奇蹟」！每年10%的報酬率，30年後資產成長17倍！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "越早開始投資，複利的效果越好。",
+      "correct_answer": true,
+      "explanation": "對！20歲投資比30歲多10年，最終財富差異可能超過一倍！時間是複利最好的朋友。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "「短線交易」和「長期投資」哪個更適合一般人？",
+      "options": [
+        "短線交易一定比較好",
+        "對大多數人而言，長期投資勝率更高、心理壓力更小",
+        "兩個一樣好",
+        "只有專業人士才能投資"
+      ],
+      "correct_answer": 1,
+      "explanation": "研究顯示，長期持有績優股的報酬通常超過大多數短線交易者，且壓力更小！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "股市短期的波動，對長期投資人來說影響較小。",
+      "correct_answer": true,
+      "explanation": "對！如果持有10年以上，短期的漲漲跌跌相對不重要，重要的是長期趨勢！"
     }
   ],
   "ai_prompt_context": {
     "topic": "長期投資的力量與耐心的重要性",
     "age_hint": "7-9歲",
     "vocabulary_level": "simple",
-    "metaphor_suggestions": ["種樹比喻", "複利魔法", "馬拉松不是短跑", "定期定額"]
+    "metaphor_suggestions": [
+      "種樹比喻",
+      "複利魔法",
+      "馬拉松不是短跑",
+      "定期定額"
+    ]
   }
 }

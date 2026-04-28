@@ -61,12 +61,53 @@
       ],
       "correct_answer": 3,
       "explanation": "錢不能直接變成大象啦 🐘 不過可以用錢去動物園看大象喔！"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "「以物易物」是什麼意思？",
+      "options": [
+        "用錢購物",
+        "用東西換東西",
+        "把東西送人",
+        "借錢給別人"
+      ],
+      "correct_answer": 1,
+      "explanation": "對！以物易物就是不用錢，直接用自己有的東西和別人交換。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "現代人主要用「以物易物」方式買東西。",
+      "correct_answer": false,
+      "explanation": "不對！現代人主要用錢交易。以物易物因為太不方便，所以才發明了錢。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "錢有哪些功能？",
+      "options": [
+        "只能買食物",
+        "買東西、存起來、拿去投資",
+        "只能存在銀行",
+        "只能給大人用"
+      ],
+      "correct_answer": 1,
+      "explanation": "錢有三種功能：消費、儲蓄、投資，這三種都很重要！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "錢是人類為了讓交易更方便而發明的工具。",
+      "correct_answer": true,
+      "explanation": "正確！錢就是一張萬能兌換券，讓我們不需要帶大象去換東西了。"
     }
   ],
   "ai_prompt_context": {
     "topic": "貨幣的基本概念與由來",
     "age_hint": "6-8歲",
     "vocabulary_level": "simple",
-    "metaphor_suggestions": ["便利商店", "零用錢", "存錢筒", "兌換券"]
+    "metaphor_suggestions": [
+      "便利商店",
+      "零用錢",
+      "存錢筒",
+      "兌換券"
+    ]
   }
 }

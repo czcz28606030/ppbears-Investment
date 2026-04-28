@@ -40,31 +40,33 @@ export default function AdminDashboard() {
   const [newsletterSending, setNewsletterSending] = useState(false);
   const [newsletterResult, setNewsletterResult] = useState<{ success: boolean; message: string } | null>(null);
 
+  const [pricesLoading, setPricesLoading] = useState(false);
+
   useEffect(() => {
-    if (user?.isAdmin) {
-      setAdminLoading(true);
-      // 並行加載三個數據源，而非串聯
-      Promise.all([
-        loadAllUsers(),
-        supabase
-          ? supabase.from('holdings').select('*').then(({ data }) => data || [])
-          : Promise.resolve([]),
-        fetchTWSEAllStocks(),
-      ])
-        .then(([_, holdingsData, twseData]) => {
-          setAllHoldings(holdingsData);
-          const quotesMap: Record<string, TWSTEStockQuote> = {};
-          twseData.forEach(t => quotesMap[t.Code] = t);
-          setLiveQuotes(quotesMap);
-        })
-        .catch((err) => {
-          console.error('Failed to load admin data:', err);
-        })
-        .finally(() => {
-          setAdminLoading(false);
-        });
-    }
+    if (!user?.isAdmin) return;
+
+    // ── 第一階段：立即載入用戶列表（最快，幾乎無延遲）──
+    setAdminLoading(true);
+    loadAllUsers().finally(() => setAdminLoading(false));
+
+    // ── 第二階段：背景載入持倉 + 即時行情（慢，不阻塞用戶列表）──
+    setPricesLoading(true);
+    Promise.all([
+      supabase
+        ? supabase.from('holdings').select('*').then(({ data }) => data || [])
+        : Promise.resolve([]),
+      fetchTWSEAllStocks(),
+    ])
+      .then(([holdingsData, twseData]) => {
+        setAllHoldings(holdingsData);
+        const quotesMap: Record<string, TWSTEStockQuote> = {};
+        twseData.forEach(t => quotesMap[t.Code] = t);
+        setLiveQuotes(quotesMap);
+      })
+      .catch(err => console.error('Failed to load admin prices:', err))
+      .finally(() => setPricesLoading(false));
   }, [user]);
+
 
   // 用 useMemo 快取每個用戶的未平倉損益計算結果，避免每次渲染都重新計算
   const pnlMap = useMemo(() => {
@@ -271,21 +273,29 @@ export default function AdminDashboard() {
         <div style={{ width: 40 }}></div>
       </div>
 
-      {/* 加載狀態提示 */}
+      {/* 用戶列表載入中 */}
       {adminLoading && (
         <div style={{
-          padding: '16px',
-          background: 'rgba(33, 150, 243, 0.1)',
-          border: '1px solid #2196F3',
-          borderRadius: '8px',
-          color: '#1976D2',
-          marginBottom: '16px',
-          fontSize: '14px',
-          textAlign: 'center'
+          padding: '16px', background: 'rgba(33, 150, 243, 0.08)',
+          border: '1px solid #2196F3', borderRadius: '12px',
+          color: '#1976D2', marginBottom: '16px', fontSize: '14px', textAlign: 'center'
         }}>
-          ⏳ 正在載入管理數據 (用戶、持倉、即時行情)...
+          ⏳ 正在載入用戶列表...
         </div>
       )}
+      {/* 行情背景更新（非阻塞，細小提示） */}
+      {!adminLoading && pricesLoading && (
+        <div style={{
+          padding: '8px 14px', background: 'rgba(255,160,0,0.08)',
+          border: '1px solid rgba(255,160,0,0.3)', borderRadius: '8px',
+          color: '#E65100', marginBottom: '12px', fontSize: '12px',
+          display: 'flex', alignItems: 'center', gap: 6
+        }}>
+          <span style={{ display: 'inline-block', animation: 'spin 1s linear infinite' }}>🔄</span>
+          正在背景更新即時行情與持倉損益...
+        </div>
+      )}
+
 
       {/* 統計卡片 */}
       <div className="admin-stats">

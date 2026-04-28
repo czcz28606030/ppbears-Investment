@@ -61,12 +61,52 @@
       ],
       "correct_answer": 1,
       "explanation": "對！🔥 PSR 熱度值代表市場對這檔股票的關注程度與資金熱度，是量化模型中的重要指標之一。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "量化模型的核心優勢是？",
+      "options": [
+        "完全憑直覺",
+        "用數學和統計排除人為情緒，客觀分析大量數據",
+        "只看新聞",
+        "靠預測未來"
+      ],
+      "correct_answer": 1,
+      "explanation": "量化模型用數學分析歷史數據，找出規律，不受情緒影響，是Simons成功的秘訣！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "Simons 的文藝復興科技基金是歷史上最成功的對沖基金之一。",
+      "correct_answer": true,
+      "explanation": "對！文藝復興的大獎章基金30多年年均報酬超過66%，是投資界的傳奇！"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "量化投資主要分析的是？",
+      "options": [
+        "投資人的感受",
+        "大量的歷史市場數據和統計模型",
+        "公司老闆的個人風格",
+        "只看新聞標題"
+      ],
+      "correct_answer": 1,
+      "explanation": "量化投資靠數據說話，分析價格、成交量、財務數據等找出統計優勢！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "量化模型可以保證每次投資都賺錢。",
+      "correct_answer": false,
+      "explanation": "不對！再好的量化模型也有失誤，只是整體勝率和期望值為正，不保證每次都贏！"
     }
   ],
   "ai_prompt_context": {
     "topic": "量化投資概念、Jim Simons 介紹、PPBears Simons 量化模型四大指標",
     "age_hint": "9-12歲",
     "vocabulary_level": "intermediate",
-    "metaphor_suggestions": ["數學家選股", "電腦自動分析", "四大指標像體檢報告"]
+    "metaphor_suggestions": [
+      "數學家選股",
+      "電腦自動分析",
+      "四大指標像體檢報告"
+    ]
   }
 }

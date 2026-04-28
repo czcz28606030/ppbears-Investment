@@ -61,12 +61,53 @@
       ],
       "correct_answer": 1,
       "explanation": "對！🎉 1,000 × 1% = 10 元。所以一年後你的存款變成 1,010 元！"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "銀行給你的「利息」是什麼？",
+      "options": [
+        "手續費",
+        "因為你存錢，銀行給你的報酬",
+        "罰款",
+        "保管費"
+      ],
+      "correct_answer": 1,
+      "explanation": "對！利息是銀行使用你的錢的報酬，存得越多、越久，利息就越多。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "利率越高，你能賺到的利息就越多。",
+      "correct_answer": true,
+      "explanation": "正確！利率是利息的比例，利率高表示銀行給你更多報酬。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "「複利」的意思是？",
+      "options": [
+        "複雜的利息計算",
+        "利息再賺利息，讓錢越滾越多",
+        "兩家銀行一起的利息",
+        "利息會消失"
+      ],
+      "correct_answer": 1,
+      "explanation": "複利是最強大的財富增長方式！利息加入本金，下次又繼續賺利息，威力驚人！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "借錢也需要付利息給對方。",
+      "correct_answer": true,
+      "explanation": "對！借錢就要付利息，所以盡量不要借錢，或是借了要盡快還清。"
     }
   ],
   "ai_prompt_context": {
     "topic": "利息與複利的基本概念",
     "age_hint": "6-8歲",
     "vocabulary_level": "simple",
-    "metaphor_suggestions": ["錢長大", "銀行感謝你", "利滾利", "種子發芽"]
+    "metaphor_suggestions": [
+      "錢長大",
+      "銀行感謝你",
+      "利滾利",
+      "種子發芽"
+    ]
   }
 }

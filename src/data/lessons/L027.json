@@ -61,12 +61,53 @@
       ],
       "correct_answer": 2,
       "explanation": "對！📈 今年比去年同期賣更多，就是「營收成長」，這通常是好消息！"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "「營收」和「利潤」有什麼不同？",
+      "options": [
+        "沒有不同",
+        "營收是總收入，利潤是扣掉成本後剩下的",
+        "利潤比營收大",
+        "營收就是員工薪水"
+      ],
+      "correct_answer": 1,
+      "explanation": "營收是賺到的全部錢，利潤是扣掉所有成本費用後剩下的，才是真正賺到的！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "公司營收很高，代表一定很賺錢。",
+      "correct_answer": false,
+      "explanation": "不一定！營收高但成本更高的話，公司可能是虧錢的，要看利潤才準確！"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "公司每季公布一次業績叫做？",
+      "options": [
+        "月報",
+        "季報（財報）",
+        "年報",
+        "周報"
+      ],
+      "correct_answer": 1,
+      "explanation": "公司每三個月（一季）公布一次財務報告，叫季報，投資人很重視這個資料！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "營收持續成長通常是公司業務擴張的好訊號。",
+      "correct_answer": true,
+      "explanation": "對！每年營收成長代表公司業務在擴大，通常是正面的投資訊號！"
     }
   ],
   "ai_prompt_context": {
     "topic": "營收的概念、成長衰退與營收不等於利潤",
     "age_hint": "7-9歲",
     "vocabulary_level": "simple",
-    "metaphor_suggestions": ["飲料店營收", "月營收公佈", "跟去年比較", "營收高不一定賺錢"]
+    "metaphor_suggestions": [
+      "飲料店營收",
+      "月營收公佈",
+      "跟去年比較",
+      "營收高不一定賺錢"
+    ]
   }
 }

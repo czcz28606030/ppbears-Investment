@@ -61,12 +61,53 @@
       ],
       "correct_answer": 0,
       "explanation": "對！⭐⭐⭐⭐⭐ 四個指標同時表現強勁叫做「共振」，這是量化條件最理想的狀態，通常 AI 推薦等級也會最高。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "AI推薦等級「超高度」代表什麼？",
+      "options": [
+        "AI認為這支一定大漲",
+        "四個指標（PSR、強度、GVI、籌碼）表現都非常優異，綜合評分最高",
+        "公司非常大",
+        "超級容易買到"
+      ],
+      "correct_answer": 1,
+      "explanation": "超高度是Simons模型的最高評級，代表多個量化指標同時亮綠燈，條件最好！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "AI推薦等級高的股票，在大盤大跌時也一定不會跌。",
+      "correct_answer": false,
+      "explanation": "不對！即使AI評級再高，大盤系統性下跌時個股也可能受波及，沒有絕對保證！"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "使用AI推薦等級做投資決策時，最正確的態度是？",
+      "options": [
+        "等級高就全押",
+        "把它當作參考工具之一，再結合自己的判斷和風險管理",
+        "完全忽略它",
+        "只看等級不看其他"
+      ],
+      "correct_answer": 1,
+      "explanation": "AI推薦等級是輔助工具！還要考慮大盤環境、個人風險承受度、買入時機等！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "學會了Simons量化模型後，就不需要再學其他知識了。",
+      "correct_answer": false,
+      "explanation": "投資學習永無止境！Simons模型是一個很棒的工具，但結合總體經濟、心理面等知識更完整！"
     }
   ],
   "ai_prompt_context": {
     "topic": "AI 推薦等級的組成、四個指標綜合解讀、模型的限制與正確使用心態",
     "age_hint": "9-12歲",
     "vocabulary_level": "intermediate",
-    "metaphor_suggestions": ["四個指標像體檢四個項目", "共振概念", "推薦等級是參考不是命令", "Stage 3 Simons 章節總結"]
+    "metaphor_suggestions": [
+      "四個指標像體檢四個項目",
+      "共振概念",
+      "推薦等級是參考不是命令",
+      "Stage 3 Simons 章節總結"
+    ]
   }
 }

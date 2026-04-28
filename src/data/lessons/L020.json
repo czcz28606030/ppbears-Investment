@@ -61,12 +61,53 @@
       ],
       "correct_answer": 2,
       "explanation": "對！💰 公司賺錢後分給股東的紅利叫做「股利」（Dividend），這是股東的權利之一。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "股東最主要的「好處」是什麼？",
+      "options": [
+        "可以指揮公司員工",
+        "可以分享公司的利潤（股利）和股價上漲",
+        "免費使用公司產品",
+        "不用工作就有薪水"
+      ],
+      "correct_answer": 1,
+      "explanation": "股東可以分到股利，也可以在股價上漲時賣出賺差價，這是投資的主要報酬！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "持有股票越多的人，在公司的發言權越大。",
+      "correct_answer": true,
+      "explanation": "對！股東大會投票時，持股越多票數越多，對公司決策影響力越大。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "成為一家公司的股東，你擁有的是？",
+      "options": [
+        "公司的一部分所有權",
+        "公司所有的錢",
+        "公司的所有資產",
+        "公司老闆的職位"
+      ],
+      "correct_answer": 0,
+      "explanation": "對！買股票就是買下公司的一部分所有權，你是這家公司的小股東！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "公司虧損時，股東也可能損失部分投資。",
+      "correct_answer": true,
+      "explanation": "正確！股東雖然可以分享獲利，但也要承擔公司虧損時股價下跌的風險。"
     }
   ],
   "ai_prompt_context": {
     "topic": "股東的概念、權利與風險",
     "age_hint": "6-8歲",
     "vocabulary_level": "simple",
-    "metaphor_suggestions": ["公司的小老闆", "股東會投票", "分紅利", "選喜歡的公司"]
+    "metaphor_suggestions": [
+      "公司的小老闆",
+      "股東會投票",
+      "分紅利",
+      "選喜歡的公司"
+    ]
   }
 }

@@ -61,12 +61,53 @@
       ],
       "correct_answer": 1,
       "explanation": "對！🟢 新台幣 200 元鈔票是最少見的面額之一，很多人都沒看過呢！"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "新台幣最大面額的紙鈔是？",
+      "options": [
+        "500元",
+        "1000元",
+        "2000元",
+        "200元"
+      ],
+      "correct_answer": 1,
+      "explanation": "目前台灣流通最大面額的紙鈔是1000元，偶爾也有2000元但較少見。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "台灣的貨幣單位是「新台幣」，英文縮寫是 NTD 或 TWD。",
+      "correct_answer": true,
+      "explanation": "對！新台幣的官方英文縮寫是 NTD（New Taiwan Dollar）或 TWD。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "台灣的硬幣有哪些面額？",
+      "options": [
+        "只有1元",
+        "1元、5元、10元、50元",
+        "1元、2元、5元",
+        "10元和100元"
+      ],
+      "correct_answer": 1,
+      "explanation": "台灣現行流通硬幣有1元、5元、10元、50元四種面額！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "紙鈔上的人物都是歷史名人或重要景點。",
+      "correct_answer": true,
+      "explanation": "對！台灣紙鈔上有孫中山、蔣中正等人物，以及玉山等重要景觀。"
     }
   ],
   "ai_prompt_context": {
     "topic": "新台幣面額認識與基本換算",
     "age_hint": "6-8歲",
     "vocabulary_level": "simple",
-    "metaphor_suggestions": ["硬幣家族", "鈔票顏色", "便利商店找零", "零錢包"]
+    "metaphor_suggestions": [
+      "硬幣家族",
+      "鈔票顏色",
+      "便利商店找零",
+      "零錢包"
+    ]
   }
 }

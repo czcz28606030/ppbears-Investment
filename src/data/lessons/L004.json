@@ -61,12 +61,53 @@
       ],
       "correct_answer": 1,
       "explanation": "沒錯！🌟 預算就是提前計畫好錢要花在哪裡。先做好計畫，才不會亂花錢喔！"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "收到零用錢後，最聰明的做法是？",
+      "options": [
+        "全部立刻花掉",
+        "存起來一部分，再花剩下的",
+        "借給朋友",
+        "放著不管"
+      ],
+      "correct_answer": 1,
+      "explanation": "聰明！先存一部分，再用剩下的滿足需求，這是很好的理財習慣。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "每個月記錄自己的收入和支出，叫做「記帳」。",
+      "correct_answer": true,
+      "explanation": "對！記帳可以讓你清楚知道錢花到哪裡去，是很棒的理財習慣。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "「預算」是什麼意思？",
+      "options": [
+        "預測天氣",
+        "計畫錢要怎麼花",
+        "銀行的名字",
+        "一種股票"
+      ],
+      "correct_answer": 1,
+      "explanation": "正確！預算就是事先計畫錢的用途，可以避免亂花錢。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "零用錢應該全部存起來，一點都不能花。",
+      "correct_answer": false,
+      "explanation": "不對！零用錢可以適當消費，但養成存一部分的習慣更重要！"
     }
   ],
   "ai_prompt_context": {
     "topic": "零用錢管理、記帳與預算",
     "age_hint": "6-8歲",
     "vocabulary_level": "simple",
-    "metaphor_suggestions": ["存錢筒", "記帳本", "每週零用錢", "便利商店"]
+    "metaphor_suggestions": [
+      "存錢筒",
+      "記帳本",
+      "每週零用錢",
+      "便利商店"
+    ]
   }
 }

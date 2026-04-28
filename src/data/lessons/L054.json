@@ -61,12 +61,52 @@
       ],
       "correct_answer": 1,
       "explanation": "對！⚡ 氣動指數由負轉正是動能反轉的訊號，代表資金從流出轉為流入，可能是趨勢轉強的起點，值得關注。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "氣動指數（GVI）主要反映什麼？",
+      "options": [
+        "天氣對股價的影響",
+        "資金流入流出的速度和方向",
+        "公司的氣候政策",
+        "股票的體積"
+      ],
+      "correct_answer": 1,
+      "explanation": "GVI（氣動指數）衡量資金流入的動能和方向，就像風往哪裡吹，資金往哪裡流！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "GVI比歷史中位數高，通常代表資金流入比平均水準更強。",
+      "correct_answer": true,
+      "explanation": "對！GVI高於中位數說明當前資金流入動能強於歷史平均，是偏多的訊號！"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "「GVI由負轉正」代表什麼？",
+      "options": [
+        "股票要下市",
+        "資金從流出轉為流入，可能是趨勢轉強的起點",
+        "公司要換老闆",
+        "沒有意義"
+      ],
+      "correct_answer": 1,
+      "explanation": "GVI由負轉正是趨勢轉換的訊號，代表賣壓結束、買盤開始主導，值得關注！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "GVI需要和同類股票比較才更有意義。",
+      "correct_answer": true,
+      "explanation": "對！把個股GVI和同板塊中位數比較，才能判斷這支股票的資金吸引力是否突出！"
     }
   ],
   "ai_prompt_context": {
     "topic": "氣動指數的定義、對比概念、判讀方式、與其他指標搭配",
     "age_hint": "9-12歲",
     "vocabulary_level": "intermediate",
-    "metaphor_suggestions": ["風向比喻（颱風/微風/逆風）", "對比很重要不看絕對值", "三指標共振概念"]
+    "metaphor_suggestions": [
+      "風向比喻（颱風/微風/逆風）",
+      "對比很重要不看絕對值",
+      "三指標共振概念"
+    ]
   }
 }

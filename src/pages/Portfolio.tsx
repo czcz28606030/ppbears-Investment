@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore, formatMoney, formatPrice } from '../store';
 import type { Holding } from '../types';
-import { fetchStockQuantData } from '../api';
+import { fetchStockQuantData, clearTTLCache } from '../api';
 import { getCache, setCache, clearCache, getCacheTTL, CACHE_KEYS } from '../cache';
 import './Portfolio.css';
 
@@ -29,6 +29,8 @@ export default function Portfolio() {
   const [signalDataDate, setSignalDataDate] = useState<string>('');;
   const [signalsLoading, setSignalsLoading] = useState(false);
   const [loadingMsg, setLoadingMsg] = useState('正在載入資料...');
+  const [loadingProgress, setLoadingProgress] = useState(0); // 0-100
+  const [refreshKey, setRefreshKey] = useState(0); // 遞增來強制重新抓取
   const [enableCustomSignal, setEnableCustomSignal] = useState(() => {
     return localStorage.getItem('ppbears_custom_signal') === 'true';
   });
@@ -46,13 +48,14 @@ export default function Portfolio() {
         if (mounted && Object.keys(aiSignals).length > 0) setAiSignals({});
         return;
       }
+      if (mounted) setLoadingProgress(0);
 
       // 檢查快取（5 分鐘）
       type SignalCacheData = typeof aiSignals & { _date: string; _holdingKeys: string };
       const holdingKeys = holdings.map(h => h.stockCode).sort().join(',');
       const cacheKey = CACHE_KEYS.PORTFOLIO_SIGNALS;
       const cached = getCache<SignalCacheData>(cacheKey);
-      if (cached && cached._holdingKeys === holdingKeys) {
+      if (refreshKey === 0 && cached && cached._holdingKeys === holdingKeys) {
         if (mounted) {
           const { _date, _holdingKeys: _k, ...cachedSignals } = cached;
           setAiSignals(cachedSignals);
@@ -63,6 +66,7 @@ export default function Portfolio() {
 
       if (mounted) {
         setSignalsLoading(true);
+        setLoadingProgress(5);
         setLoadingMsg('正在連線 AI 量化分析...');
       }
       
@@ -81,8 +85,9 @@ export default function Portfolio() {
         }
         try {
           // 並行取得 AI 量化訊號
-          if (mounted) setLoadingMsg(`正在分析 ${holdings.length} 支持股 AI 訊號...`);
+          if (mounted) { setLoadingMsg(`正在分析 ${holdings.length} 支持股 AI 訊號...`); setLoadingProgress(20); }
 
+          let doneCount = 0;
           await Promise.all(holdings.map(async (h) => {
             const quantData = await fetchStockQuantData(h.stockCode).catch(() => null);
 
@@ -101,6 +106,12 @@ export default function Portfolio() {
             }
 
             signals[h.stockCode] = { primaryLabel, primaryType, primaryIcon };
+            doneCount++;
+            if (mounted) {
+              const pct = 20 + Math.round((doneCount / holdings.length) * 70);
+              setLoadingProgress(pct);
+              setLoadingMsg(`正在分析 ${h.stockName}（${doneCount}/${holdings.length}）...`);
+            }
           }));
 
         } catch (err) {
@@ -142,6 +153,10 @@ export default function Portfolio() {
       }
 
       if (mounted) {
+        setLoadingProgress(100);
+        setLoadingMsg('分析完成！');
+        // 短暫顯示 100% 再關閉
+        await new Promise(r => setTimeout(r, 400));
         setAiSignals(signals);
         setSignalsLoading(false);
         // 寫入快取（5 分鐘）
@@ -153,7 +168,7 @@ export default function Portfolio() {
     }
     loadSignals();
     return () => { mounted = false; };
-  }, [holdings, hasAiFeature, enableCustomSignal]);
+  }, [holdings, hasAiFeature, enableCustomSignal, refreshKey]);
 
   return (
     <div className="portfolio">
@@ -169,6 +184,14 @@ export default function Portfolio() {
             </div>
             <div className="pf-loading-title">AI 訊號分析中</div>
             <div className="pf-loading-step">{loadingMsg}</div>
+            {/* 進度條 */}
+            <div className="pf-progress-bar-wrap">
+              <div
+                className="pf-progress-bar-fill"
+                style={{ width: `${loadingProgress}%` }}
+              />
+            </div>
+            <div className="pf-progress-pct">{loadingProgress}%</div>
             <div className="pf-loading-dots">
               <span /><span /><span />
             </div>
@@ -255,8 +278,13 @@ export default function Portfolio() {
                 title="重新抓取最新 AI 訊號"
                 onClick={() => {
                   clearCache(CACHE_KEYS.PORTFOLIO_SIGNALS);
+                  // 同時清除每支持股的 localStorage TTL 快取（量化訊號）
+                  holdings.forEach(h => clearTTLCache(`ppbears_quant30_${h.stockCode}`));
                   setAiSignals({});
                   setSignalDataDate('');
+                  setLoadingProgress(0);
+                  // 遞增 refreshKey 強制 useEffect 重新執行
+                  setRefreshKey(k => k + 1);
                 }}
               >
                 🔄 重新抓取

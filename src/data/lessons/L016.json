@@ -61,12 +61,53 @@
       ],
       "correct_answer": 1,
       "explanation": "對！🏪 統一超商（7-ELEVEN）的公司主要是經營便利商店，提供各種生活商品和服務。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "公司是什麼？",
+      "options": [
+        "一個人獨自賺錢",
+        "一群人合作提供產品或服務並賺取利潤的組織",
+        "政府開的機關",
+        "學校"
+      ],
+      "correct_answer": 1,
+      "explanation": "對！公司是人們合作做生意的組織，提供商品或服務並賺取利潤。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "公司一定要賺錢才能繼續經營。",
+      "correct_answer": true,
+      "explanation": "對！公司長期虧損就無法繼續運作，賺錢是公司存活的基本條件。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "成立公司需要哪些基本要素？",
+      "options": [
+        "只需要一個名字",
+        "資金、人才、產品或服務、客戶",
+        "只需要一台電腦",
+        "只需要場地"
+      ],
+      "correct_answer": 1,
+      "explanation": "開公司需要資金（錢）、人才、提供的產品或服務，以及願意購買的客戶。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "公司可以只有一個人獨自經營。",
+      "correct_answer": true,
+      "explanation": "對！獨資公司只有一個老闆，台灣有很多小商店就是這種形式。"
     }
   ],
   "ai_prompt_context": {
     "topic": "公司的基本概念與運作方式",
     "age_hint": "6-8歲",
     "vocabulary_level": "simple",
-    "metaphor_suggestions": ["雞排店", "便利商店", "書包工廠", "牛奶公司"]
+    "metaphor_suggestions": [
+      "雞排店",
+      "便利商店",
+      "書包工廠",
+      "牛奶公司"
+    ]
   }
 }

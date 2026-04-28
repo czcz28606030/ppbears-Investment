@@ -61,12 +61,53 @@
       ],
       "correct_answer": 1,
       "explanation": "答對了！🛡️ 漲跌幅限制是為了保護投資人，避免股價一天之內暴漲暴跌造成重大損失。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "台股每天的漲跌幅限制是多少？",
+      "options": [
+        "5%",
+        "10%",
+        "20%",
+        "沒有限制"
+      ],
+      "correct_answer": 1,
+      "explanation": "台灣股市每天漲跌停限制是前一日收盤價的正負10%，保護投資人免受過度波動傷害！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "股票「漲停」就是漲了10%，當天不能再漲了。",
+      "correct_answer": true,
+      "explanation": "對！漲停就是漲到上限10%，當天無法再漲更高了（收盤前可能撤單後跌離漲停板）。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "股票連續多天漲停板通常代表什麼？",
+      "options": [
+        "公司要倒了",
+        "市場對這檔股票非常看好，大量買單湧入",
+        "政府在拉抬股價",
+        "這是正常現象"
+      ],
+      "correct_answer": 1,
+      "explanation": "連續漲停通常是有重大利多消息（如訂單大增、新技術突破），買氣極為旺盛！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "「跌停」時想賣出股票可能賣不掉。",
+      "correct_answer": true,
+      "explanation": "對！跌停時大家都想賣，但沒人接手，委賣單可能無法成交，造成「賣不掉」的窘境！"
     }
   ],
   "ai_prompt_context": {
     "topic": "台灣股市的漲跌幅限制、漲停板與跌停板",
     "age_hint": "7-9歲",
     "vocabulary_level": "simple",
-    "metaphor_suggestions": ["紅綠燈", "交通號誌停止", "10%限制", "保護投資人"]
+    "metaphor_suggestions": [
+      "紅綠燈",
+      "交通號誌停止",
+      "10%限制",
+      "保護投資人"
+    ]
   }
 }

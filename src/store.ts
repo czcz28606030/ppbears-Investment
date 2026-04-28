@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { createClient } from '@supabase/supabase-js';
 import { supabase } from './supabase';
 import type { Session } from '@supabase/supabase-js';
 import type { UserAccount, Trade, Holding, WithdrawalRequest, FeatureOverride, SystemSettings, LessonResult, RewardRule, RewardTriggerType, WalletTransaction, RewardShopItem, RedemptionRequest, WatchlistItem, WatchlistSignal, WatchlistWarning } from './types';
@@ -154,6 +155,8 @@ interface InvestmentStore {
   // Children Management
   loadChildren: () => Promise<void>;
   createChildAccount: (email: string, password: string, displayName: string, avatar: string, initialBalance: number) => Promise<{ error: string | null; needsConfirmation?: boolean }>;
+  updateChildProfile: (childId: string, displayName: string, avatar: string) => Promise<{ error: string | null }>;
+  deleteChildAccount: (childId: string) => Promise<{ error: string | null }>;
   setChildBalance: (childId: string, amount: number, mode: 'set' | 'add') => Promise<{ error: string | null }>;
   loadWithdrawalRequests: () => Promise<void>;
   approveWithdrawal: (requestId: string) => Promise<{ error: string | null }>;
@@ -1108,7 +1111,8 @@ export const useStore = create<InvestmentStore>((set, get) => ({
     if (!supabase) return;
     set({ loading: true });
 
-    const { data: userData } = await supabase.from('users').select('*').eq('id', userId).single();
+    // maybeSingle() 避免找不到資料時回傳 406 錯誤
+    const { data: userData } = await supabase.from('users').select('*').eq('id', userId).maybeSingle();
     if (!userData) { set({ loading: false }); return; }
 
     const currentUser = rowToUser(userData);
@@ -1206,31 +1210,61 @@ export const useStore = create<InvestmentStore>((set, get) => ({
     if (!supabase) return { error: '資料庫未連線' };
     const { user, children, systemSettings } = get();
     if (!user || user.role !== 'parent') return { error: '只有主帳號可以建立副帳號' };
-    
     if (!get().isPremiumUser() && children.length >= systemSettings.free_max_child_accounts) {
       return { error: `免費帳號最多只能建立 ${systemSettings.free_max_child_accounts} 個副帳號！\n升級 Premium 可解鎖無限副帳號 💎` };
     }
-
     try {
-      const { data, error } = await supabase.auth.signUp({ email, password });
+      // 建立隔離臨時 client 進行 signUp，避免搶佔父帳號 auth lock
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+      const tempClient = createClient(supabaseUrl, supabaseAnonKey, {
+        auth: { storageKey: `sb-temp-${Date.now()}`, persistSession: false, autoRefreshToken: false },
+      });
+      const { data, error } = await tempClient.auth.signUp({ email, password });
       if (error) return { error: error.message };
       if (!data.user) return { error: '無法建立副帳號' };
-
       const { error: insertError } = await supabase.from('users').insert([{
         id: data.user.id, email, display_name: displayName, avatar,
         role: 'child', parent_id: user.id,
-        available_balance: initialBalance,
-        initial_balance: initialBalance,
+        available_balance: initialBalance, initial_balance: initialBalance,
       }]);
       if (insertError) return { error: insertError.message };
-
       await get().loadChildren();
-      
-      if (!data.session) {
-        return { error: null, needsConfirmation: true };
-      }
-      return { error: null, needsConfirmation: false };
+      return { error: null, needsConfirmation: !data.session };
     } catch (e) { return { error: String(e) }; }
+  },
+
+  updateChildProfile: async (childId, displayName, avatar) => {
+    if (!supabase) return { error: '資料庫未連線' };
+    const { user, children } = get();
+    if (!user || user.role !== 'parent') return { error: '權限不足' };
+    if (!children.find(c => c.id === childId)) return { error: '找不到此副帳號' };
+    const { error } = await supabase.from('users')
+      .update({ display_name: displayName, avatar })
+      .eq('id', childId).eq('parent_id', user.id);
+    if (error) return { error: error.message };
+    set(s => ({ children: s.children.map(c => c.id === childId ? { ...c, displayName, avatar } : c) }));
+    return { error: null };
+  },
+
+  deleteChildAccount: async (childId) => {
+    if (!supabase) return { error: '資料庫未連線' };
+    const { user, children } = get();
+    if (!user || user.role !== 'parent') return { error: '權限不足' };
+    if (!children.find(c => c.id === childId)) return { error: '找不到此副帳號' };
+    try {
+      await Promise.all([
+        supabase.from('holdings').delete().eq('user_id', childId),
+        supabase.from('trades').delete().eq('user_id', childId),
+        supabase.from('lesson_progress').delete().eq('user_id', childId),
+        supabase.from('wallet_transactions').delete().eq('user_id', childId),
+        supabase.from('withdrawal_requests').delete().eq('child_id', childId),
+      ]);
+      const { error } = await supabase.from('users').delete().eq('id', childId).eq('parent_id', user.id);
+      if (error) return { error: error.message };
+      set(s => ({ children: s.children.filter(c => c.id !== childId) }));
+      return { error: null };
+    } catch (e) { return { error: e instanceof Error ? e.message : '刪除失敗' }; }
   },
 
   // 主帳號可以直接設定或追加子帳號餘額（無上限限制）
@@ -1441,64 +1475,44 @@ export const useStore = create<InvestmentStore>((set, get) => ({
     }
 
     try {
-      // 單一 RPC 完成：讀手續費 → 驗餘額 → 更新 balance → 寫 trades → upsert holdings
+      // 超時提升到 35s：Supabase 免費方案 cold start 可長達 10~25s
+      // 不加重試：若前一次已成功但前端逾時，重試會造成重複下單！
       const { data, error } = await withWriteTimeout(
         supabase.rpc('execute_buy_trade', {
-          p_stock_code: stockCode,
-          p_stock_name: stockName,
-          p_quantity: quantity,
-          p_price: price,
-          p_industry: industry || '',
-          p_reason: reason || null,
+          p_stock_code: stockCode, p_stock_name: stockName,
+          p_quantity: quantity, p_price: price,
+          p_industry: industry || '', p_reason: reason || null,
         }),
-        15000
+        35000
       );
       if (error) throw error;
       const row = Array.isArray(data) ? data[0] : data;
       if (!row) throw new Error('RPC 未回傳資料');
-
-      // 本地狀態更新，不再 reload 全部資料
       const newBalance = Number(row.new_balance);
       const newTrade: Trade = {
-        id: row.trade_id,
-        stockCode, stockName,
-        tradeType: 'buy',
-        quantity, price,
-        totalAmount: Number(row.total_cost),
-        reason: reason || undefined,
-        timestamp: Number(row.trade_timestamp),
+        id: row.trade_id, stockCode, stockName, tradeType: 'buy',
+        quantity, price, totalAmount: Number(row.total_cost),
+        reason: reason || undefined, timestamp: Number(row.trade_timestamp),
       };
       const newSharesNum = Number(row.new_shares);
       const newAvgCostNum = Number(row.new_avg_cost);
       const existingIdx = holdings.findIndex(h => h.stockCode === stockCode);
       const newHoldings: Holding[] = existingIdx >= 0
         ? holdings.map((h, i) => i === existingIdx
-            ? { ...h, totalShares: newSharesNum, avgCost: newAvgCostNum, currentPrice: price }
-            : h)
-        : [...holdings, {
-            stockCode, stockName,
-            totalShares: newSharesNum, avgCost: newAvgCostNum,
-            currentPrice: price, industry: industry || '',
-          }];
-
-      set({
-        user: { ...user, availableBalance: newBalance },
-        trades: [newTrade, ...trades],
-        holdings: newHoldings,
-      });
-
+            ? { ...h, totalShares: newSharesNum, avgCost: newAvgCostNum, currentPrice: price } : h)
+        : [...holdings, { stockCode, stockName, totalShares: newSharesNum, avgCost: newAvgCostNum, currentPrice: price, industry: industry || '' }];
+      set({ user: { ...user, availableBalance: newBalance }, trades: [newTrade, ...trades], holdings: newHoldings });
       return { success: true, message: `成功買入 ${stockName} ${quantity} 股 🎉` };
     } catch (err) {
       console.error('executeBuy error:', err);
       const raw = err instanceof Error ? err.message : String(err);
-      if (raw.includes('insufficient_balance')) {
-        return { success: false, message: `餘額不足！需要更多零用錢才能買喔 💰` };
-      }
-      if (raw.includes('not_authenticated')) {
-        return { success: false, message: '登入逾期，請重新登入' };
-      }
-      if (raw.includes('function') && raw.includes('execute_buy_trade')) {
-        return { success: false, message: '⚠️ 交易服務尚未部署，請管理員執行 supabase-trade-rpc.sql' };
+      if (raw.includes('insufficient_balance')) return { success: false, message: '餘額不足！需要更多零用錢才能買喔 💰' };
+      if (raw.includes('not_authenticated')) return { success: false, message: '登入逾期，請重新登入' };
+      if (raw.includes('function') && raw.includes('execute_buy_trade')) return { success: false, message: '⚠️ 交易服務尚未部署，請管理員執行 supabase-trade-rpc.sql' };
+      // 逾時情境：DB 可能已成功執行，不確定結果，禁止重試
+      if (raw.includes('逾時')) {
+        setTimeout(() => { get().loadUserData(user.id).catch(() => {}); }, 2000);
+        return { success: false, message: '⚠️ 網路回應較慢，交易可能已處理。\n請到「交易紀錄」確認，不要重複下單！' };
       }
       return { success: false, message: `⚠️ 買入失敗：${raw || '請檢查網路後再試。'}` };
     }

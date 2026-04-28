@@ -61,12 +61,53 @@
       ],
       "correct_answer": 1,
       "explanation": "答對了！💚 營收扣掉全部成本後的結果是「淨利」30,000 元，這是公司真正賺到的錢。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "「毛利」的計算方式是？",
+      "options": [
+        "收入＋成本",
+        "收入－直接成本（進貨、原料等）",
+        "收入÷股數",
+        "成本×2"
+      ],
+      "correct_answer": 1,
+      "explanation": "毛利 = 收入 - 直接成本，反映產品本身的獲利能力！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "一家公司的成本越低，通常利潤就越高。",
+      "correct_answer": true,
+      "explanation": "對！在收入不變的情況下，降低成本直接提高利潤，這是公司努力的方向之一。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "「固定成本」和「變動成本」的差別是？",
+      "options": [
+        "沒有差別",
+        "固定成本不隨產量改變（如房租），變動成本隨產量增減",
+        "固定成本比較貴",
+        "變動成本是固定的"
+      ],
+      "correct_answer": 1,
+      "explanation": "房租不管賣多少都要付（固定），原料成本則隨生產量增減（變動）！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "公司獲利能力好，對股東是正面的消息。",
+      "correct_answer": true,
+      "explanation": "對！公司越賺錢，股東收到的股利可能越多，股價也可能上漲！"
     }
   ],
   "ai_prompt_context": {
     "topic": "成本種類、毛利與淨利的計算",
     "age_hint": "7-9歲",
     "vocabulary_level": "simple",
-    "metaphor_suggestions": ["雞排店成本", "毛利vs淨利", "省成本=賺錢", "材料租金薪水"]
+    "metaphor_suggestions": [
+      "雞排店成本",
+      "毛利vs淨利",
+      "省成本=賺錢",
+      "材料租金薪水"
+    ]
   }
 }

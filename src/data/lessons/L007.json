@@ -61,12 +61,53 @@
       ],
       "correct_answer": 2,
       "explanation": "很棒！💡 買東西前先想想是「需要」還是「想要」，這樣才能做出聰明的花錢決定。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "「需要」和「想要」的最大差別是？",
+      "options": [
+        "價格不同",
+        "需要是生活必需品，想要是額外的慾望",
+        "顏色不同",
+        "大人買的叫需要，小孩買的叫想要"
+      ],
+      "correct_answer": 1,
+      "explanation": "正確！食物、衣服是「需要」；新玩具、零食是「想要」，分清楚才能聰明用錢！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "買東西前先想想「這是需要還是想要」，可以幫助你省錢。",
+      "correct_answer": true,
+      "explanation": "對！多問自己這個問題，可以避免衝動購物，讓錢用在更重要的地方。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "下面哪個是「需要」而不是「想要」？",
+      "options": [
+        "新款電動遊戲機",
+        "學校的教科書",
+        "漫畫書",
+        "流行玩具"
+      ],
+      "correct_answer": 1,
+      "explanation": "教科書是上課必需品，屬於「需要」。遊戲機和玩具大多是「想要」。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "「想要」的東西完全不應該買。",
+      "correct_answer": false,
+      "explanation": "不對！偶爾買想要的東西是可以的，但要在能力範圍內，並優先滿足「需要」。"
     }
   ],
   "ai_prompt_context": {
     "topic": "需要與想要的區別，理性消費",
     "age_hint": "6-8歲",
     "vocabulary_level": "simple",
-    "metaphor_suggestions": ["買玩具", "午餐便當", "零用錢決策", "文具和飲料"]
+    "metaphor_suggestions": [
+      "買玩具",
+      "午餐便當",
+      "零用錢決策",
+      "文具和飲料"
+    ]
   }
 }

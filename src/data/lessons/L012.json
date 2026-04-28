@@ -61,12 +61,53 @@
       ],
       "correct_answer": 2,
       "explanation": "答對了！🔢 每個帳戶都有唯一的帳號，而且小朋友只要有爸媽陪同也可以開帳戶喔！"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "「活期存款」和「定期存款」最大的差別是？",
+      "options": [
+        "金額不同",
+        "活期可以隨時領，定期要等一段時間才能領",
+        "顏色不同",
+        "定期比較安全"
+      ],
+      "correct_answer": 1,
+      "explanation": "對！活期靈活可以隨時動用，定期利率比較高但要等到期日才能領取。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "定期存款的利率通常比活期存款高。",
+      "correct_answer": true,
+      "explanation": "正確！因為定期存款把錢鎖住一段時間，銀行給的利率就比較高作為補償。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "開設銀行帳戶通常需要帶什麼？",
+      "options": [
+        "只需要名字",
+        "身分證件和印章",
+        "帶錢就好",
+        "不需要帶任何東西"
+      ],
+      "correct_answer": 1,
+      "explanation": "開戶一般需要攜帶身分證和印章，未成年人還需要有家長陪同喔！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "一個人可以在不同銀行同時開多個帳戶。",
+      "correct_answer": true,
+      "explanation": "對！可以在多家銀行開戶，有些人會把不同用途的錢放在不同帳戶管理。"
     }
   ],
   "ai_prompt_context": {
     "topic": "銀行帳戶、存款、提款和存摺",
     "age_hint": "6-8歲",
     "vocabulary_level": "simple",
-    "metaphor_suggestions": ["保險箱小房間", "日記本", "存摺紀錄", "帳號像電話號碼"]
+    "metaphor_suggestions": [
+      "保險箱小房間",
+      "日記本",
+      "存摺紀錄",
+      "帳號像電話號碼"
+    ]
   }
 }

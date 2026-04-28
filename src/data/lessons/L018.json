@@ -61,12 +61,54 @@
       ],
       "correct_answer": 2,
       "explanation": "答對了！🍔 麥當勞是餐飲業的公司，專門提供速食餐飲服務。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "下面哪間是「科技業」的公司？",
+      "options": [
+        "麥當勞",
+        "台積電",
+        "統一企業",
+        "長榮航空"
+      ],
+      "correct_answer": 1,
+      "explanation": "台積電是全球最大的晶片代工廠，屬於半導體科技業！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "你每天喝的牛奶可能來自一家上市公司。",
+      "correct_answer": true,
+      "explanation": "對！如統一、味全、林鳳營都是上市公司，生產我們日常喝的牛奶。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "「零售業」是指什麼？",
+      "options": [
+        "只賣零食",
+        "直接販售商品給消費者的行業",
+        "製造產品的工廠",
+        "農業"
+      ],
+      "correct_answer": 1,
+      "explanation": "零售業就是直接賣給消費者，如超市、便利商店、百貨公司都是零售業！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "7-ELEVEN（統一超商）是一家上市公司。",
+      "correct_answer": true,
+      "explanation": "對！統一超商（2912）在台灣證券交易所上市，你可以買它的股票！"
     }
   ],
   "ai_prompt_context": {
     "topic": "日常生活中的各種公司與產業類別",
     "age_hint": "6-8歲",
     "vocabulary_level": "simple",
-    "metaphor_suggestions": ["台積電", "便利商店", "麥當勞", "Nike", "上學途中經過的店"]
+    "metaphor_suggestions": [
+      "台積電",
+      "便利商店",
+      "麥當勞",
+      "Nike",
+      "上學途中經過的店"
+    ]
   }
 }

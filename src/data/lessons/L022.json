@@ -61,12 +61,53 @@
       ],
       "correct_answer": 1,
       "explanation": "答對了！🕐 台股早上 9:00 開盤，下午 1:30 收盤。交易時間只有 4.5 小時。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "台灣主要的股票交易所叫什麼？",
+      "options": [
+        "台灣銀行",
+        "台灣證券交易所（TWSE）",
+        "台灣期貨交易所",
+        "台灣商品交易所"
+      ],
+      "correct_answer": 1,
+      "explanation": "台灣證券交易所（簡稱台交所，TWSE）是台灣最主要的股票市場！"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "上市和上櫃的公司都可以在市場上自由買賣股票。",
+      "correct_answer": true,
+      "explanation": "對！上市公司在台灣證交所，上櫃公司在櫃買中心（OTC），都可以公開交易。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "「加權指數」代表什麼？",
+      "options": [
+        "台灣最重的股票",
+        "台灣整體股市的平均表現",
+        "台積電的股價",
+        "最便宜的股票"
+      ],
+      "correct_answer": 1,
+      "explanation": "台灣加權股價指數（台股大盤）反映全體上市公司的整體表現，常簡稱「大盤」。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "買股票一定要透過合格的券商才能交易。",
+      "correct_answer": true,
+      "explanation": "對！要買賣股票需要在有牌照的券商開設證券帳戶，直接交易是違規的。"
     }
   ],
   "ai_prompt_context": {
     "topic": "台灣股票市場、證券交易所與交易時間",
     "age_hint": "6-8歲",
     "vocabulary_level": "simple",
-    "metaphor_suggestions": ["菜市場vs股票市場", "台灣證券交易所", "9:00開盤", "手機APP下單"]
+    "metaphor_suggestions": [
+      "菜市場vs股票市場",
+      "台灣證券交易所",
+      "9:00開盤",
+      "手機APP下單"
+    ]
   }
 }
