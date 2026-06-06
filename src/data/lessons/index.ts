@@ -61,6 +61,46 @@ import L057 from './L057.json';
 import L058 from './L058.json';
 import L059 from './L059.json';
 import L060 from './L060.json';
+import L100 from './L100.json';
+import L099 from './L099.json';
+import L098 from './L098.json';
+import L097 from './L097.json';
+import L096 from './L096.json';
+import L095 from './L095.json';
+import L094 from './L094.json';
+import L093 from './L093.json';
+import L092 from './L092.json';
+import L091 from './L091.json';
+import L090 from './L090.json';
+import L089 from './L089.json';
+import L088 from './L088.json';
+import L087 from './L087.json';
+import L086 from './L086.json';
+import L085 from './L085.json';
+import L084 from './L084.json';
+import L083 from './L083.json';
+import L082 from './L082.json';
+import L081 from './L081.json';
+import L080 from './L080.json';
+import L079 from './L079.json';
+import L078 from './L078.json';
+import L077 from './L077.json';
+import L076 from './L076.json';
+import L075 from './L075.json';
+import L074 from './L074.json';
+import L073 from './L073.json';
+import L072 from './L072.json';
+import L071 from './L071.json';
+import L070 from './L070.json';
+import L069 from './L069.json';
+import L068 from './L068.json';
+import L067 from './L067.json';
+import L066 from './L066.json';
+import L065 from './L065.json';
+import L064 from './L064.json';
+import L063 from './L063.json';
+import L062 from './L062.json';
+import L061 from './L061.json';
 
 const LESSON_MAP: Record<string, LessonData> = {
   L001: L001 as LessonData,
@@ -123,6 +163,46 @@ const LESSON_MAP: Record<string, LessonData> = {
   L058: L058 as LessonData,
   L059: L059 as LessonData,
   L060: L060 as LessonData,
+  L100: L100 as LessonData,
+  L099: L099 as LessonData,
+  L098: L098 as LessonData,
+  L097: L097 as LessonData,
+  L096: L096 as LessonData,
+  L095: L095 as LessonData,
+  L094: L094 as LessonData,
+  L093: L093 as LessonData,
+  L092: L092 as LessonData,
+  L091: L091 as LessonData,
+  L090: L090 as LessonData,
+  L089: L089 as LessonData,
+  L088: L088 as LessonData,
+  L087: L087 as LessonData,
+  L086: L086 as LessonData,
+  L085: L085 as LessonData,
+  L084: L084 as LessonData,
+  L083: L083 as LessonData,
+  L082: L082 as LessonData,
+  L081: L081 as LessonData,
+  L080: L080 as LessonData,
+  L079: L079 as LessonData,
+  L078: L078 as LessonData,
+  L077: L077 as LessonData,
+  L076: L076 as LessonData,
+  L075: L075 as LessonData,
+  L074: L074 as LessonData,
+  L073: L073 as LessonData,
+  L072: L072 as LessonData,
+  L071: L071 as LessonData,
+  L070: L070 as LessonData,
+  L069: L069 as LessonData,
+  L068: L068 as LessonData,
+  L067: L067 as LessonData,
+  L066: L066 as LessonData,
+  L065: L065 as LessonData,
+  L064: L064 as LessonData,
+  L063: L063 as LessonData,
+  L062: L062 as LessonData,
+  L061: L061 as LessonData,
 };
 
 export function getLesson(lessonId: string): LessonData | null {
@@ -130,5 +210,5 @@ export function getLesson(lessonId: string): LessonData | null {
 }
 
 export function getAllLessonIds(): string[] {
-  return Object.keys(LESSON_MAP);
+  return Object.keys(LESSON_MAP).sort((a, b) => Number(a.slice(1)) - Number(b.slice(1)));
 }

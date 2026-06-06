@@ -10,9 +10,9 @@ import { createClient } from '@supabase/supabase-js';
  *  3. 更新各股票最新的 AI 進出場訊號
  *  4. 收集當日個股收盤 K 線
  *
- * Cron 時間：UTC 15:00（台灣時間 23:00），每個交易日
+ * Cron 時間：台灣時間 08:00 檢查 Simons 是否完成上一個交易日資料；使用者可在頁面手動重新抓取。
  * vercel.json 設定：
- *   { "path": "/api/backtest-daily-collect", "schedule": "0 15 * * 1-5" }
+ *   { "path": "/api/backtest-daily-collect", "schedule": "0 21,22,23,0,1 * * *" }
  */
 
 const IFALGO_BASE = 'https://api.ifalgo.com.tw/frontapi';
@@ -21,6 +21,20 @@ const DELAY_MS = 500;
 export const config = {
   maxDuration: 300,
 };
+
+type TargetStock = {
+  coid: string;
+  stkname?: string | null;
+};
+
+type TradingSignal = {
+  out_date?: unknown;
+  in_date?: unknown;
+  sell_sig?: unknown;
+};
+
+const BUY_SIGNAL_TEXTS = new Set(['進場', '加碼', '買進', 'buy', 'Buy', 'BUY']);
+const SELL_SIGNAL_TEXTS = new Set(['出場', '賣出', '減碼', 'sell', 'Sell', 'SELL']);
 
 // ── 工具函式 ──────────────────────────────────────────────────────────────────
 
@@ -41,6 +55,39 @@ async function fetchWithTimeout(url: string, ms = 10000): Promise<Response> {
 /** 台灣今日日期字串 */
 function getTodayTW(): string {
   return new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
+function getLatestCompletedTradingDateTW(now = Date.now()): string {
+  const tw = new Date(now + 8 * 60 * 60 * 1000);
+  tw.setUTCHours(0, 0, 0, 0);
+  tw.setUTCDate(tw.getUTCDate() - 1);
+  while (tw.getUTCDay() === 0 || tw.getUTCDay() === 6) {
+    tw.setUTCDate(tw.getUTCDate() - 1);
+  }
+  return tw.toISOString().slice(0, 10);
+}
+
+function normalizeSimonsDate(value: unknown): string {
+  const raw = String(value ?? '').trim();
+  if (/^\d{8}$/.test(raw)) return `${raw.slice(0, 4)}-${raw.slice(4, 6)}-${raw.slice(6, 8)}`;
+  return raw.slice(0, 10).replace(/\//g, '-');
+}
+
+function normalizeSignalText(value: unknown): string {
+  return String(value ?? '').trim();
+}
+
+function normalizeSignalDate(value: unknown): string {
+  const raw = normalizeSignalText(value).replace(/\//g, '-');
+  if (/^\d{8}$/.test(raw)) return `${raw.slice(0, 4)}-${raw.slice(4, 6)}-${raw.slice(6, 8)}`;
+  if (/^\d{4}-\d{2}-\d{2}/.test(raw)) return raw.slice(0, 10);
+  return raw;
+}
+
+function daysAgoTW(days: number): string {
+  const date = new Date(Date.now() + 8 * 60 * 60 * 1000);
+  date.setUTCDate(date.getUTCDate() - days);
+  return date.toISOString().slice(0, 10);
 }
 
 function parseNumericOrNull(val: unknown): number | null {
@@ -115,69 +162,59 @@ function calculateSimonsScore(
 // ── Step 1：收集當日 Simons 推薦清單 ─────────────────────────────────────────
 
 async function collectTodaySimons(
-  supabase: ReturnType<typeof createClient>,
+  supabase: any,
   todayStr: string
 ): Promise<{ coids: string[]; count: number }> {
-  const log: string[] = [];
+  const dateStr = todayStr;
 
-  // 嘗試今天，若無資料嘗試昨天（盤後可能延遲）
-  for (let delta = 0; delta <= 2; delta++) {
-    const d = new Date(todayStr);
-    d.setDate(d.getDate() - delta);
-    const day = d.getDay();
-    if (day === 0 || day === 6) continue;
-    const dateStr = d.toISOString().split('T')[0];
+  try {
+    const res = await fetchWithTimeout(
+      `${IFALGO_BASE}/common/getSimonsData?searchDate=${dateStr}`
+    );
+    if (!res.ok) return { coids: [], count: 0 };
+    const json = await res.json() as { data?: { dataItems?: Record<string, unknown>[] } };
+    const items = json?.data?.dataItems || [];
+    if (items.length === 0) return { coids: [], count: 0 };
+    const dataDate = normalizeSimonsDate(items[0]?.mdate);
+    if (dataDate !== dateStr) return { coids: [], count: 0 };
 
-    try {
-      const res = await fetchWithTimeout(
-        `${IFALGO_BASE}/common/getSimonsData?searchDate=${dateStr}`
-      );
-      if (!res.ok) continue;
-      const json = await res.json() as { data?: { dataItems?: Record<string, unknown>[] } };
-      const items = json?.data?.dataItems || [];
-      if (items.length === 0) continue;
+    const rows = items.map(item => ({
+      snapshot_date: dateStr,
+      coid: item.coid as string,
+      stkname: item.stkname as string,
+      close: parseNumericOrNull(item.close) || 0,
+      strength: parseNumericOrNull(item.strength),
+      psr: item.psr != null ? parseFloat(String(item.psr)) : null,
+      ret_w: item.ret_w as string || null,
+      ret_m: item.ret_m as string || null,
+      wtcost: parseNumericOrNull(item.wtcost),
+      fcost: parseNumericOrNull(item.fcost),
+      tcost: parseNumericOrNull(item.tcost),
+      dcost: parseNumericOrNull(item.dcost),
+      gvi: item.gvi != null ? parseFloat(String(item.gvi)) : null,
+      mediangvi: parseNumericOrNull(item.mediangvi),
+      unusual: item.unusual as string || null,
+      category: item.category as string || null,
+      subindustry: item.subindustry as string || null,
+      status: item.status as string || null,
+      value: item.value as string || null,
+      free_score: calculateFreeScore(item),
+    }));
 
-      const rows = items.map(item => ({
-        snapshot_date: dateStr,
-        coid: item.coid as string,
-        stkname: item.stkname as string,
-        close: parseNumericOrNull(item.close) || 0,
-        strength: parseNumericOrNull(item.strength),
-        psr: item.psr != null ? parseFloat(String(item.psr)) : null,
-        ret_w: item.ret_w as string || null,
-        ret_m: item.ret_m as string || null,
-        wtcost: parseNumericOrNull(item.wtcost),
-        fcost: parseNumericOrNull(item.fcost),
-        tcost: parseNumericOrNull(item.tcost),
-        dcost: parseNumericOrNull(item.dcost),
-        gvi: item.gvi != null ? parseFloat(String(item.gvi)) : null,
-        mediangvi: parseNumericOrNull(item.mediangvi),
-        unusual: item.unusual as string || null,
-        category: item.category as string || null,
-        subindustry: item.subindustry as string || null,
-        status: item.status as string || null,
-        value: item.value as string || null,
-        free_score: calculateFreeScore(item),
-      }));
+    await supabase
+      .from('simons_daily_snapshots')
+      .upsert(rows, { onConflict: 'snapshot_date,coid', ignoreDuplicates: true });
 
-      await supabase
-        .from('simons_daily_snapshots')
-        .upsert(rows, { onConflict: 'snapshot_date,coid', ignoreDuplicates: true });
-
-      log.push(`Simons ${dateStr}: ${rows.length} 支`);
-      return { coids: rows.map(r => r.coid), count: rows.length };
-    } catch (e) {
-      log.push(`Simons ${dateStr} error: ${String(e)}`);
-    }
+    return { coids: rows.map(r => r.coid), count: rows.length };
+  } catch {
+    return { coids: [], count: 0 };
   }
-
-  return { coids: [], count: 0 };
 }
 
 // ── Step 2：補充量化指標（AI 推薦等級/累積報酬/籌碼穩定度）─────────────────
 
 async function enrichQuantData(
-  supabase: ReturnType<typeof createClient>,
+  supabase: any,
   coids: string[],
   dateStr: string
 ): Promise<void> {
@@ -237,7 +274,7 @@ async function enrichQuantData(
 // ── Step 3：更新各股票最新 AI 進出場訊號 ────────────────────────────────────
 
 async function updateTradingSignals(
-  supabase: ReturnType<typeof createClient>,
+  supabase: any,
   coids: string[]
 ): Promise<void> {
   for (const coid of coids) {
@@ -293,7 +330,7 @@ async function updateTradingSignals(
 // ── Step 4：收集當日個股 K 線 ────────────────────────────────────────────────
 
 async function collectTodayPrices(
-  supabase: ReturnType<typeof createClient>,
+  supabase: any,
   coids: string[]
 ): Promise<void> {
   for (const coid of coids) {
@@ -329,6 +366,164 @@ async function collectTodayPrices(
   }
 }
 
+// ── Step 5：收集觀察/庫存股票每日籌碼穩定度快照 ─────────────────────────────
+
+function addSnapshotTarget(map: Map<string, TargetStock>, coid: unknown, stkname?: unknown) {
+  const code = String(coid || '').trim();
+  if (!/^\d{4,6}$/.test(code)) return;
+  const existing = map.get(code);
+  if (existing?.stkname) return;
+  map.set(code, { coid: code, stkname: stkname ? String(stkname) : existing?.stkname ?? null });
+}
+
+async function fetchLatestSimonsSnapshotTargets(): Promise<TargetStock[]> {
+  const today = new Date(Date.now() + 8 * 60 * 60 * 1000);
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(today);
+    d.setUTCDate(d.getUTCDate() - i);
+    if (d.getUTCDay() === 0 || d.getUTCDay() === 6) continue;
+    const dateStr = d.toISOString().slice(0, 10);
+    try {
+      const response = await fetchWithTimeout(`${IFALGO_BASE}/common/getSimonsData?searchDate=${dateStr}`);
+      if (!response.ok) continue;
+      const json = await response.json() as { data?: { dataItems?: Record<string, unknown>[] } };
+      const items = json?.data?.dataItems || [];
+      if (items.length > 0) {
+        return items.map(item => ({
+          coid: String(item.coid),
+          stkname: item.stkname ? String(item.stkname) : null,
+        }));
+      }
+    } catch {
+      // Try the previous trading day.
+    }
+  }
+  return [];
+}
+
+async function collectStockQuantTargets(supabase: any, preferredCoids: string[]): Promise<TargetStock[]> {
+  const targets = new Map<string, TargetStock>();
+  for (const coid of preferredCoids) addSnapshotTarget(targets, coid);
+
+  const [holdingsResult, watchlistResult, recentResult, simonsTargets] = await Promise.all([
+    supabase.from('holdings').select('stock_code,stock_name').limit(500),
+    supabase.from('watchlist').select('stock_code,stock_name').limit(500),
+    supabase
+      .from('stock_quant_daily_snapshots')
+      .select('coid,stkname')
+      .gte('snapshot_date', daysAgoTW(70))
+      .limit(500),
+    fetchLatestSimonsSnapshotTargets(),
+  ]);
+
+  for (const row of holdingsResult.data || []) addSnapshotTarget(targets, row.stock_code, row.stock_name);
+  for (const row of watchlistResult.data || []) addSnapshotTarget(targets, row.stock_code, row.stock_name);
+  if (!recentResult.error) {
+    for (const row of recentResult.data || []) addSnapshotTarget(targets, row.coid, row.stkname);
+  }
+  for (const stock of simonsTargets) addSnapshotTarget(targets, stock.coid, stock.stkname);
+
+  return [...targets.values()].slice(0, 180);
+}
+
+function getCurrentQuantSignal(tradingList: TradingSignal[], dataDate: string): 'buy' | 'sell' | 'neutral' {
+  if (!Array.isArray(tradingList) || tradingList.length === 0) return 'neutral';
+  const targetDate = normalizeSignalDate(dataDate);
+  if (!targetDate) return 'neutral';
+
+  let hasBuyEvent = false;
+  let hasSellEvent = false;
+
+  for (const item of tradingList) {
+    const inDate = normalizeSignalDate(item?.in_date);
+    const outDate = normalizeSignalDate(item?.out_date);
+    const sig = normalizeSignalText(item?.sell_sig);
+
+    if (BUY_SIGNAL_TEXTS.has(sig) && inDate === targetDate) hasBuyEvent = true;
+    if (SELL_SIGNAL_TEXTS.has(sig) && (outDate || inDate) === targetDate) hasSellEvent = true;
+  }
+
+  if (hasSellEvent) return 'sell';
+  if (hasBuyEvent) return 'buy';
+  return 'neutral';
+}
+
+async function fetchStockQuantSnapshotRow(target: TargetStock) {
+  const response = await fetchWithTimeout(`${IFALGO_BASE}/stock?coid=${encodeURIComponent(target.coid)}`);
+  if (!response.ok) return null;
+  const json = await response.json() as {
+    data?: {
+      stock?: {
+        stkname?: unknown;
+        aiQuanBackDataComment?: { remark?: unknown; cum_ret?: unknown; freq?: unknown };
+        aiQuanBackDataTradingList?: TradingSignal[];
+        position?: {
+          stkname?: unknown;
+          chipStability?: { mdate?: unknown; pts?: unknown };
+          stockInfo?: { gvi?: unknown; mediangvi?: unknown };
+        };
+      };
+    };
+  };
+  const stock = json?.data?.stock;
+  const position = stock?.position;
+  const chipPts = parseNumericOrNull(position?.chipStability?.pts);
+  if (chipPts === null) return null;
+
+  const snapshotDate = String(position?.chipStability?.mdate || getTodayTW());
+
+  return {
+    snapshot_date: snapshotDate,
+    coid: target.coid,
+    stkname: String(position?.stkname || target.stkname || stock?.stkname || target.coid),
+    chip_pts: chipPts,
+    ai_remark: stock?.aiQuanBackDataComment?.remark ? String(stock.aiQuanBackDataComment.remark) : null,
+    ai_cum_ret: stock?.aiQuanBackDataComment?.cum_ret ? String(stock.aiQuanBackDataComment.cum_ret) : null,
+    ai_freq: parseNumericOrNull(stock?.aiQuanBackDataComment?.freq),
+    gvi: parseNumericOrNull(position?.stockInfo?.gvi),
+    mediangvi: parseNumericOrNull(position?.stockInfo?.mediangvi),
+    current_signal: getCurrentQuantSignal(stock?.aiQuanBackDataTradingList || [], snapshotDate),
+    source: 'ifalgo-stock',
+    collected_at: new Date().toISOString(),
+  };
+}
+
+async function collectStockQuantSnapshots(
+  supabase: any,
+  preferredCoids: string[],
+): Promise<{ targetCount: number; collected: number; failures: string[]; error?: string }> {
+  const targets = await collectStockQuantTargets(supabase, preferredCoids);
+  const rows = [];
+  const failures: string[] = [];
+
+  for (const target of targets) {
+    try {
+      const row = await fetchStockQuantSnapshotRow(target);
+      if (row) rows.push(row);
+    } catch (error) {
+      failures.push(`${target.coid}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    await sleep(DELAY_MS);
+  }
+
+  if (rows.length > 0) {
+    const { error } = await supabase
+      .from('stock_quant_daily_snapshots')
+      .upsert(rows, { onConflict: 'snapshot_date,coid', ignoreDuplicates: false });
+    if (error) return { targetCount: targets.length, collected: rows.length, failures, error: error.message };
+  }
+
+  return { targetCount: targets.length, collected: rows.length, failures };
+}
+
+async function hasCompletedQuantSnapshots(supabase: any, dateStr: string): Promise<boolean> {
+  const { count, error } = await supabase
+    .from('stock_quant_daily_snapshots')
+    .select('coid', { count: 'exact', head: true })
+    .eq('snapshot_date', dateStr);
+  return !error && Number(count || 0) >= 20;
+}
+
 // ── Handler ──────────────────────────────────────────────────────────────────
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -345,12 +540,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   );
 
   const todayStr = getTodayTW();
-  const log: string[] = [`[${todayStr}] 開始每日回測數據收集`];
+  const targetDate = getLatestCompletedTradingDateTW();
+  const log: string[] = [`[${todayStr}] 檢查 Simons 最新完整交易日 ${targetDate}`];
 
   try {
+    if (await hasCompletedQuantSnapshots(supabase, targetDate)) {
+      log.push('今日 AI 訊號快取已完成，略過重複抓取');
+      return res.status(200).json({ success: true, date: todayStr, targetDate, skipped: true, log });
+    }
+
     // Step 1：當日 Simons 推薦清單
-    const { coids, count } = await collectTodaySimons(supabase, todayStr);
+    const { coids, count } = await collectTodaySimons(supabase, targetDate);
     log.push(`Step1 Simons: ${count} 支`);
+
+    if (coids.length === 0) {
+      log.push('Simons 尚未整理完成，保留既有快取');
+      return res.status(200).json({ success: true, date: todayStr, targetDate, status: 'waiting-simons', log });
+    }
 
     if (coids.length > 0) {
       // Step 2：量化指標補充
@@ -365,6 +571,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       await collectTodayPrices(supabase, coids);
       log.push(`Step4 K 線: ${coids.length} 支`);
     }
+
+    const quantSnapshots = await collectStockQuantSnapshots(supabase, coids);
+    log.push(`Step5 籌碼穩定度快照: ${quantSnapshots.collected}/${quantSnapshots.targetCount} 支`);
+    if (quantSnapshots.error) log.push(`Step5 寫入提醒: ${quantSnapshots.error}`);
+    if (quantSnapshots.failures.length > 0) log.push(`Step5 抓取失敗: ${quantSnapshots.failures.slice(0, 5).join('；')}`);
 
     log.push('✅ 所有步驟完成');
     console.log(log.join('\n'));

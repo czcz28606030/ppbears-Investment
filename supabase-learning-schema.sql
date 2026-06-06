@@ -42,6 +42,9 @@ CREATE TABLE IF NOT EXISTS public.lesson_progress (
 CREATE INDEX IF NOT EXISTS lesson_progress_user_idx
   ON public.lesson_progress (user_id, completed_at DESC);
 
+CREATE UNIQUE INDEX IF NOT EXISTS lesson_progress_user_lesson_unique
+  ON public.lesson_progress (user_id, lesson_id);
+
 -- ==========================================================
 -- 3. learning_wallet — 副帳號的學習幣錢包
 -- ==========================================================

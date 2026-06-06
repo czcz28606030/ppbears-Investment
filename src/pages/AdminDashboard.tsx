@@ -9,6 +9,7 @@ import './AdminDashboard.css';
 const FEATURE_KEYS = [
   { key: 'ai_stock_picking', label: '🤖 AI 聰明選股 + Simons 量化模型', desc: '找股票 AI 分頁、個股 AI 推薦等級、累積報酬、籌碼穩定度' },
   { key: 'ai_portfolio_advice', label: '📊 庫存 AI 建議', desc: '' },
+  { key: 'daily_newsletter', label: '📧 每日電子報', desc: '控制此帳號是否列入每日自動電子報寄送名單' },
 ];
 
 export default function AdminDashboard() {
@@ -34,6 +35,7 @@ export default function AdminDashboard() {
   const [tradesModal, setTradesModal] = useState<{ userId: string; name: string } | null>(null);
   const [userTrades, setUserTrades] = useState<Trade[]>([]);
   const [tradesLoading, setTradesLoading] = useState(false);
+  const [holdingsModal, setHoldingsModal] = useState<{ userId: string; name: string } | null>(null);
 
   const [relationModal, setRelationModal] = useState<{ userId: string; name: string; role: 'parent' | 'child'; parentId: string | null } | null>(null);
   const [newsletterTarget, setNewsletterTarget] = useState<{ userId: string; name: string; email: string } | null>(null);
@@ -47,7 +49,23 @@ export default function AdminDashboard() {
 
     // ── 第一階段：立即載入用戶列表（最快，幾乎無延遲）──
     setAdminLoading(true);
-    loadAllUsers().finally(() => setAdminLoading(false));
+    (async () => {
+      await loadAllUsers();
+      if (supabase) {
+        const { data } = await supabase.from('feature_overrides').select('*');
+        const grouped: Record<string, FeatureOverride[]> = {};
+        (data || []).forEach((f: any) => {
+          const userId = f.user_id as string;
+          grouped[userId] = grouped[userId] || [];
+          grouped[userId].push({
+            userId,
+            featureKey: f.feature_key,
+            enabled: Boolean(f.enabled),
+          });
+        });
+        setUserFeatures(grouped);
+      }
+    })().finally(() => setAdminLoading(false));
 
     // ── 第二階段：背景載入持倉 + 即時行情（慢，不阻塞用戶列表）──
     setPricesLoading(true);
@@ -85,6 +103,38 @@ export default function AdminDashboard() {
   const calculateUnrealizedPnL = useCallback((userId: string) => {
     return pnlMap[userId] || 0;
   }, [pnlMap]);
+
+  const holdingsByUser = useMemo(() => {
+    const map: Record<string, any[]> = {};
+    allHoldings.forEach(h => {
+      map[h.user_id] = map[h.user_id] || [];
+      map[h.user_id].push(h);
+    });
+    return map;
+  }, [allHoldings]);
+
+  const getUserHoldings = useCallback((userId: string) => holdingsByUser[userId] || [], [holdingsByUser]);
+
+  const getHoldingPrice = useCallback((h: any) => {
+    const q = liveQuotes[h.stock_code];
+    return q ? parseFloat(q.ClosingPrice) : Number(h.current_price);
+  }, [liveQuotes]);
+
+  const getHoldingSummary = useCallback((userId: string) => {
+    const rows = getUserHoldings(userId);
+    return rows.reduce((sum, h) => {
+      const currentPrice = getHoldingPrice(h);
+      const shares = Number(h.total_shares);
+      const cost = Number(h.avg_cost) * shares;
+      const value = currentPrice * shares;
+      return {
+        count: sum.count + 1,
+        shares: sum.shares + shares,
+        value: sum.value + value,
+        pnl: sum.pnl + value - cost,
+      };
+    }, { count: 0, shares: 0, value: 0, pnl: 0 });
+  }, [getHoldingPrice, getUserHoldings]);
 
   if (!user?.isAdmin) {
     return (
@@ -364,8 +414,7 @@ export default function AdminDashboard() {
               <td style={{ padding: '8px 4px', fontWeight: 600 }}>📧 每日電子報</td>
               <td style={{ textAlign: 'center', padding: '8px 4px' }}>❌ 鎖定</td>
               <td style={{ textAlign: 'center', padding: '8px 4px' }}>
-                每天 {systemSettings.newsletter_send_hour?.toString().padStart(2, '0')}:00 發送
-                <span style={{ cursor: 'pointer', marginLeft: 6 }} onClick={() => { setSettingModal({ key: 'newsletter_send_hour', label: '電子報發送時間 (0-23)', value: systemSettings.newsletter_send_hour || 7 }); setSettingInput(String(systemSettings.newsletter_send_hour || 7)); }}>✏️</span>
+                每天 08:00 更新資料，08:30 發送
               </td>
             </tr>
             <tr style={{ borderBottom: '1px solid #f5f5f5' }}>
@@ -388,6 +437,8 @@ export default function AdminDashboard() {
         {displayedUsers.map(u => {
           const isChild = !!u.parentId;
           const parent = isChild ? allUsers.find(p => p.id === u.parentId) : null;
+          const newsletterEnabled = isFeatureEnabled(u.id, 'daily_newsletter', u.tier);
+          const holdingSummary = getHoldingSummary(u.id);
           
           return (
           <div key={u.id} className="admin-user-card" style={{ marginLeft: isChild ? 32 : 0, borderLeft: isChild ? '4px solid #FFA000' : 'none' }}>
@@ -412,6 +463,12 @@ export default function AdminDashboard() {
                     (未平倉: {calculateUnrealizedPnL(u.id) > 0 ? '+' : ''}{formatMoney(calculateUnrealizedPnL(u.id))})
                   </span>
                 </div>
+                <div className="admin-user-balance">
+                  📦 庫存 {holdingSummary.count} 檔・市值 NT$ {formatMoney(holdingSummary.value)}
+                  <span style={{ marginLeft: 8, color: holdingSummary.pnl >= 0 ? 'var(--profit-color)' : 'var(--loss-color)' }}>
+                    {holdingSummary.pnl >= 0 ? '+' : ''}{formatMoney(holdingSummary.pnl)}
+                  </span>
+                </div>
                 <div className="admin-user-badges">
                   <span className={`admin-badge ${u.role === 'parent' ? 'badge-parent' : 'badge-child'}`}>
                     {u.role === 'parent' ? '👨‍👩‍👧主帳號' : '👶副帳號'}
@@ -425,6 +482,9 @@ export default function AdminDashboard() {
                       到期: {new Date(u.subscriptionExpiresAt).toLocaleDateString('zh-TW')}
                     </span>
                   )}
+                  <span className="admin-badge" style={{ background: newsletterEnabled ? '#E8F5E9' : '#F5F5F5', color: newsletterEnabled ? '#2E7D32' : '#777' }}>
+                    {newsletterEnabled ? '📧 電子報開啟' : '📭 電子報關閉'}
+                  </span>
                 </div>
               </div>
             </div>
@@ -441,11 +501,12 @@ export default function AdminDashboard() {
                 setBalanceInput(String(u.availableBalance));
               }}>💰 調餘額</button>
               <button className="admin-btn admin-btn-feature" onClick={() => handleViewTrades(u)}>📄 交易紀錄</button>
+              <button className="admin-btn admin-btn-feature" onClick={() => setHoldingsModal({ userId: u.id, name: u.displayName })}>📦 庫存股票</button>
               <button className="admin-btn admin-btn-feature" onClick={() => {
                  setRelationModal({ userId: u.id, name: u.displayName, role: u.role, parentId: u.parentId || null });
               }}>🔗 變更歸屬</button>
               <button className="admin-btn admin-btn-feature" onClick={() => toggleFeaturePanel(u.id)}>🔧 功能開關</button>
-              {u.tier === 'premium' && (
+              {newsletterEnabled && (
                 <button className="admin-btn" style={{ background: '#e8f5e9', color: '#2e7d32', border: '1px solid #a5d6a7' }}
                   onClick={() => { setNewsletterTarget({ userId: u.id, name: u.displayName, email: u.email }); setNewsletterResult(null); }}>
                   📧 發電子報
@@ -526,6 +587,73 @@ export default function AdminDashboard() {
             )}
             <div className="admin-modal-btns" style={{ marginTop: 24 }}>
               <button className="btn-confirm" onClick={() => setTradesModal(null)} style={{ width: '100%' }}>關閉頁面</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 庫存股票彈窗 */}
+      {holdingsModal && (
+        <div className="admin-modal-overlay" onClick={() => setHoldingsModal(null)}>
+          <div className="admin-modal" style={{ maxWidth: 640, width: '92%', maxHeight: '82vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+            <h3 style={{ marginBottom: 16 }}>📦 {holdingsModal.name} 的庫存股票</h3>
+            {getUserHoldings(holdingsModal.userId).length === 0 ? (
+              <div style={{ textAlign: 'center', padding: 24, color: '#888' }}>目前沒有庫存股票</div>
+            ) : (
+              <>
+                <div className="admin-holdings-summary">
+                  {(() => {
+                    const summary = getHoldingSummary(holdingsModal.userId);
+                    return (
+                      <>
+                        <div>
+                          <span>持股檔數</span>
+                          <strong>{summary.count}</strong>
+                        </div>
+                        <div>
+                          <span>總市值</span>
+                          <strong>NT$ {formatMoney(summary.value)}</strong>
+                        </div>
+                        <div>
+                          <span>未實現損益</span>
+                          <strong style={{ color: summary.pnl >= 0 ? 'var(--profit-color)' : 'var(--loss-color)' }}>
+                            {summary.pnl >= 0 ? '+' : ''}NT$ {formatMoney(summary.pnl)}
+                          </strong>
+                        </div>
+                      </>
+                    );
+                  })()}
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {getUserHoldings(holdingsModal.userId).map(h => {
+                    const currentPrice = getHoldingPrice(h);
+                    const shares = Number(h.total_shares);
+                    const avgCost = Number(h.avg_cost);
+                    const value = currentPrice * shares;
+                    const pnl = (currentPrice - avgCost) * shares;
+                    const pnlPct = avgCost > 0 ? ((currentPrice - avgCost) / avgCost) * 100 : 0;
+                    return (
+                      <div key={h.stock_code} className="admin-holding-row">
+                        <div>
+                          <div className="admin-holding-title">{h.stock_code} {h.stock_name}</div>
+                          <div className="admin-holding-meta">
+                            {shares.toLocaleString('zh-TW')} 股・均價 NT$ {formatPrice(avgCost)}・現價 NT$ {formatPrice(currentPrice)}
+                          </div>
+                        </div>
+                        <div className="admin-holding-value">
+                          <div>NT$ {formatMoney(value)}</div>
+                          <span style={{ color: pnl >= 0 ? 'var(--profit-color)' : 'var(--loss-color)' }}>
+                            {pnl >= 0 ? '+' : ''}NT$ {formatMoney(pnl)} ({pnlPct >= 0 ? '+' : ''}{pnlPct.toFixed(2)}%)
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+            <div className="admin-modal-btns" style={{ marginTop: 24 }}>
+              <button className="btn-confirm" onClick={() => setHoldingsModal(null)} style={{ width: '100%' }}>關閉頁面</button>
             </div>
           </div>
         </div>

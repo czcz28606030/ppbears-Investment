@@ -1,10 +1,11 @@
 .approval-page {
   padding: 0 0 100px;
+  position: relative;
 }
 
 /* ── 申請出金表單 ────────────────────────────────── */
 .withdrawal-form-section {
-  padding: 16px;
+  padding: 8px 0 16px;
   margin-bottom: 24px;
 }
 
@@ -16,19 +17,22 @@
 }
 
 .withdrawal-form-card {
-  background: var(--bg-card);
-  border: 2px solid var(--primary);
-  border-radius: 16px;
-  padding: 16px;
+  background:
+    radial-gradient(circle at 92% 12%, rgba(255, 202, 58, 0.2), transparent 22%),
+    var(--bg-card);
+  border: 2px solid rgba(255, 202, 58, 0.38);
+  border-radius: 24px;
+  padding: 18px;
   display: flex;
   flex-direction: column;
   gap: 12px;
+  box-shadow: 0 12px 26px rgba(43, 33, 24, 0.08);
 }
 
 .form-balance-note {
-  background: rgba(0,0,0,0.04);
+  background: rgba(255, 202, 58, 0.14);
   padding: 10px 12px;
-  border-radius: 10px;
+  border-radius: 16px;
   font-size: 13px;
   color: var(--text-secondary);
   font-weight: 700;
@@ -47,18 +51,18 @@
 }
 
 .form-input {
-  border: 1px solid rgba(0,0,0,0.1);
-  border-radius: 10px;
-  padding: 10px 12px;
+  border: 2px solid rgba(255, 202, 58, 0.25);
+  border-radius: 16px;
+  padding: 12px 14px;
   font-size: 14px;
   font-family: inherit;
-  background: var(--bg-base);
+  background: var(--bg-input);
   color: var(--text-primary);
   outline: none;
 }
 .form-input:focus {
   border-color: var(--primary);
-  box-shadow: 0 0 0 2px rgba(123, 44, 191, 0.1);
+  box-shadow: 0 0 0 4px rgba(255, 202, 58, 0.14);
 }
 .form-input:disabled {
   background: rgba(0,0,0,0.04);
@@ -81,11 +85,11 @@
 }
 
 .btn-withdrawal-submit {
-  background: var(--primary);
-  color: #fff;
+  background: linear-gradient(180deg, #ffda59, #f0b800);
+  color: var(--text-primary);
   border: none;
-  border-radius: 12px;
-  padding: 12px 16px;
+  border-radius: 999px;
+  padding: 14px 18px;
   font-size: 15px;
   font-weight: 800;
   cursor: pointer;
@@ -101,7 +105,7 @@
 }
 
 .approval-section {
-  padding: 0 16px;
+  padding: 0;
   margin-bottom: 24px;
 }
 
@@ -127,17 +131,19 @@
 }
 
 .request-card {
-  background: var(--card-bg);
-  border: 1px solid var(--border-color);
-  border-radius: 20px;
+  background: var(--bg-card);
+  border: 1.5px solid rgba(255, 202, 58, 0.22);
+  border-radius: 24px;
   padding: 18px;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+  box-shadow: 0 10px 24px rgba(43, 33, 24, 0.08);
   transition: transform 0.2s;
 }
 
 .request-card.pending {
   border-color: rgba(255, 193, 7, 0.4);
-  background: linear-gradient(135deg, var(--card-bg), rgba(255, 193, 7, 0.05));
+  background:
+    radial-gradient(circle at 92% 18%, rgba(255, 202, 58, 0.2), transparent 20%),
+    linear-gradient(135deg, var(--bg-card), rgba(255, 193, 7, 0.08));
 }
 
 .request-card.approved {
@@ -187,8 +193,8 @@
 .request-reason {
   font-size: 13px;
   color: var(--text-secondary);
-  background: var(--bg-primary);
-  border-radius: 10px;
+  background: var(--bg-input);
+  border-radius: 16px;
   padding: 10px 14px;
   margin-bottom: 14px;
   line-height: 1.5;
@@ -202,7 +208,7 @@
 .btn-reject {
   flex: 1;
   padding: 12px;
-  border-radius: 12px;
+  border-radius: 999px;
   border: 1.5px solid rgba(244, 67, 54, 0.4);
   background: rgba(244, 67, 54, 0.08);
   color: #f44336;
@@ -220,9 +226,9 @@
 .btn-approve {
   flex: 2;
   padding: 12px;
-  border-radius: 12px;
+  border-radius: 999px;
   border: none;
-  background: linear-gradient(135deg, #4CAF50, #45a049);
+  background: linear-gradient(135deg, #8AC926, #45a049);
   color: #fff;
   font-size: 14px;
   font-weight: 700;

@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, NavLink, Navigate, useLocation } from 'react-router-dom';
 import { useStore } from './store';
 
@@ -20,6 +20,7 @@ import ShopView from './pages/ShopView';
 import ChildRequestsView from './pages/ChildRequestsView';
 import ParentRewardHistory from './pages/ParentRewardHistory';
 import TradeHistory from './pages/TradeHistory';
+import DividendHistory from './pages/DividendHistory';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import ManageChildren from './pages/ManageChildren';
@@ -35,12 +36,25 @@ import './App.css';
 const AUTH_ROUTES = ['/login', '/register', '/forgot-password'];
 
 function AppContent() {
-  const { user, authLoading, initAuth, withdrawalRequests, isRecoveryMode } = useStore();
+  const { session, user, authLoading, initAuth, withdrawalRequests, isRecoveryMode } = useStore();
   const location = useLocation();
+  const [profileWaitExpired, setProfileWaitExpired] = useState(false);
 
   useEffect(() => {
     initAuth();
   }, [initAuth]);
+
+  useEffect(() => {
+    if (!session || user) {
+      setProfileWaitExpired(false);
+      return;
+    }
+
+    const timerId = window.setTimeout(() => {
+      setProfileWaitExpired(true);
+    }, 12000);
+    return () => window.clearTimeout(timerId);
+  }, [session, user]);
 
   // 全頁載入中
   if (authLoading) {
@@ -58,6 +72,33 @@ function AppContent() {
   // 密碼恢復模式優先導向
   if (isRecoveryMode && location.pathname !== '/update-password') {
     return <Navigate to="/update-password" replace />;
+  }
+
+  // 重新整理深層頁面時，Supabase session 會先回來，user profile 會稍晚載入。
+  // 這段時間保持在原頁等待，避免 /stock/:code 先被導到 login，再被送回首頁。
+  if (session && !user && !isAuthRoute && location.pathname !== '/update-password') {
+    if (profileWaitExpired) {
+      return (
+        <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14, background: 'var(--bg-primary)', padding: 24, textAlign: 'center' }}>
+          <img src="/ppbear.png" alt="PPBear" style={{ width: 72, marginBottom: 4 }} />
+          <div style={{ color: 'var(--text-primary)', fontSize: 18, fontWeight: 900 }}>帳號資料載入逾時</div>
+          <div style={{ color: 'var(--text-secondary)', fontSize: 14, lineHeight: 1.6, maxWidth: 320 }}>
+            系統有登入紀錄，但雲端帳號資料沒有成功回來。請重新整理或回登入頁重新登入。
+          </div>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
+            <button className="btn-secondary" type="button" onClick={() => window.location.reload()}>重新整理</button>
+            <button className="btn-primary" type="button" onClick={() => useStore.getState().logout()}>回登入頁</button>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-primary)' }}>
+        <img src="/ppbear.png" alt="PPBear" style={{ width: 72, marginBottom: 16, animation: 'pulse 1.5s ease-in-out infinite' }} />
+        <div style={{ color: 'var(--text-secondary)', fontSize: 15 }}>正在帶你回到原本頁面...</div>
+      </div>
+    );
   }
 
   // 未登入 → 導向 login
@@ -86,6 +127,7 @@ function AppContent() {
           <Route path="/learn/lesson/:lessonId" element={<LessonView />} />
           <Route path="/learn/wallet" element={<WalletView />} />
           <Route path="/history" element={<TradeHistory />} />
+          <Route path="/dividends" element={<DividendHistory />} />
           <Route path="/backtest" element={<Backtest />} />
 
           {/* Parent-only Routes */}

@@ -1,9 +1,628 @@
 # 📦 PPBears Investment — 更新日誌
 
-> **目前版本：v1.20.9**（2026-04-28）
-> 最新更新：修正「看庫存」AI 訊號誤判：ifalgo 同日佔位符 out_date 造成已出場訊號被判為「AI 加碼」。
+> **目前版本：v1.24.75**（2026-06-05）
+> 最新更新：觀察清單加入 AI 出場與低度推薦的一鍵移除提醒，ETF 小卡改為 ETF+N 支撐數。
 
 ---
+
+## [v1.24.75] - 2026-06-05
+### Added
+- Added Watchlist cleanup alerts for `AI出場` and `AI推薦低度` stocks so users can remove weak watchlist candidates in one click without switching filters.
+- Added a merged cleanup alert when a stock is both AI exit and low recommendation, keeping the card action area to one clear removal prompt.
+
+### Changed
+- Changed Watchlist, Portfolio, and Stock Detail ETF chips to show `ETF+N`, where `N` means the number of tracked ETFs currently holding that stock.
+- Hid ETF support chips when no tracked ETF currently holds the stock.
+
+## [v1.24.74] - 2026-06-05
+### Added
+- Expanded ETF holding-flow import sources to track `0050`, `0056`, `00878`, `00919`, `006208`, `00981A`, and `00403A`, excluding bond ETF `00937B`.
+- Added ETF holding share and share-change fields to the ETF support radar payload so Stock Detail pages can show fund-level holding details.
+- Added a Stock Detail ETF support table with fund name, holding ratio, holding change, and current shares.
+
+### Changed
+- Renamed user-facing Active ETF language to `ETF支撐` / `ETF 支撐` so it reflects broader large Taiwan stock ETF backing.
+- Kept Watchlist and Portfolio cards as compact ETF support chips while moving detailed ETF evidence into Stock Detail.
+- Reordered Watchlist sort pills to `股票本質`, `累計報酬`, `籌碼分數`, and `推薦次數`.
+
+## [v1.24.73] - 2026-06-05
+### Changed
+- Removed the Watchlist entry-timing score chip so watchlist cards rely on the original AI entry/neutral/exit signal flow.
+- Changed the Watchlist default sort to `股票本質` so observed stocks are compared by the core quality score first.
+- Removed the entry-timing sort option from Watchlist filters to avoid mixing incomplete composite scores with AI entry signals.
+
+## [v1.24.72] - 2026-06-05
+### Added
+- Added a Stock Detail `加碼決策雷達` card that explains add-timing score sources including 股票本質, 科技順風, 主動ETF, 籌碼穩定, 推薦次數, and 累積報酬.
+- Added expandable Active ETF detail rows on Stock Detail pages so users can inspect recent ETF add/reduce/remove signals.
+
+### Changed
+- Kept the technical K-line chart above the add-timing radar so Stock Detail pages still lead with price action before decision support.
+
+## [v1.24.71] - 2026-06-05
+### Changed
+- Simplified the Watchlist stock-quality dialog so it only explains `股票本質` as the stock foundation.
+- Simplified the Watchlist add-timing dialog so it only explains `加碼時機` as the entry signal.
+- Removed cross-explanations and duplicate detail rows between the two dialogs to reduce text density.
+
+## [v1.24.70] - 2026-06-05
+### Changed
+- Active ETF radar requests now bypass stale browser/CDN cache so newly imported ETF holdings can appear immediately.
+- Watchlist Active ETF placeholders now distinguish between no imported data and imported data with no record for that stock.
+- Updated Active ETF explanation copy to avoid implying an import failure when a stock is simply absent from 00981A/00403A holdings.
+
+## [v1.24.69] - 2026-06-05
+### Fixed
+- Fixed the Active ETF importer so it parses the official `holdings` table cells directly instead of relying on flattened text line order.
+- Confirmed `00981A` and `00403A` source pages can each parse 50 holdings from the current disclosed portfolio table.
+- Kept `/api/cron-active-etf-import` ready for Vercel Cron and manual Vercel cron runs after deployment.
+
+## [v1.24.68] - 2026-06-05
+### Added
+- Added `科技順風` signals to help connect TSMC earnings-call tailwinds with Taiwan technology supply-chain watchlist decisions.
+- Added Active ETF radar data plumbing, schema, and scheduled import support for `00981A` and `00403A` disclosed holdings.
+- Added clickable explanation dialogs for Watchlist small chips, including 加碼時機, 科技順風, 主動 ETF, 累積報酬, and 籌碼 stability.
+- Added AI exit cleanup action so stocks filtered by `AI出場` can be removed from the watchlist in one click.
+
+### Changed
+- Renamed `股票本質評分` to `股票本質` and clarified that 股票本質 is the foundation while 加碼時機 is the entry signal.
+- Renamed add-priority language to `加碼時機`, keeping it separate from the long-term stock-quality score.
+- Updated Watchlist default sorting to prioritize 加碼時機 while retaining 股票本質 as the core quality reference.
+- Removed the top technical-signal filter from the member Watchlist filter area while keeping card-level warnings visible.
+- Updated Portfolio and Watchlist chips so Active ETF impact is shown as counts or holding markers instead of a separate score.
+
+## [v1.24.67] - 2026-06-04
+### Added
+- Added a cached Simons recommendation-history institutional-cost lookup for Stock Detail pages.
+- Added a purple `⭐ Simons` source badge with the matched Simons data date when a stock has recommendation-list cost data.
+
+### Changed
+- Stock Detail institutional costs now prefer Simons `fcost` / `tcost` / `dcost` and use Simons `wtcost` as the weighted-average headline cost.
+- Stocks without Simons cost data continue to fall back to the original institutional-cost estimate source.
+
+## [v1.24.66] - 2026-06-04
+### Fixed
+- Replaced temporary profit/loss emoji placeholders with a neutral `讀取中` AI badge while member Portfolio signals are loading.
+- Fixed neutral Portfolio AI signal badges so a `0` streak count is no longer rendered under `AI 中立`.
+
+## [v1.24.65] - 2026-06-04
+### Fixed
+- Explore search now loads the full-market official price map on demand when a user starts searching and no local price map is available.
+- Search results now keep already-watched and currently-held stocks visible, labeling them as observed or in portfolio instead of hiding them as missing results.
+- Added a search loading state so users see that the full-market stock list is being loaded instead of immediately seeing an empty result.
+- Hardened the official price API so one interrupted TWSE/TPEx response no longer makes the whole full-market price map return empty.
+
+## [v1.24.64] - 2026-06-04
+### Changed
+- Hid the IFalgo monthly raw value from the home monthly prediction gauge and market summary copy to avoid confusing `conv1=30` with the bullish/bearish direction.
+- Kept the gauge direction driven by IFalgo `longshort` / `mforecast`, so `偏多` still points to the right-side bullish zone.
+
+## [v1.24.63] - 2026-06-04
+### Fixed
+- Changed the home Simons monthly prediction gauge to use IFalgo `longshort` / `mforecast` for needle direction, so `偏多` points to the right-side bullish zone instead of being driven left by raw `conv1=30`.
+- Kept the IFalgo raw monthly value visible as `原始值` while using the direction signal for the gauge position.
+- Updated the home market-summary browser cache key so mobile clients discard the old monthly-gauge payload after deployment.
+
+## [v1.24.62] - 2026-06-04
+### Fixed
+- Hid IFAlgo AI entry/neutral/exit signals, AI recommendation-level filters, cumulative-return chips, and chip-score chips from non-member Watchlist views.
+- Prevented non-member Watchlist refreshes from loading Premium-only stock quant signal data, while keeping public watchlist scores, prices, K-lines, and technical signals available.
+- Fixed Portfolio cumulative-return chips so member cards refill missing shared-cache returns from authorized live quant data instead of showing `--`.
+
+### Changed
+- Enlarged Portfolio AI signal badges for clearer neutral/buy/sell status on holding cards.
+
+## [v1.24.61] - 2026-06-04
+### Changed
+- Reordered the Watchlist composite filters so model entry/neutral/exit signals appear first, followed by AI recommendation level and technical signals.
+- Removed the Watchlist advice-label filter and the advice-label badge from stock cards, keeping the card focused on AI signal, recommendation level, comprehensive score, cumulative return, and chip stability.
+- Changed Watchlist sorting to default to comprehensive score, placed `綜合評分` first in the sort controls, and removed the visible `預設排序` option.
+
+## [v1.24.60] - 2026-06-04
+### Added
+- Added Premium-only IFAlgo model signal markers to the Stock Detail technical chart, with purple build/add arrows and black exit/end arrows.
+- Added a protected `/api/stock-trading-signals` endpoint so non-Premium users cannot fetch IFAlgo trading signal records.
+- Added MA5 and MA20 display toggles on the Stock Detail technical chart.
+
+### Changed
+- Updated the chart date display to daily `MM/DD` axis ticks and `YYYY/MM/DD` crosshair labels for a cleaner day-K view.
+- Updated chart signal copy to explain that exit arrows represent prior unfinished model signals being cleared or ended.
+- Sanitized the local and production IFAlgo stock proxy so browser stock data keeps K-line prices without exposing `aiQuanBackDataTradingList`.
+
+## [v1.24.59] - 2026-06-03
+### Fixed
+- Split shared Simons cache access into manual update and read-only sync modes so automatic cross-user refreshes no longer update the global cache version.
+- Changed forced Simons reads from the client to use a `read` query unless an explicit shared-cache update is requested.
+- Verified locally that `type=simons&read=...` leaves the global AI cache version unchanged before deployment.
+
+## [v1.24.58] - 2026-06-03
+### Changed
+- Bumped and redeployed the global AI cache version sync release to production.
+- Kept Explore, Watchlist, Portfolio, and Stock Detail aligned on the shared AI cache version polling behavior.
+
+## [v1.24.57] - 2026-06-03
+### Added
+- Added a lightweight global AI cache version endpoint backed by the shared Supabase daily Simons cache.
+- Added client-side version polling for Explore, Watchlist, Portfolio, and Stock Detail so stale local browser caches are cleared automatically when another user refreshes the shared data.
+
+### Changed
+- Manual refresh now records the latest observed global AI cache version for the current page after updating shared data, avoiding repeated local refresh loops.
+
+## [v1.24.56] - 2026-06-03
+### Fixed
+- Changed manual Simons refresh to check the current Taiwan trading date first, so published same-day IFAlgo data no longer waits until the next morning.
+- Allowed manual stock quant snapshot collection to persist current-day IFAlgo snapshots while still falling back safely to the latest completed trading day if today is not ready.
+- Cleared browser Simons and quant TTL caches during Explore, Watchlist, and Portfolio manual refreshes, and reran the refreshed analysis with force-fresh requests.
+
+## [v1.24.55] - 2026-06-03
+### Added
+- Added add-on risk warnings for stocks already held, separating profit add-ons, loss averaging, near-stop-loss averaging, and over-stop-loss averaging.
+- Added detailed consequence rows in the buy warning modal, including current shares, average cost, current P/L, buy-after average cost, total invested cost, position weight, stop-loss reference price, possible add-on loss, whole-position stop-loss scenario, and post-buy cash balance.
+
+### Changed
+- Updated high-risk confirmation copy so severe add-on warnings require users to acknowledge the consequence data before continuing.
+- Kept existing 15% concentration and one-third add-on warnings while showing clearer numeric details for each warning.
+
+## [v1.24.54] - 2026-06-03
+### Fixed
+- Deployed the final AI signal date-guard release so Portfolio, Watchlist, and shared quant snapshots use the latest data day's event only.
+- Confirmed 6282 康舒 uses the 2026-06-02 quant snapshot and resolves to AI 中立 instead of carrying the 2026-06-01 加碼 event forward.
+
+## [v1.24.53] - 2026-06-03
+### Fixed
+- Changed AI 加碼 / AI 出場 detection to use only the latest quant data date's trading event, so prior-day entries such as 6282 康舒 on 2026-06-01 no longer appear as 2026-06-02 AI 加碼.
+- Bumped the browser quant TTL cache version and Portfolio / Watchlist persistent cache keys so old local AI signal payloads are ignored immediately after deployment.
+- Applied the same daily-event signal rule to the cloud cache endpoint, local fallback parser, and daily snapshot collection script.
+
+## [v1.24.52] - 2026-06-03
+### Changed
+- Changed the production Simons AI signal cron to the Vercel Hobby-compatible daily 08:00 Taipei run.
+- Updated Explore, Watchlist, and Portfolio freshness labels to show `08:00 自動檢查；可手動重新抓取`.
+- Added manual Simons readiness checks to the main refresh actions so users can click `重新抓取` outside the scheduled run.
+
+## [v1.24.51] - 2026-06-03
+### Changed
+- Changed Explore, Watchlist, and Portfolio AI signal refreshes to use daily Simons-ready cache checks instead of refetching AI signals on every page entry.
+- Set the production Vercel cron to the deployable daily 08:00 Taipei check because Hobby cron limits do not allow the full 05:00-09:00 hourly window.
+- Added manual AI cache refresh checks from Explore, Watchlist, and Portfolio so users can re-check Simons readiness outside the scheduled run.
+- Limited automatic stock-price refreshes to Taiwan market hours and kept off-market page entry on cached quote data where available.
+- Updated the Stock Detail live analysis prompt and fallback wording to use professional, plain-language investment summaries instead of child-focused phrasing.
+
+### Fixed
+- Added front-end and Edge Function safeguards so cached company descriptions must match the current stock name, industry, and profile before being reused.
+- Added conservative company-description fallback text for power-management and semiconductor component stocks such as 3317 尼克森.
+- Updated `get-kid-description` cache validation so stale or mismatched `stock_profiles` content is regenerated or replaced with a conservative source-based description.
+
+## [v1.24.50] - 2026-06-02
+### Fixed
+- Added a shared local quant-cache cleanup helper that removes all `ppbears_quant30_` browser cache entries during manual refresh.
+- Updated Explore, Watchlist, and Portfolio manual refresh actions to clear all local quant signal TTL cache before forcing fresh data.
+- Bumped the quant signal cache version to `v3` so older browser-stored `v2` entries are ignored.
+
+## [v1.24.49] - 2026-06-02
+### Fixed
+- Changed MIS realtime quote fallback to use the first bid price, then first ask price, when the latest trade price is unavailable.
+- Stopped using the intraday high as the current stock price for stocks such as 6257 and 6274 when MIS returns `z = -`.
+- Applied the corrected quote parsing across Explore, Watchlist, and Portfolio price refreshes.
+
+## [v1.24.48] - 2026-06-02
+### Fixed
+- Made Portfolio manual refresh bypass the holding-price throttle so refreshed prices can write back before AI signal refresh starts.
+- Waited for forced holding-price refresh before clearing Portfolio signal caches and rebuilding AI helper badges.
+- Reduced the chance that mobile app restarts show older persisted holding prices after a manual refresh.
+
+## [v1.24.47] - 2026-06-02
+### Changed
+- Added separate Portfolio helper badges for AI add-on signals while holdings are still losing money.
+- AI add-on loss states now show 低檔觀察 within -10%, 謹慎觀察 within -20%, and 風險優先 below -20%.
+- Gave each Portfolio helper badge state a distinct outline color so profit, loss, observation, stop, and take-profit cues are easier to scan.
+
+## [v1.24.46] - 2026-06-02
+### Changed
+- Linked Portfolio profit/loss helper badges to the active AI signal so neutral holdings stay visually clean.
+- AI add-on signals now show 小心加碼 for 0% to +19.9% gains and 順勢加碼 at +20% or higher.
+- AI exit signals now show 建議停損 at -20%, 分批停利 at +20%, and 持續觀察 for the remaining cases.
+
+## [v1.24.45] - 2026-06-02
+### Added
+- Added Portfolio profit/loss level badges for add-on caution, add-on confidence, ongoing observation, and stop-loss suggestion.
+- Added a two-column profit/loss icon legend below the Portfolio refresh controls without horizontal scrolling.
+
+### Changed
+- Increased holding quantity and price text size so the right-side figures match the stock-name emphasis.
+- Switched profit/loss helper badges to low-emphasis outline styling so AI signal badges remain the primary visual focus.
+
+## [v1.24.44] - 2026-06-02
+### Changed
+- Updated mobile Portfolio holding cards to use three stacked rows: stock name, stock code with market badge, and recommendation count.
+- Kept the AI signal badge compact so the stock name has the full info-column width.
+
+## [v1.24.43] - 2026-06-02
+### Changed
+- Updated mobile Portfolio holding cards to use three information columns: stock name, stock code with market badge, and recommendation count.
+- Reduced the AI signal badge size on mobile so stock names have more room and are less likely to be truncated.
+
+## [v1.24.42] - 2026-06-02
+### Changed
+- Updated Portfolio holding cards so stock name/code and market/recommendation count use fixed two-row columns.
+- Kept long stock names from shifting the recommendation badge and market badge layout.
+
+## [v1.24.41] - 2026-06-02
+### Added
+- Added visible data freshness status to Explore so stock-picking results show whether data is updating, current, or possibly stale.
+- Added source timing details for Explore, including data update time, source data date, fixed update windows, and background price checks.
+
+### Changed
+- Enlarged the Explore manual refresh button so refreshing stock-picking data is a primary, obvious action.
+- Explore manual refresh now clears quant caches for both recommendation and visible search result stocks before forcing fresh data.
+
+## [v1.24.40] - 2026-06-02
+### Added
+- Added visible data freshness status for Watchlist and Portfolio so users can see when data is updating, current, or possibly stale.
+- Added source timing details for today, data update time, source data date, fixed update windows, and background price checks.
+
+### Changed
+- Enlarged the Watchlist and Portfolio manual refresh buttons so refreshing data is a primary, obvious action.
+- Portfolio manual refresh now also triggers a holding-price refresh before forcing fresh AI signal data.
+
+## [v1.24.39] - 2026-06-01
+### Changed
+- Explore search results now reuse the richer recommendation-card layout and show available Simons quant details instead of staying as simple placeholder cards.
+- Search quant details load in the background after the basic result list renders, limiting enrichment to the visible result set so typing remains responsive.
+
+## [v1.24.38] - 2026-05-30
+### Fixed
+- Fixed Watchlist half-year K-line quick preview on mobile by invalidating stale Watchlist caches that do not include complete K-line data.
+- Watchlist cached data now requires each observed stock to have enough K-line rows before it can skip a fresh reload.
+
+## [v1.24.37] - 2026-05-30
+### Fixed
+- Fixed the mobile Stock Detail chip-cost summary footer so the explanatory text no longer reserves desktop-height space after switching to a vertical layout.
+
+## [v1.24.36] - 2026-05-30
+### Added
+- Added lightweight price auto-refresh for Explore, Watchlist, and Portfolio during Taiwan market hours, refreshing every 5 minutes only while the page is visible.
+- Added persistent refresh-slot caches for Watchlist and Portfolio so already-loaded daily data is reused until the next fixed update window.
+
+### Changed
+- Premium Explore now goes directly to AI stock picking and hides manual strategy cards.
+- Explore, Watchlist, and Portfolio now use a simpler data-time display with today, data update time, fixed update schedule, and a manual refresh button.
+- Watchlist and Portfolio refresh buttons now clear the new persistent caches before forcing a fresh reload.
+
+## [v1.24.35] - 2026-05-30
+### Added
+- Added shared-cache metadata for stock quant data so Explore, Watchlist, and Portfolio can show fixed update windows, actual fetch time, source data date, and whether the data came from shared cache or a live IFAlgo request.
+- Added extra app-cache warmup cron windows at Taiwan time 08:10 and 14:00, in addition to the existing 06:45 warmup and 23:30 after-market snapshot collection.
+
+### Changed
+- Stock quant API now checks `stock_quant_daily_snapshots` before hitting IFAlgo, then writes live misses back into the shared snapshot cache for later users.
+- Explore now shows stock recommendations first while Simons quant details continue syncing in the background.
+- Watchlist and Portfolio now clearly separate price update timing from lower-frequency Simons quant data timing.
+
+## [v1.24.34] - 2026-05-29
+### Added
+- Added `推薦次數` as a Watchlist sort option using each stock's trailing 90-day Simons recommendation count.
+
+### Changed
+- Recommendation-count sorting now works with the existing ascending and descending sort direction controls.
+
+## [v1.24.33] - 2026-05-29
+### Added
+- Added a 90-day Simons recommendation-count API so existing Watchlist and Portfolio stocks can show repeat recommendation badges.
+- Watchlist and Portfolio stock names now show `推薦X2`, `推薦X3`, and higher badges only when a stock has appeared more than once in the last 90 days.
+
+### Changed
+- Explore now hides stocks that are already in the Watchlist or currently held in Portfolio, including both strategy lists and search results.
+- Recommendation-count badges reset naturally by counting only Simons snapshots from the trailing 90-day window.
+
+## [v1.24.32] - 2026-05-29
+### Added
+- Added Watchlist sort direction controls so cumulative return, chip score, and comprehensive score can sort descending or ascending.
+- Added comprehensive-score fallback for watched stocks that have individual IFAlgo quant data but are not in the daily Simons recommendation list.
+
+### Changed
+- Watchlist filter controls now prioritize AI recommendation level, use clearer active states, and show recommendation-level mineral icons.
+- Watchlist stock cards now use fixed badge rows: AI recommendation and AI state first, comprehensive score on its own row, then smaller supporting tags.
+- Renamed Watchlist score labels from Simons/quant score wording to `綜合評分`.
+
+## [v1.24.31] - 2026-05-29
+### Added
+- Added a server-side stock quant snapshot endpoint that saves Simons/IFAlgo chip-stability data into `stock_quant_daily_snapshots`.
+- Watchlist additions now trigger a background snapshot so newly watched stocks start accumulating chip-stability trend data without opening the detail page.
+
+### Changed
+- Daily app-cache warmup now writes stock quant snapshots for Simons, holding, and Watchlist stocks instead of only warming short-lived quant cache.
+- Stock detail entries now reset scroll position to the top and show a compact floating stock context bar while scrolling.
+
+## [v1.24.30] - 2026-05-28
+### Added
+- Added a half-year candlestick mini chart to each Watchlist stock card using the existing IFAlgo K-line data.
+- Added MA20 and six-month performance display inside the Watchlist mini chart.
+
+### Changed
+- Watchlist cards now preserve fast loading by reusing already-fetched stock data for charts instead of making extra chart API requests.
+- Watchlist mini charts automatically move below the stock summary on narrow mobile screens to avoid crowding the card header.
+
+## [v1.24.29] - 2026-05-28
+### Added
+- Added daily stock quant snapshots for 30/60 day chip-stability trend tracking on stock detail pages.
+- Added a stock quant history API that combines new daily snapshots, existing Simons snapshots, and the latest IFAlgo value.
+- Added Watchlist sorting by cumulative return, chip score, and Simons quant score.
+
+### Changed
+- Watchlist now renders existing cards first and refreshes quotes, quant data, and MA5/volume signals in the background.
+- Portfolio now renders holdings first and refreshes AI entry/exit signals in the background.
+- Automatic Watchlist and Portfolio loads now reuse short-lived quant cache; manual refresh still forces a fresh quant request.
+
+## [v1.24.28] - 2026-05-20
+### Added
+- Buy order modal now estimates stop-loss risk before confirming, including the stop-loss reference price, estimated loss, and the loss as a share of available balance.
+- Parent account settings now include an adjustable stop-loss alert percentage, defaulting to 20%, and sync the value to child accounts.
+- Child-account creation now inherits broker fee and stop-loss settings from the parent account.
+
+## [v1.24.27] - 2026-05-20
+### Changed
+- PPBear stock company introductions now use MoneyDJ company wiki facts before AI rewriting, prioritizing core products, revenue mix, and application scenarios over broad industry tags.
+- Stock detail now calls the Supabase description function with the active session token so authenticated users do not fall back to generic local copy.
+- Replaced the vague local fallback company text with more specific conservative copy, including a richer power-supply fallback for companies like 6282 康舒.
+
+## [v1.24.26] - 2026-05-19
+### Changed
+- Watchlist AI entry and exit signals now reuse only same-day short-lived cache, then automatically refresh after the cache expires or the day changes.
+- Watchlist automatic analysis now bypasses per-stock quant cache so users do not need to press "重新抓取" to see updated AI signal states.
+- The Watchlist data source label now shows "今日快取" only when it is actually displaying a valid same-day cached result.
+
+## [v1.24.25] - 2026-05-19
+### Changed
+- Portfolio AI entry and exit signals now reuse only same-day short-lived cache, then automatically refresh after the cache expires or the day changes.
+- Portfolio signal refresh now bypasses per-stock quant cache during automatic analysis so users do not need to press "重新抓取" to see updated AI signal states.
+- The Portfolio data source label now shows "今日快取" only when it is actually displaying a valid same-day cached signal result.
+
+## [v1.24.24] - 2026-05-16
+### Changed
+- Restricted the Dashboard Simons quant model section to Premium, admin, or inherited Premium family accounts.
+- Free users no longer render the Simons market panel or trigger the home-market summary request from the Dashboard.
+
+## [v1.24.23] - 2026-05-16
+### Changed
+- Released the stock analysis shared-cache strategy as a production version bump.
+- Stock analysis cache keeps one latest row per stock/type and removes entries that have not been updated for 30 days.
+
+## [v1.24.22] - 2026-05-16
+### Added
+- Added a server-side `stock_daily_cache` Supabase table for shared per-stock daily analysis results.
+- Stock analysis now reuses the same day's cached technical, chip, and news summary before calling IFAlgo, Yahoo, and OpenAI again.
+
+### Changed
+- Stock detail first-load release no longer waits for PPBear company description or AI three-way analysis, allowing the main stock page to appear while those sections finish in the background.
+
+## [v1.24.21] - 2026-05-15
+### Changed
+- Explore stock cards now show the unified red AI entry icon only for active AI buy signals.
+- AI neutral and AI exit states are hidden from Explore cards to keep the list focused and easier to scan.
+
+## [v1.24.20] - 2026-05-15
+### Fixed
+- Portfolio AI signal loading now times out per stock request so one slow data source cannot leave the portfolio page spinning forever.
+- Portfolio now falls back to showing holdings first when signal analysis is temporarily unavailable.
+- Dashboard market prediction gauges now label the cards as AI daily/monthly bullish-bearish predictions.
+
+## [v1.24.19] - 2026-05-15
+### Fixed
+- Watchlist AI signal filters now persist while opening a stock detail page and returning to the watchlist.
+- Buying a stock now removes it from the watchlist immediately and blocks already-held stocks from being added back to the watchlist.
+- Watchlist now cleans up any existing watched stocks that are already present in portfolio holdings.
+
+## [v1.24.18] - 2026-05-13
+### Added
+- Added an admin-controlled `daily_newsletter` feature switch so each account can be included in or excluded from automatic daily newsletter delivery.
+- Added an admin holdings view for each account, including holding count, market value, unrealized P/L, shares, average cost, and current price.
+
+### Changed
+- Daily newsletter preparation now targets Taiwan time 08:00 data, with scheduled delivery at 08:30 and an explicit data-time label in the email.
+- Automatic and manual newsletter sending now respect the per-account newsletter switch, while keeping Premium enabled by default and Free disabled by default.
+
+## [v1.24.17] - 2026-05-13
+### Changed
+- Changed Stock Detail first-load behavior to show a full progress loading panel while price, quant signals, chip-cost data, PPBear description, and AI analysis finish loading.
+- Stock Detail now releases the full page only after the initial data pipeline has completed, avoiding partially rendered stock pages with empty chip or analysis sections.
+
+## [v1.24.16] - 2026-05-13
+### Fixed
+- Fixed Goodinfo institutional cost fetching after its dynamic CLIENT_KEY redirect flow changed, restoring 3037 欣興 and other stock chip-cost estimates.
+- Fixed refreshing a deep stock detail route so an existing Supabase session waits for the user profile to load instead of bouncing through login and returning to the home page.
+
+## [v1.24.15] - 2026-05-13
+### Fixed
+- Fixed account sync refreshes leaving Stock Detail trade buttons stuck in "同步中" by preserving ready state during background refreshes and adding guarded timeouts.
+- Fixed Learning quiz result counts exceeding the question total on mobile by locking each question to a single recorded answer and clamping result calculations to the active quiz length.
+- Improved Learning completion save handling so a slow `lesson_progress` insert verifies whether the record actually exists before showing a retry error.
+
+## [v1.24.14] - 2026-05-13
+### Added
+- Added FinMind institutional buy/sell flow as a supporting signal in the stock detail chip-cost API and summary card.
+- Added a shared cute market badge component and used it on stock detail, Explore, Watchlist, and Portfolio stock rows.
+
+### Changed
+- Official price maps now include market type metadata (`listed` / `otc`) so list pages can show market badges without extra per-row calls.
+
+## [v1.24.13] - 2026-05-13
+### Added
+- Added a compact market badge before the stock code on the stock detail page, showing "上市" for TWSE stocks and "上櫃" for TPEx stocks.
+
+## [v1.24.12] - 2026-05-13
+### Changed
+- Removed the full "大人們買在哪裡？" institutional cost distribution section from the stock detail page.
+- Removed the "查看完整成本分布" jump button from the chip-cost summary card while keeping the compact chip-cost summary visible.
+
+## [v1.24.11] - 2026-05-13
+### Added
+- Added a stock detail chip-cost summary card that shows the institutional estimated average cost area near the technical chart.
+- Added a `/api/institution-cost` endpoint that reads Goodinfo institutional buy amount and buy volume, then estimates buy-side average cost when IFAlgo cost data is missing.
+
+### Changed
+- Stock detail now prioritizes IFAlgo/Simons institutional costs, then fills missing foreign, investment trust, or dealer values with clearly labeled Goodinfo estimates.
+- Updated chip-cost copy to say "法人估算成本" and mark Goodinfo-derived values as estimates instead of presenting them as official holding cost.
+
+## [v1.24.10] - 2026-05-12
+### Fixed
+- Fixed withdrawal approvals staying pending after login by moving approval/rejection to a server-side API that verifies the parent session before writing status changes.
+- Ensured approved withdrawals update the request status, deduct the child balance, and insert a withdrawal trade record as one guarded flow with visible errors on failure.
+- Repaired the existing stuck NT$100 withdrawal request for 娃娃魚 and confirmed there are no pending withdrawal requests left in production data.
+
+## [v1.24.9] - 2026-05-08
+### Added
+- Added a Vercel cron warmup at 06:45 Taiwan time to preload Home market summary, Simons daily data, official TWSE/TPEX prices, and shared stock quant endpoints before users open the app.
+- Added cloud cache API routes for Home market summary, daily Simons/official price data, and stock quant data so users do not each trigger the same raw source requests.
+
+### Changed
+- Home now checks browser cache first, then cloud daily cache, and only falls back to raw source calculation when the cloud cache is unavailable.
+- Explore now reads the cloud-prepared official price map instead of rebuilding TWSE/TPEX data on every cold page load.
+- Simons daily recommendations are cached until the next 07:00 Taiwan refresh window.
+- Stock quant data is shared through a cloud endpoint while keeping the existing 30-minute client TTL for signal freshness.
+
+### Preserved
+- Portfolio real-time holding prices still refresh during market hours with the existing short TTL/manual refresh behavior instead of being locked to the daily cache.
+
+## [v1.24.8] - 2026-05-08
+### Changed
+- Updated the Home 今日市場氛圍 inference rules using the provided Threads samples, so 放鬆 is no longer triggered only by margin maintenance being above the safety line.
+- Prioritized 貪婪 when AI日預測 is hot while monthly or macro signals are not fully aligned, 樂觀 for constructive but not overheated setups, and 放鬆 only when monthly direction and margin pressure are both supportive.
+- Updated the mood help copy to state that the mood is inferred from IFalgo public data and the currently collected author samples.
+
+### Known Limitations
+- 冷靜 remains conservative because there are fewer confirmed author samples; future samples can further tune the rule.
+
+## [v1.24.7] - 2026-05-08
+### Changed
+- Changed the Home Simons dashboard to use IFalgo's public `index/firstZoneData` API for monthly prediction, daily prediction, margin maintenance, and market fund momentum instead of image-calibrated or stock-level inferred values.
+- Moved the 今日市場氛圍 card to the first position under Simons 量化模型 so users see the daily conclusion before the supporting charts.
+- Removed the four static explanation cards and replaced them with click-to-expand help on the market fund momentum chart and daily market mood card.
+
+### Fixed
+- Fixed AI日預測 data sourcing so it reads `lastPtsTw.pts` from IFalgo's market dashboard API instead of deriving the value from a single stock's `gin8`.
+- Removed hardcoded screenshot calibration values and stale fallback margin values that could make market data look live when it was not.
+
+## [v1.24.6] - 2026-05-07
+### Fixed
+- Removed the generic answer-position memorization question from the Learning quiz pool because it was not investment-related and could repeat across lessons.
+- Verified all 100 lessons still have enough available questions after removing that shared question.
+- Reset production learning progress records and learning profile counters while preserving learning wallets and wallet transactions.
+
+## [v1.24.5] - 2026-05-07
+### Fixed
+- Fixed Learning Home responsive layout so the top stats, progress panel, and shortcut actions keep the same single-row structure on mobile and desktop.
+- Made perfect-score learning coin grant failures visible instead of silently returning 0 coins, and refreshes the wallet/transaction state after successful grants.
+- Kept completed lessons from showing a retry action when only coin sync produced a warning, avoiding confusion after a successful all-correct retry.
+
+## [v1.24.4] - 2026-05-06
+### Changed
+- Changed the Home Simons dashboard cache to a Taiwan-time daily refresh slot at 08:00, so the same user session reuses the daily market summary instead of refetching every visit.
+- Bumped the Home market summary cache key to clear previous 30-minute cached data and adopt the daily update cadence.
+
+## [v1.24.3] - 2026-05-06
+### Fixed
+- Made the margin maintenance API return the latest verified fallback value when the upstream source blocks server requests, keeping the Home Simons dashboard stable in production.
+
+## [v1.24.2] - 2026-05-06
+### Added
+- Replaced the Home holdings preview with a Simons macro dashboard showing market fund momentum, AI monthly prediction, AI daily prediction, and margin maintenance rate.
+- Added hover tooltips to the market fund momentum chart with monthly momentum and TAIEX values.
+- Added market aspect scoring for 追價熱度、趨勢信心、槓桿安全、波動穩定, including an explanation that the four scores are simultaneous dimensions rather than exclusive moods.
+- Added a serverless margin maintenance endpoint and dynamic cache versioning for the Home Simons summary.
+
+### Changed
+- Tuned the market fund momentum chart axes to match the Simons reference scale and restored 2026/04 monthly data.
+- Renamed the previous emotional labels to clearer market aspect labels to reduce misinterpretation.
+
+## [v1.24.1] - 2026-05-06
+### Fixed
+- Fixed the mobile Learning map so scene layout uses the same map rules as desktop, keeping lesson nodes aligned with the background artwork.
+- Applied calibrated node positions for stages 2-10, so lessons 11-100 now match their scene platforms.
+- Removed oversized translucent lesson shells from later stages; all stages now use the same compact circular lesson badge treatment.
+- Replaced the Learning map scene art with atmosphere-only backgrounds that avoid island/platform shapes, reducing coordinate mismatch risk across desktop and mobile.
+
+## [v1.24.0] - 2026-05-05
+### Added
+- Added 10 clean themed Learning map backgrounds for the 100-lesson course path, including spring sakura, summer beach, autumn maple, winter snow, deep sea, sky castle, crystal cave, lakeside, firefly forest, and lava castle scenes.
+- Added a local-only Learning map calibration mode so level positions can be dragged, saved, copied, and reused during design tuning.
+
+### Changed
+- Learning map level nodes now use calibrated platform positions across all 10 scene sections.
+- Completed lessons now visually change into green completed badges with check marks, while the current lesson remains highlighted and locked lessons stay subdued.
+- Replaced old map backgrounds that contained baked-in numbers or lock icons with clean scene assets.
+
+## [v1.23.1] - 2026-05-05
+### Changed
+- Rebuilt the Learning home page as a Duolingo-style vertical course map with 100 lesson nodes.
+- Each lesson node now shows the lesson number, title, summary, level, and completion status.
+- The map can be scrolled up and down, with alternating left/right lesson placement and stage markers.
+- Added responsive mobile layout so the full 100-level path remains readable on small screens.
+
+## [v1.23.0] - 2026-05-05
+### Added
+- Expanded the learning course catalog from 60 lessons to 100 investment lessons.
+- Added chart-based learning visuals for K-line patterns, ETF/index concepts, allocation, orders, financial statements, valuation, risk, and safety lessons.
+- Added dynamic scenario and chart questions so children must reason through the lesson instead of memorizing fixed answer positions.
+- Added `supabase-learning-reset-2026-05-05.sql` for resetting learning progress while preserving existing learning coins.
+
+### Changed
+- Shuffled quiz answer choices per attempt and regenerated the correct option mapping automatically.
+- Completed Learning Home quick actions, reward, wallet, shop, article, and request links so the learning interface is more fully clickable.
+
+### Fixed
+- Lesson completion now requires a perfect score before awarding XP and learning coins.
+- Previously completed lessons can no longer be repeated for duplicate coin rewards.
+
+## [v1.22.3] - 2026-05-05
+### Changed
+- Updated the Learning page into a full cute forest adventure-map layout while keeping lesson, XP, wallet, streak, correct-answer, and article entry points.
+- Replaced the mobile app/logo bear icon with the new cute PPBears mascot artwork.
+- Added Apple touch icon and web app manifest metadata for a better phone home-screen icon experience.
+
+## [v1.22.2] - 2026-05-05
+### Changed
+- Redesigned PPBears UI visual system for a cuter, higher-quality child-friendly experience.
+- Updated Learning page into a dark forest game-map style while preserving existing learning data, lesson links, wallet, XP, streak, and article entry points.
+- Polished Home, Explore, Watchlist, Portfolio, Withdrawal Approval, shared cards, badges, and bottom navigation without changing API or data logic.
+
+## [v1.22.1] - 2026-05-04
+### Changed
+- 電子報資料準備時間改為每日台灣時間 08:00，正式寄送改為每日台灣時間 08:30，並移除寄送 API 內部舊的整點檢查，避免資料庫舊設定讓 08:30 排程被略過。
+
+## [v1.22.0] - 2026-05-04
+### Added
+- 新增股利自動入帳基礎系統：`dividend_payments` 記錄每位使用者、股票、除息日、最後買進日、真實現金發放日、符合資格股數與入帳狀態。
+- 新增 `upsert_and_credit_dividend` Supabase RPC，會以除息日前一日收盤後持股數計算可領股數，並在發放日當天把現金股利加到 `users.available_balance`。
+- 新增 Vercel 排程 `/api/cron-dividend-payments`，每日抓 Yahoo 股利頁的真實 `cashPayDate`，建立待發放紀錄並於發放日入帳。
+- 新增 `/dividends` 股利入帳紀錄頁，顯示已入帳、待發放、除息日、最後買進日、股數、每股股利與入帳金額。
+
+## [v1.21.4] - 2026-05-04
+### Fixed
+- 修正「看庫存」AI 連續訊號次數誤算：Simons `aiQuanBackDataTradingList` 同一天可能有多筆交易明細，現在會先合併成每日事件再計算，不會把同一天多筆出場誤顯示成 `X3`、`X5`。
+- 連續次數改用完整事件序列計算：`in_date` 會視為進場/加碼事件，`out_date` 才視為出場或中立事件，因此中間有進場會正確打斷出場累計。
+- `AI 中立` 不再顯示 `0`，也不會重置或增加進出場累計。
+
+## [v1.21.3] - 2026-05-04
+### Added
+- 看庫存 AI 訊號新增連續次數顯示：同一檔持股連續出現 `AI 加碼` 或 `AI 出場` 時，badge 會顯示 `X2`、`X3` 等累計次數。
+- 連續次數會從目前這輪持股開始日後計算，並在 `AI 加碼` / `AI 出場` 方向切換時重新累計；`AI 中立` 不會打斷既有方向累計。
+
+## [v1.21.2] - 2026-05-03
+### Fixed
+- 修復管理副帳號建立流程，避免 Supabase Auth 已建立但 public.users 未寫入時留下孤兒帳號。
+- 新增後端 `/api/create-child-account`，由 server-side service role 一次完成 Auth 建立、父子帳號關聯與失敗回滾。
+- 支援修復 Auth 已存在但尚未綁定 `public.users` 的副帳號資料。
+
+## [v1.21.1] - 2026-04-29
+### Fixed
+- **下單轉圈問題根治：加入資料就緒 Guard（`dataReady`）**
+  - **問題根本原因**：App 重新開啟時，會立即從 localStorage 讀取舊 session（~50ms）並顯示頁面，但 `loadUserData()` 在背景執行需 1~3 秒。若使用者在背景載入完成前點擊下單，會使用過期的快取資料，導致下單請求卡住轉圈
+  - **修正方式**：Store 新增 `dataReady: boolean` 狀態（初始為 `false`），`loadUserData` 開始時設為 `false`，所有資料平行載入完成後才設為 `true`
+  - **UI 防護**：個股頁「🛒 買入」/「💰 賣出」按鈕在 `dataReady === false` 時顯示 `⏳ 同步中...` 並 disable，頁面上方顯示橘色提示橫幅「帳號資料同步中，請稍候再下單以確保數據正確」
+  - **彈窗二重防護**：即使強制開啟交易面板，確認按鈕同樣在資料未就緒時顯示 `資料同步中...` 並 disable，點擊時顯示 alert 提示
+- **閒置自動登出縮短為 30 分鐘**（原 120 分鐘）
+  - 縮短後每次重新登入都會執行完整的 `loadUserData()`，確保資料絕對新鮮，從根本減少舊快取造成的操作異常
 
 ## [v1.21.0] - 2026-04-28
 ### Fixed

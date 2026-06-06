@@ -1,0 +1,17 @@
+{
+  "name": "PPBears 小熊投資家",
+  "short_name": "PPBears",
+  "description": "可愛又實用的小熊投資學習 App",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#fff7df",
+  "theme_color": "#123c3b",
+  "icons": [
+    {
+      "src": "/ppbear.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

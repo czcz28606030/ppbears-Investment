@@ -1,32 +1,203 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore, formatPrice } from '../store';
-import { fetchSimonsData, fetchStockData, fetchStockQuantData, toRecommendation, clearTTLCache } from '../api';
-import type { StockQuantData } from '../api';
-import type { AIAdvice, SimonsItem, StockRecommendation, WatchlistSignal, WatchlistWarning } from '../types';
-import { getCache, setCache, clearCache, getCacheTTL, CACHE_KEYS } from '../cache';
+import { fetchOfficialPriceMap, fetchSimonsData, fetchStockData, fetchStockQuantData, toRecommendation, fetchSimonsRecommendationCounts, refreshDailyAiCache, clearQuantSignalTTLCache, clearSimonsDataTTLCache, fetchDailyAiCacheVersion, getKnownDailyAiCacheVersion, rememberDailyAiCacheVersion, fetchActiveEtfRadarMap } from '../api';
+import type { ActiveEtfRadarItem, OfficialPriceMapEntry, StockQuantData, StockQuantMeta } from '../api';
+import type { SimonsItem, StockData, StockPrice, StockRecommendation, WatchlistSignal, WatchlistWarning } from '../types';
+import { getCache, setCache, clearCache, getPersistentCache, setPersistentCache, clearPersistentCache, CACHE_KEYS } from '../cache';
+import MarketBadge from '../components/MarketBadge';
+import { canAutoRefreshPrices, PRICE_AUTO_REFRESH_MS } from '../utils/priceAutoRefresh';
+import { getIndustryTailwind } from '../utils/industryTailwinds';
 import './Watchlist.css';
+
+const WATCHLIST_FILTER_STORAGE_KEY = 'ppbears_watchlist_filters_v2';
+const WATCHLIST_PERSISTENT_CACHE_KEY = 'ppbears_watchlist_full_v4';
+const WATCHLIST_CACHE_VERSION = 'score-fallback-kline-v3';
+type WatchlistAiFilter = 'all' | 'buy' | 'neutral' | 'sell';
+type WatchlistRemarkFilter = 'all' | 'ultra' | 'high' | 'mid' | 'low';
+type WatchlistSortKey = 'simonsScore' | 'recommendationCount' | 'cumRet' | 'chipPts';
+type WatchlistSortDirection = 'desc' | 'asc';
+type WatchlistFilterState = {
+  warnOnly: boolean;
+  aiSignal: WatchlistAiFilter;
+  aiRemark: WatchlistRemarkFilter;
+  sortKey: WatchlistSortKey;
+  sortDirection: WatchlistSortDirection;
+};
+type WatchlistInfoDialog = {
+  kind: 'score';
+  stockName: string;
+  stockCode: string;
+  rec: StockRecommendation;
+  quantData?: StockQuantData;
+};
+type ActiveEtfInfoDialog = {
+  stockName: string;
+  stockCode: string;
+  radar?: ActiveEtfRadarItem;
+};
+type SmallChipInfoDialog = {
+  title: string;
+  subtitle: string;
+  text: string;
+  details: string[];
+  note?: string;
+};
+
+const WATCHLIST_FULL_TTL_MS = 18 * 60 * 60 * 1000;
+const DEFAULT_WATCHLIST_SORT_KEY: WatchlistSortKey = 'simonsScore';
+const DAILY_AI_CACHE_POLL_MS = 90 * 1000;
+const DATA_REFRESH_SCHEDULE = [
+  { label: '08:00', minutes: 8 * 60 },
+];
+
+function getTodayString(): string {
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}
+
+function formatAnalyzeTimestamp(): string {
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${now.getFullYear()}/${pad(now.getMonth() + 1)}/${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+}
+
+function getRefreshSlotInfo() {
+  const now = new Date();
+  const minutesNow = now.getHours() * 60 + now.getMinutes();
+  let currentIndex = DATA_REFRESH_SCHEDULE.findIndex(slot => minutesNow < slot.minutes) - 1;
+  let slotDate = new Date(now);
+  if (currentIndex < 0) {
+    currentIndex = DATA_REFRESH_SCHEDULE.length - 1;
+    slotDate.setDate(slotDate.getDate() - 1);
+  }
+  const currentSlot = DATA_REFRESH_SCHEDULE[currentIndex];
+  const nextSlot = DATA_REFRESH_SCHEDULE[(currentIndex + 1) % DATA_REFRESH_SCHEDULE.length];
+  slotDate.setHours(Math.floor(currentSlot.minutes / 60), currentSlot.minutes % 60, 0, 0);
+  const nextDate = new Date(now);
+  nextDate.setHours(Math.floor(nextSlot.minutes / 60), nextSlot.minutes % 60, 0, 0);
+  if (nextSlot.minutes <= minutesNow) nextDate.setDate(nextDate.getDate() + 1);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const dateKey = `${slotDate.getFullYear()}-${pad(slotDate.getMonth() + 1)}-${pad(slotDate.getDate())}`;
+  return {
+    key: `${dateKey}-${currentSlot.label}`,
+    ttlMs: Math.max(5 * 60 * 1000, nextDate.getTime() - now.getTime()),
+    startedAt: slotDate,
+  };
+}
+
+function formatMetaDateTime(value?: string): string {
+  if (!value) return '尚未同步';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}/${pad(date.getMonth() + 1)}/${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function getLatestQuantMeta(map: Record<string, StockQuantData>): StockQuantMeta | null {
+  const metas = Object.values(map).map(item => item.meta).filter(Boolean) as StockQuantMeta[];
+  if (metas.length === 0) return null;
+  return metas.sort((a, b) => new Date(b.fetchedAt).getTime() - new Date(a.fetchedAt).getTime())[0];
+}
+
+function getDataFreshness(meta: StockQuantMeta | null, loading: boolean, hasData: boolean) {
+  if (loading) {
+    return { className: 'wl-data-freshness-updating', label: '正在讀取每日快取與更新價格' };
+  }
+  if (!hasData) {
+    return { className: 'wl-data-freshness-waiting', label: '等待 Simons 最新交易日資料' };
+  }
+
+  if (meta?.cacheStatus === 'fresh') {
+    return { className: 'wl-data-freshness-fresh', label: '已重新讀取每日快取' };
+  }
+
+  return { className: 'wl-data-freshness-fresh', label: '已使用每日 AI 訊號快取' };
+}
+
+function hasCompleteKlineCache(klineMap: Record<string, StockPrice[]> | undefined, stockCodes: string[]): boolean {
+  if (!klineMap || stockCodes.length === 0) return false;
+  return stockCodes.every(code => (klineMap[code] || []).length >= 12);
+}
+
+function formatTodayDate(): string {
+  return getTodayString().replace(/-/g, '/');
+}
+
+function getFixedUpdateLabel(): string {
+  return '08:00 自動檢查；可手動重新抓取';
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null> {
+  return Promise.race([
+    promise,
+    new Promise<null>(resolve => window.setTimeout(() => resolve(null), ms)),
+  ]);
+}
+
+function readSavedWatchlistFilters(): WatchlistFilterState {
+  try {
+    const raw = sessionStorage.getItem(WATCHLIST_FILTER_STORAGE_KEY);
+    if (!raw) return { warnOnly: false, aiSignal: 'all', aiRemark: 'all', sortKey: DEFAULT_WATCHLIST_SORT_KEY, sortDirection: 'desc' };
+    const parsed = JSON.parse(raw) as Partial<WatchlistFilterState>;
+    const aiSignal: WatchlistAiFilter =
+      parsed.aiSignal === 'buy' || parsed.aiSignal === 'neutral' || parsed.aiSignal === 'sell'
+        ? parsed.aiSignal
+        : 'all';
+    const aiRemark: WatchlistRemarkFilter =
+      parsed.aiRemark === 'ultra' || parsed.aiRemark === 'high' || parsed.aiRemark === 'mid' || parsed.aiRemark === 'low'
+        ? parsed.aiRemark
+        : 'all';
+    return {
+      warnOnly: Boolean(parsed.warnOnly),
+      aiSignal,
+      aiRemark,
+      sortKey: parsed.sortKey === 'simonsScore' || parsed.sortKey === 'recommendationCount' || parsed.sortKey === 'cumRet' || parsed.sortKey === 'chipPts'
+        ? parsed.sortKey
+        : DEFAULT_WATCHLIST_SORT_KEY,
+      sortDirection: parsed.sortDirection === 'asc' ? 'asc' : 'desc',
+    };
+  } catch {
+    return { warnOnly: false, aiSignal: 'all', aiRemark: 'all', sortKey: DEFAULT_WATCHLIST_SORT_KEY, sortDirection: 'desc' };
+  }
+}
 
 export default function Watchlist() {
   const navigate = useNavigate();
   const {
     watchlist, watchlistSignals, watchlistWarnings, watchlistSignalsLoading,
-    removeFromWatchlist, checkWatchlistSignals, fetchWatchlist,
+    holdings, removeFromWatchlist, checkWatchlistSignals, fetchWatchlist, hasFeature,
   } = useStore();
+  const hasAiFeature = hasFeature('ai_stock_picking');
+  const savedFilters = readSavedWatchlistFilters();
 
   const [liveQuotes, setLiveQuotes] = useState<Record<string, { close: number; change: number }>>({});
-  const [_quotesLoading, setQuotesLoading] = useState(false);
+  const [, setQuotesLoading] = useState(false);
   const [removeConfirm, setRemoveConfirm] = useState<string | null>(null);
   const [lastAnalyzedAt, setLastAnalyzedAt] = useState<string | null>(null);
-  const [latestKlineDate, setLatestKlineDate] = useState<string | null>(null);
+  const [, setLatestKlineDate] = useState<string | null>(null);
   const [industryMap, setIndustryMap] = useState<Record<string, string>>({});
+  const [marketMap, setMarketMap] = useState<Record<string, OfficialPriceMapEntry>>({});
+  const [klineMap, setKlineMap] = useState<Record<string, StockPrice[]>>({});
   const [quantDataMap, setQuantDataMap] = useState<Record<string, StockQuantData>>({});
   const [simonsRecMap, setSimonsRecMap] = useState<Record<string, StockRecommendation>>({});
-  const [filterSignalOnly, setFilterSignalOnly] = useState(false); // 只顯示有訊號的
-  const [filterWarnOnly, setFilterWarnOnly] = useState(false);   // 只顯示建議移除的
-  const [filterAiSignal, setFilterAiSignal] = useState<'all' | 'buy' | 'neutral' | 'sell'>('all'); // AI 進出場訊號篩選
+  const [quantSyncingCodes, setQuantSyncingCodes] = useState<Set<string>>(new Set());
+  const [quantFailedCodes, setQuantFailedCodes] = useState<Set<string>>(new Set());
+  const [filterWarnOnly, setFilterWarnOnly] = useState(savedFilters.warnOnly);   // 只顯示建議移除的
+  const [filterAiSignal, setFilterAiSignal] = useState<WatchlistAiFilter>(savedFilters.aiSignal); // AI 進出場訊號篩選
+  const [filterAiRemark, setFilterAiRemark] = useState<WatchlistRemarkFilter>(savedFilters.aiRemark);
+  const [sortKey, setSortKey] = useState<WatchlistSortKey>(savedFilters.sortKey);
+  const [sortDirection, setSortDirection] = useState<WatchlistSortDirection>(savedFilters.sortDirection);
   const [dataLoading, setDataLoading] = useState(false);
   const [loadingStep, setLoadingStep] = useState<string>('正在連線...');
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [, setUsingWatchlistCache] = useState(false);
+  const [infoDialog, setInfoDialog] = useState<WatchlistInfoDialog | null>(null);
+  const [activeEtfDialog, setActiveEtfDialog] = useState<ActiveEtfInfoDialog | null>(null);
+  const [smallChipDialog, setSmallChipDialog] = useState<SmallChipInfoDialog | null>(null);
+  const [recommendationCounts, setRecommendationCounts] = useState<Record<string, number>>({});
+  const [activeEtfMap, setActiveEtfMap] = useState<Record<string, ActiveEtfRadarItem>>({});
 
   // 進入頁面時抓取即時報價 + 訊號分析
   useEffect(() => {
@@ -37,45 +208,201 @@ export default function Watchlist() {
   }, []);
 
   useEffect(() => {
+    sessionStorage.setItem(WATCHLIST_FILTER_STORAGE_KEY, JSON.stringify({
+      warnOnly: filterWarnOnly,
+      aiSignal: filterAiSignal,
+      aiRemark: filterAiRemark,
+      sortKey,
+      sortDirection,
+    }));
+  }, [filterWarnOnly, filterAiSignal, filterAiRemark, sortKey, sortDirection]);
+
+  useEffect(() => {
+    if (hasAiFeature) return;
+    if (filterAiSignal !== 'all') setFilterAiSignal('all');
+    if (filterAiRemark !== 'all') setFilterAiRemark('all');
+    if (sortKey === 'cumRet' || sortKey === 'chipPts') setSortKey(DEFAULT_WATCHLIST_SORT_KEY);
+    if (sortDirection !== 'desc') setSortDirection('desc');
+    setQuantDataMap({});
+    setQuantSyncingCodes(new Set());
+    setQuantFailedCodes(new Set());
+  }, [hasAiFeature, filterAiSignal, filterAiRemark, sortKey, sortDirection]);
+
+  useEffect(() => {
+    const heldCodes = new Set(
+      holdings
+        .filter(h => h.totalShares > 0)
+        .map(h => h.stockCode)
+    );
+    const heldWatchlistCodes = watchlist
+      .filter(w => heldCodes.has(w.stockCode))
+      .map(w => w.stockCode);
+
+    if (heldWatchlistCodes.length === 0) return;
+
+    clearCache(CACHE_KEYS.WATCHLIST_FULL);
+    setRemoveConfirm(current => (
+      current && heldWatchlistCodes.includes(current) ? null : current
+    ));
+    setLiveQuotes(prev => {
+      const next = { ...prev };
+      heldWatchlistCodes.forEach(code => { delete next[code]; });
+      return next;
+    });
+    setKlineMap(prev => {
+      const next = { ...prev };
+      heldWatchlistCodes.forEach(code => { delete next[code]; });
+      return next;
+    });
+    setQuantDataMap(prev => {
+      const next = { ...prev };
+      heldWatchlistCodes.forEach(code => { delete next[code]; });
+      return next;
+    });
+    setSimonsRecMap(prev => {
+      const next = { ...prev };
+      heldWatchlistCodes.forEach(code => { delete next[code]; });
+      return next;
+    });
+
+    heldWatchlistCodes.forEach(code => {
+      removeFromWatchlist(code).catch(() => {});
+    });
+  }, [holdings, watchlist, removeFromWatchlist]);
+
+  useEffect(() => {
+    const codes = watchlist.map(w => w.stockCode);
+    if (codes.length === 0) {
+      setRecommendationCounts({});
+      setActiveEtfMap({});
+      return;
+    }
+
+    let cancelled = false;
+    fetchSimonsRecommendationCounts(codes, 90).then(counts => {
+      if (!cancelled) setRecommendationCounts(counts);
+    });
+    fetchActiveEtfRadarMap(codes, 5).then(items => {
+      if (!cancelled) setActiveEtfMap(items);
+    });
+
+    return () => { cancelled = true; };
+  }, [watchlist, refreshKey]);
+
+  useEffect(() => {
+    if (watchlist.length === 0) return;
+    if (!hasAiFeature) return;
+    let cancelled = false;
+    async function checkSharedAiCacheVersion() {
+      if (dataLoading) return;
+      const latest = await fetchDailyAiCacheVersion();
+      if (cancelled || !latest?.version) return;
+      const known = getKnownDailyAiCacheVersion('watchlist');
+      if (!known) {
+        rememberDailyAiCacheVersion(latest.version, 'watchlist');
+        return;
+      }
+      if (latest.version !== known) {
+        rememberDailyAiCacheVersion(latest.version, 'watchlist');
+        clearCache(CACHE_KEYS.WATCHLIST_FULL);
+        clearPersistentCache(WATCHLIST_PERSISTENT_CACHE_KEY);
+        clearQuantSignalTTLCache();
+        clearSimonsDataTTLCache();
+        setLastAnalyzedAt(null);
+        setUsingWatchlistCache(false);
+        setLiveQuotes({});
+        setKlineMap({});
+        setQuantDataMap({});
+        setSimonsRecMap({});
+        setRefreshKey(k => k + 1);
+      }
+    }
+
+    checkSharedAiCacheVersion();
+    const timer = window.setInterval(checkSharedAiCacheVersion, DAILY_AI_CACHE_POLL_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [watchlist.length, dataLoading, hasAiFeature]);
+
+  useEffect(() => {
     if (watchlist.length === 0) return;
 
-    // 檢查快取（TTL 5 分鐘）
+    // 只有今天且仍在 TTL 內的快取才直接使用；否則進頁自動重新分析。
     type WatchlistCacheData = {
       quotes: Record<string, { close: number; change: number }>;
       industryMap: Record<string, string>;
+      marketMap: Record<string, OfficialPriceMapEntry>;
+      klineMap: Record<string, StockPrice[]>;
       quantDataMap: Record<string, StockQuantData>;
       simonsRecMap: Record<string, StockRecommendation>;
       latestKlineDate: string;
       analyzedAt: string;
+      analyzedDate?: string;
       watchlistKeys: string; // 用來檢測觀察名單是否變更
+      cacheVersion?: string;
+      accessScope?: 'ai' | 'basic';
+      refreshSlot?: string;
     };
     const cacheKey = CACHE_KEYS.WATCHLIST_FULL;
-    const watchlistKeys = watchlist.map(w => w.stockCode).sort().join(',');
-    const cached = getCache<WatchlistCacheData>(cacheKey);
-    if (cached && cached.watchlistKeys === watchlistKeys) {
-      // 資料未過期且觀察名單未變更 → 直接讀快取
+    const watchlistCodes = watchlist.map(w => w.stockCode);
+    const watchlistKeys = watchlistCodes.slice().sort().join(',');
+    const refreshSlot = getRefreshSlotInfo();
+    const cached = refreshKey === 0
+      ? getCache<WatchlistCacheData>(cacheKey) || getPersistentCache<WatchlistCacheData>(WATCHLIST_PERSISTENT_CACHE_KEY, refreshSlot.key)
+      : null;
+    if (
+      refreshKey === 0 &&
+      cached &&
+      cached.watchlistKeys === watchlistKeys &&
+      cached.analyzedDate === getTodayString() &&
+      cached.cacheVersion === WATCHLIST_CACHE_VERSION &&
+      cached.accessScope === (hasAiFeature ? 'ai' : 'basic') &&
+      cached.refreshSlot === refreshSlot.key &&
+      hasCompleteKlineCache(cached.klineMap, watchlistCodes)
+    ) {
+      // 資料未過期、觀察名單未變更、且是今天的資料 → 直接讀快取
       setLiveQuotes(cached.quotes);
       setIndustryMap(cached.industryMap);
-      setQuantDataMap(cached.quantDataMap);
+      setMarketMap(cached.marketMap || {});
+      setKlineMap(cached.klineMap || {});
+      setQuantDataMap(hasAiFeature ? cached.quantDataMap : {});
       setSimonsRecMap(cached.simonsRecMap);
       setLatestKlineDate(cached.latestKlineDate);
       setLastAnalyzedAt(cached.analyzedAt);
+      setUsingWatchlistCache(true);
+      setCache(cacheKey, cached, refreshSlot.ttlMs);
       return;
     }
 
     async function fetchQuotesAndSignals() {
+      setUsingWatchlistCache(false);
       setDataLoading(true);
       setLoadingStep(`正在抓取 ${watchlist.length} 支股票報價...`);
       setQuotesLoading(true);
 
-      // 平行抓取所有觀察股票的即時報價
-      const stockDatas = await Promise.all(
-        watchlist.map(w => fetchStockData(w.stockCode).catch(() => null))
-      );
+      const forceFresh = refreshKey > 0;
+
+      const cachedOfficialMap = getCache<Record<string, OfficialPriceMapEntry>>(CACHE_KEYS.TWSE_PRICE_MAP);
+      const officialMapPromise = canAutoRefreshPrices()
+        ? fetchOfficialPriceMap().catch(() => cachedOfficialMap || {} as Record<string, OfficialPriceMapEntry>)
+        : Promise.resolve(cachedOfficialMap || {} as Record<string, OfficialPriceMapEntry>);
+
+      // 平行抓取觀察股票 K 線與官方報價；非開盤時官方報價只讀前端快取。
+      const [stockDatas, officialMap] = await Promise.all([
+        Promise.all(watchlist.map(w => fetchStockData(w.stockCode).catch(() => null))),
+        officialMapPromise,
+      ]);
+      setMarketMap(officialMap);
 
       const quotes: Record<string, { close: number; change: number }> = {};
+      const stockDataMap: Record<string, StockData | null> = {};
+      const nextKlineMap: Record<string, StockPrice[]> = {};
       stockDatas.forEach((res, idx) => {
+        stockDataMap[watchlist[idx].stockCode] = res;
         if (res && res.prices && res.prices.length >= 2) {
+          nextKlineMap[watchlist[idx].stockCode] = res.prices.slice(-126);
           const latest = res.prices[res.prices.length - 1];
           const prev = res.prices[res.prices.length - 2];
           const close = parseFloat(latest.close_d);
@@ -101,6 +428,7 @@ export default function Watchlist() {
       setIndustryMap(nextIndustryMap);
 
       setLiveQuotes(quotes);
+      setKlineMap(nextKlineMap);
       setQuotesLoading(false);
 
       // 記錄最新 K 線日期
@@ -113,17 +441,9 @@ export default function Watchlist() {
       });
       if (latestDate) setLatestKlineDate(latestDate);
 
-      setLoadingStep('正在載入 Simons 量化模型...');
+      setLoadingStep(hasAiFeature ? '正在載入 Simons 量化模型...' : '正在載入股票本質資料...');
 
-      const [simonsItems, quantResults] = await Promise.all([
-        fetchSimonsData().catch(() => []),
-        Promise.all(watchlist.map(w => fetchStockQuantData(w.stockCode).catch(() => ({
-          aiQuanBackDataComment: null,
-          chipStability: null,
-          stockInfo: null,
-          currentSignal: 'neutral' as const,
-        }))))
-      ]);
+      const simonsItems = await fetchSimonsData(undefined, { forceFresh }).catch(() => []);
 
       const simonsItemMap: Record<string, SimonsItem> = {};
       simonsItems.forEach((item) => {
@@ -133,44 +453,192 @@ export default function Watchlist() {
       const nextQuantDataMap: Record<string, StockQuantData> = {};
       const nextSimonsRecMap: Record<string, StockRecommendation> = {};
 
-      watchlist.forEach((w, idx) => {
-        const qd = quantResults[idx];
-        nextQuantDataMap[w.stockCode] = qd;
-
-        const simonsItem = simonsItemMap[w.stockCode];
-        if (simonsItem) {
-          nextSimonsRecMap[w.stockCode] = toRecommendation(simonsItem, qd);
-        }
-      });
-
-      setQuantDataMap(nextQuantDataMap);
-      setSimonsRecMap(nextSimonsRecMap);
-
       setLoadingStep('正在分析 MA5 與量能訊號...');
       // 訊號 + 警告分析
-      await checkWatchlistSignals();
+      await checkWatchlistSignals(stockDataMap);
+      setLiveQuotes(quotes);
+      setDataLoading(false);
+
+      if (!hasAiFeature) {
+        watchlist.forEach((w) => {
+          const simonsItem = simonsItemMap[w.stockCode];
+          if (simonsItem) {
+            nextSimonsRecMap[w.stockCode] = toRecommendation(simonsItem);
+          }
+        });
+        setQuantDataMap({});
+        setSimonsRecMap(nextSimonsRecMap);
+        setQuantFailedCodes(new Set());
+        setQuantSyncingCodes(new Set());
+
+        const analyzedAt = formatAnalyzeTimestamp();
+        const analyzedDate = getTodayString();
+        setLastAnalyzedAt(analyzedAt);
+
+        const cacheData: WatchlistCacheData = {
+          quotes,
+          industryMap: nextIndustryMap,
+          marketMap: officialMap,
+          klineMap: nextKlineMap,
+          quantDataMap: {},
+          simonsRecMap: nextSimonsRecMap,
+          latestKlineDate: latestDate,
+          analyzedAt,
+          analyzedDate,
+          watchlistKeys,
+          cacheVersion: WATCHLIST_CACHE_VERSION,
+          accessScope: 'basic',
+          refreshSlot: refreshSlot.key,
+        };
+        const ttlMs = Math.min(WATCHLIST_FULL_TTL_MS, refreshSlot.ttlMs);
+        setCache<WatchlistCacheData>(cacheKey, cacheData, ttlMs);
+        setPersistentCache<WatchlistCacheData>(WATCHLIST_PERSISTENT_CACHE_KEY, cacheData, ttlMs, refreshSlot.key);
+        return;
+      }
+
+      setLoadingStep(`正在同步最新 AI 訊號 0/${watchlist.length}...`);
+      setDataLoading(true);
+      setQuantDataMap({});
+      setSimonsRecMap({});
+      setQuantFailedCodes(new Set());
+      setQuantSyncingCodes(new Set(watchlistCodes));
+
+      let completed = 0;
+      const queue = [...watchlist];
+      const workerCount = Math.min(4, queue.length);
+      async function runWorker() {
+        while (queue.length > 0) {
+          const w = queue.shift();
+          if (!w) return;
+          const qd = await withTimeout(
+            fetchStockQuantData(w.stockCode, undefined, { forceFresh }),
+            12000
+          ).catch(() => null);
+
+          if (qd) {
+            nextQuantDataMap[w.stockCode] = qd;
+            const simonsItem = simonsItemMap[w.stockCode];
+            let rec: StockRecommendation | null = null;
+            if (simonsItem) {
+              rec = toRecommendation(simonsItem, qd);
+            } else if (qd.aiQuanBackDataComment) {
+              rec = toRecommendation(
+                buildFallbackSimonsItem(w.stockCode, w.stockName, qd, stockDataMap[w.stockCode], quotes[w.stockCode]),
+                qd
+              );
+            }
+            if (rec) nextSimonsRecMap[w.stockCode] = rec;
+            setQuantDataMap(prev => ({ ...prev, [w.stockCode]: qd }));
+            if (rec) setSimonsRecMap(prev => ({ ...prev, [w.stockCode]: rec }));
+          } else {
+            setQuantFailedCodes(prev => {
+              const next = new Set(prev);
+              next.add(w.stockCode);
+              return next;
+            });
+          }
+
+          completed += 1;
+          setQuantSyncingCodes(prev => {
+            const next = new Set(prev);
+            next.delete(w.stockCode);
+            return next;
+          });
+          setLoadingStep(`正在同步最新 AI 訊號 ${completed}/${watchlist.length}...`);
+        }
+      }
+
+      await Promise.all(Array.from({ length: workerCount }, () => runWorker()));
 
       // 記錄分析完成時間
-      const now = new Date();
-      const analyzedAt = `${now.getFullYear()}/${String(now.getMonth()+1).padStart(2,'0')}/${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+      const analyzedAt = formatAnalyzeTimestamp();
+      const analyzedDate = getTodayString();
       setLastAnalyzedAt(analyzedAt);
 
-      // 寫入快取（5 分鐘）
-      setCache<WatchlistCacheData>(cacheKey, {
+      // 寫入短效快取，避免切頁時重複分析，但過期或跨日後進頁會自動更新。
+      const cacheData: WatchlistCacheData = {
         quotes,
         industryMap: nextIndustryMap,
+        marketMap: officialMap,
+        klineMap: nextKlineMap,
         quantDataMap: nextQuantDataMap,
         simonsRecMap: nextSimonsRecMap,
         latestKlineDate: latestDate,
         analyzedAt,
+        analyzedDate,
         watchlistKeys,
-      }, 5 * 60 * 1000);
+        cacheVersion: WATCHLIST_CACHE_VERSION,
+        accessScope: 'ai',
+        refreshSlot: refreshSlot.key,
+      };
+      const ttlMs = Math.min(WATCHLIST_FULL_TTL_MS, refreshSlot.ttlMs);
+      setCache<WatchlistCacheData>(cacheKey, cacheData, ttlMs);
+      setPersistentCache<WatchlistCacheData>(WATCHLIST_PERSISTENT_CACHE_KEY, cacheData, ttlMs, refreshSlot.key);
 
       setDataLoading(false);
     }
 
-    fetchQuotesAndSignals();
-  }, [watchlist.length]);
+    fetchQuotesAndSignals().catch((err) => {
+      console.error('watchlist fetchQuotesAndSignals error:', err);
+      setDataLoading(false);
+      setQuotesLoading(false);
+      setLoadingStep('資料讀取失敗，請稍後再試或手動重新抓取');
+    });
+  }, [watchlist, refreshKey, checkWatchlistSignals, hasAiFeature]);
+
+  useEffect(() => {
+    if (watchlist.length === 0) return;
+    let cancelled = false;
+    let running = false;
+
+    async function refreshWatchlistPrices() {
+      if (running || cancelled || !canAutoRefreshPrices()) return;
+      running = true;
+      const codes = watchlist.map(w => w.stockCode);
+      const officialMap = await fetchOfficialPriceMap().catch(() => ({} as Record<string, OfficialPriceMapEntry>));
+      if (!cancelled) {
+        const nextQuotes: Record<string, { close: number; change: number }> = {};
+        codes.forEach((code) => {
+          const result = officialMap[code];
+          if (!result) return;
+          const price = Number(result.close);
+          const change = Number(String(result.change || '0').replace(/,/g, ''));
+          if (!Number.isFinite(price) || price <= 0) return;
+          nextQuotes[code] = {
+            close: price,
+            change: Number.isFinite(change) ? change : liveQuotes[code]?.change ?? 0,
+          };
+        });
+
+        if (Object.keys(nextQuotes).length > 0) {
+          setLiveQuotes(prev => {
+            const merged = { ...prev, ...nextQuotes };
+            const refreshSlot = getRefreshSlotInfo();
+            const cacheData = getCache<any>(CACHE_KEYS.WATCHLIST_FULL)
+              || getPersistentCache<any>(WATCHLIST_PERSISTENT_CACHE_KEY, refreshSlot.key);
+            if (cacheData?.quotes) {
+              const updatedCache = {
+                ...cacheData,
+                quotes: { ...cacheData.quotes, ...nextQuotes },
+              };
+              setCache(CACHE_KEYS.WATCHLIST_FULL, updatedCache, refreshSlot.ttlMs);
+              setPersistentCache(WATCHLIST_PERSISTENT_CACHE_KEY, updatedCache, refreshSlot.ttlMs, refreshSlot.key);
+            }
+            return merged;
+          });
+        }
+      }
+      running = false;
+    }
+
+    const intervalId = window.setInterval(refreshWatchlistPrices, PRICE_AUTO_REFRESH_MS);
+    document.addEventListener('visibilitychange', refreshWatchlistPrices);
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', refreshWatchlistPrices);
+    };
+  }, [watchlist, liveQuotes]);
 
   function getSignalForStock(stockCode: string): WatchlistSignal | undefined {
     return watchlistSignals.find(s => s.stockCode === stockCode);
@@ -178,6 +646,16 @@ export default function Watchlist() {
 
   function getWarningForStock(stockCode: string): WatchlistWarning | undefined {
     return watchlistWarnings.find(w => w.stockCode === stockCode);
+  }
+
+  function renderRecommendationCountBadge(stockCode: string) {
+    const count = recommendationCounts[stockCode] || 0;
+    if (count <= 1) return null;
+    return (
+      <span className="wl-rec-count-badge" title="最近90天內重複出現在找股票推薦">
+        推薦X{count}
+      </span>
+    );
   }
 
   function getSignalBadge(signal?: WatchlistSignal) {
@@ -192,16 +670,68 @@ export default function Watchlist() {
     }
   }
 
-  function getAdviceBadge(advice: AIAdvice) {
-    switch (advice) {
-      case 'buy': return <span className="wl-badge wl-badge-buy">🚀 建議買進</span>;
-      case 'sell': return <span className="wl-badge wl-badge-sell">⚠️ 建議減碼</span>;
-      default: return <span className="wl-badge wl-badge-hold">🟡 觀望中</span>;
-    }
+  function buildFallbackSimonsItem(
+    stockCode: string,
+    stockName: string,
+    qd: StockQuantData,
+    stockData?: StockData | null,
+    quote?: { close: number; change: number }
+  ): SimonsItem {
+    const latestPrice = stockData?.prices?.at(-1)?.close_d ?? String(quote?.close || 0);
+    const prevPrice = stockData?.prices?.at(-2)?.close_d;
+    const latestClose = parseFloat(latestPrice) || quote?.close || 0;
+    const previousClose = parseFloat(prevPrice || '') || latestClose;
+    const retW = latestClose >= previousClose ? 'rise' : 'drop';
+    const gvi = qd.stockInfo?.gvi ?? 0;
+    const mediangvi = qd.stockInfo?.mediangvi ?? '0';
+
+    return {
+      mdate: stockData?.prices?.at(-1)?.mdate || getTodayString(),
+      coid: stockCode,
+      stkname: stockName,
+      close: String(latestClose || ''),
+      strength: '1.2',
+      psr: 5,
+      subindustry: stockData?.subindustry || null,
+      status: stockData?.status || null,
+      unusual: 'N',
+      category: stockData?.subindustry || '',
+      value: '',
+      ret_w: retW,
+      ret_m: retW,
+      wtcost: String(latestClose || ''),
+      fcost: String(latestClose || ''),
+      tcost: null,
+      dcost: String(latestClose || ''),
+      gvi,
+      mediangvi: String(mediangvi),
+      yflow: '',
+      tcr_today: '',
+      fcr_today: '',
+    };
   }
 
   function getAiSignalBadge(stockCode: string) {
+    if (!hasAiFeature) return null;
     const qd = quantDataMap[stockCode];
+    if (!qd && quantSyncingCodes.has(stockCode)) {
+      return (
+        <div className="wl-ai-icon-badge wl-ai-icon-syncing">
+          <div className="wl-ai-icon-circle wl-ai-circle-syncing">
+            <span className="wl-inline-spinner" />
+          </div>
+          <span className="wl-ai-icon-label">AI同步中</span>
+        </div>
+      );
+    }
+    if (!qd && quantFailedCodes.has(stockCode)) {
+      return (
+        <div className="wl-ai-icon-badge wl-ai-icon-pending">
+          <div className="wl-ai-icon-circle wl-ai-circle-pending">!</div>
+          <span className="wl-ai-icon-label">待重抓</span>
+        </div>
+      );
+    }
     if (!qd) return null;
     const sig = qd.currentSignal;
     switch (sig) {
@@ -244,6 +774,7 @@ export default function Watchlist() {
   }
 
   function getAiSignalForStock(stockCode: string): 'buy' | 'sell' | 'neutral' {
+    if (!hasAiFeature) return 'neutral';
     return quantDataMap[stockCode]?.currentSignal ?? 'neutral';
   }
 
@@ -262,6 +793,64 @@ export default function Watchlist() {
     return 'wl-quant-remark-low';
   }
 
+  function getRemarkFilterFromRemark(remark: string): WatchlistRemarkFilter {
+    if (remark.includes('超高')) return 'ultra';
+    if (remark.includes('高度')) return 'high';
+    if (remark.includes('中度')) return 'mid';
+    if (remark.includes('低度')) return 'low';
+    return 'all';
+  }
+
+  function getAiRecommendationBadge(stockCode: string) {
+    if (!hasAiFeature) return null;
+    const qd = quantDataMap[stockCode];
+    const remark = qd?.aiQuanBackDataComment?.remark;
+    if (!remark) return null;
+    const remarkFilter = getRemarkFilterFromRemark(remark);
+    return (
+      <div className={`wl-ai-rank-badge ${getRemarkStyle(remark)}`}>
+        <span className={`wl-ai-rank-icon wl-remark-ficon wl-remark-ficon-${remarkFilter}`}>
+          {getRemarkFilterIcon(remarkFilter)}
+        </span>
+        <span className="wl-ai-rank-text">
+          <span className="wl-ai-rank-title">AI推薦</span>
+          <strong>{remark}</strong>
+        </span>
+      </div>
+    );
+  }
+
+  function getWatchlistCleanupAlert(stockCode: string): { type: 'exit' | 'low' | 'mixed'; title: string; desc: string } | null {
+    if (!hasAiFeature) return null;
+    const aiSignal = getAiSignalForStock(stockCode);
+    const remark = quantDataMap[stockCode]?.aiQuanBackDataComment?.remark || '';
+    const isAiExit = aiSignal === 'sell';
+    const isLowRank = getRemarkFilterFromRemark(remark) === 'low';
+
+    if (isAiExit && isLowRank) {
+      return {
+        type: 'mixed',
+        title: 'AI出場 / 低度觀察清理',
+        desc: '模型已轉為出場，推薦等級也偏低，可直接從觀察名單移除。',
+      };
+    }
+    if (isAiExit) {
+      return {
+        type: 'exit',
+        title: 'AI出場觀察清理',
+        desc: '模型已轉為出場訊號，可直接從觀察名單移除。',
+      };
+    }
+    if (isLowRank) {
+      return {
+        type: 'low',
+        title: 'AI低度觀察清理',
+        desc: '目前推薦等級偏低，若沒有其他理由追蹤，可直接移除觀察。',
+      };
+    }
+    return null;
+  }
+
   function getChipStyle(pts: number): string {
     if (pts >= 7) return 'wl-quant-pts-high';
     if (pts >= 4) return 'wl-quant-pts-mid';
@@ -274,11 +863,11 @@ export default function Watchlist() {
     return val >= 0 ? 'wl-quant-ret-pos' : 'wl-quant-ret-neg';
   }
 
-  function renderAiQuantChips(stockCode: string) {
+  function renderAiQuantChips(stockCode: string, stockName: string) {
+    if (!hasAiFeature) return null;
     const qd = quantDataMap[stockCode];
     if (!qd || !qd.aiQuanBackDataComment) return null;
 
-    const aiRemark = qd.aiQuanBackDataComment.remark ?? '--';
     const cumRet = qd.aiQuanBackDataComment.cum_ret ?? '--';
     const ptsRaw = qd.chipStability ? parseFloat(qd.chipStability.pts) : null;
     const chipLabel = ptsRaw === null ? '--' :
@@ -289,16 +878,253 @@ export default function Watchlist() {
     const cumDisplay = cumRet === '--' ? '--' : (cumRet.startsWith('-') ? cumRet : `+${cumRet}`);
 
     return (
-      <div className="wl-quant-chips">
-        <span className={`wl-quant-chip wl-quant-chip-remark ${getRemarkStyle(aiRemark)}`}>
-          🤖 {aiRemark}
-        </span>
-        <span className={`wl-quant-chip wl-quant-chip-ret ${getCumRetStyle(cumRet)}`}>
+      <>
+        <button
+          type="button"
+          className={`wl-quant-chip wl-quant-chip-ret ${getCumRetStyle(cumRet)}`}
+          title="點擊查看累積報酬說明"
+          onClick={(e) => {
+            e.stopPropagation();
+            setSmallChipDialog({
+              title: `${stockName} ${stockCode}`,
+              subtitle: `累積報酬 ${cumDisplay}`,
+              text: '累積報酬來自 Simons 量化模型的歷史策略結果，用來輔助理解這檔股票在模型中的過往表現。',
+              details: [
+                `目前顯示：${cumDisplay}`,
+                '正值代表模型歷史策略累積為正報酬；負值代表歷史策略累積為負報酬。',
+                '數值很高時，代表模型歷史表現強，但也可能表示股價或題材已經走了一大段。',
+              ],
+              note: '累積報酬不是未來報酬保證，仍需搭配 AI 進場訊號、股票本質、籌碼與風險控管。',
+            });
+          }}
+        >
           📊 累積報酬 {cumDisplay}
-        </span>
-        <span className={`wl-quant-chip wl-quant-chip-pts ${ptsRaw !== null ? getChipStyle(ptsRaw) : ''}`}>
+        </button>
+        <button
+          type="button"
+          className={`wl-quant-chip wl-quant-chip-pts ${ptsRaw !== null ? getChipStyle(ptsRaw) : ''}`}
+          title="點擊查看籌碼分數說明"
+          onClick={(e) => {
+            e.stopPropagation();
+            setSmallChipDialog({
+              title: `${stockName} ${stockCode}`,
+              subtitle: `籌碼 ${ptsRaw !== null ? `${ptsRaw.toFixed(0)}分` : '--'} ${chipLabel}`,
+              text: '籌碼分數用來觀察籌碼結構是否穩定，分數越高代表模型看到的籌碼越乾淨、波動干擾較少。',
+              details: [
+                `目前顯示：${ptsRaw !== null ? `${ptsRaw.toFixed(0)}分 ${chipLabel}` : '尚無資料'}`,
+                '7分以上：籌碼相對穩定，可列為加分條件。',
+                '3到6分：籌碼普通或中性，需要搭配其他訊號。',
+                '3分以下：籌碼較凌亂，通常不適合只因題材追價。',
+              ],
+              note: '籌碼穩定不等於一定上漲，它只是降低雜訊的一個輔助指標。',
+            });
+          }}
+        >
           🔒 籌碼 {ptsRaw !== null ? `${ptsRaw.toFixed(0)}分` : '--'} {chipLabel}
-        </span>
+        </button>
+      </>
+    );
+  }
+
+  function renderIndustryTailwindChip(stockCode: string, stockName: string) {
+    const tailwind = getIndustryTailwind(stockCode);
+    if (!tailwind) return null;
+    return (
+      <button
+        type="button"
+        className={`wl-quant-chip wl-tailwind-chip wl-tailwind-chip-${tailwind.level}`}
+        title="點擊查看科技順風說明"
+        onClick={(e) => {
+          e.stopPropagation();
+          setSmallChipDialog({
+            title: `${stockName} ${stockCode}`,
+            subtitle: `科技順風 ${tailwind.score}/10`,
+            text: '科技順風是從台積電法說會、年報與 AI/HPC 產業鏈整理出的產業受惠分數。',
+            details: [
+              `主題：${tailwind.theme}`,
+              `受惠理由：${tailwind.reason}`,
+              `主要風險：${tailwind.risk}`,
+              `來源：${tailwind.source}（${tailwind.sourceDate}）`,
+            ],
+            note: '科技順風代表產業方向有利，不代表短線一定適合追價，仍要搭配 AI 進場訊號與股票本質。',
+          });
+        }}
+      >
+        科技順風 {tailwind.score}/10
+      </button>
+    );
+  }
+
+  function getActiveEtfActionLabel(action: ActiveEtfRadarItem['etfs'][number]['action']): string {
+    switch (action) {
+      case 'added': return '新進';
+      case 'increased': return '加碼';
+      case 'decreased': return '減碼';
+      case 'removed': return '剔除';
+      default: return '持有';
+    }
+  }
+
+  function getActiveEtfDetailText(radar?: ActiveEtfRadarItem): string {
+    if (!radar) {
+      const hasImportedData = Object.keys(activeEtfMap).length > 0;
+      return hasImportedData
+        ? '大型台股 ETF 已有匯入資料，但近 5 日沒有看到這檔股票的新進、加碼、減碼、剔除或持有紀錄。'
+        : '目前大型台股 ETF 的每日持股差異還沒有匯入。匯入後會顯示近 5 日新進、加碼、減碼、剔除次數。';
+    }
+    const detail = radar.etfs
+      .map(item => `${item.etfName || item.etfCode} ${getActiveEtfActionLabel(item.action)}`)
+      .join('、');
+    return `近${radar.days}日：新進${radar.addedEtfCount}、加碼${radar.increasedEtfCount}、減碼${radar.decreasedEtfCount}、剔除${radar.removedEtfCount}。${detail || '尚無 ETF 明細'}。資料日：${radar.latestDate || '待同步'}。`;
+  }
+
+  function renderActiveEtfRadarChip(stockCode: string, stockName: string, showPlaceholder = false) {
+    const radar = activeEtfMap[stockCode];
+    if (!radar) {
+      if (!showPlaceholder) return null;
+      const hasImportedData = Object.keys(activeEtfMap).length > 0;
+      return (
+        <button
+          type="button"
+          className="wl-quant-chip wl-active-etf-chip wl-active-etf-chip-neutral"
+          title="點擊查看 ETF 支撐說明"
+          onClick={(e) => {
+            e.stopPropagation();
+            setActiveEtfDialog({ stockCode, stockName });
+          }}
+        >
+          ETF支撐 {hasImportedData ? '無紀錄' : '待匯入'}
+        </button>
+      );
+    }
+    if (radar.holdingEtfCount <= 0) return null;
+    const label = `ETF+${radar.holdingEtfCount}`;
+    return (
+      <button
+        type="button"
+        className={`wl-quant-chip wl-active-etf-chip wl-active-etf-chip-${radar.signal}`}
+        title={`目前有 ${radar.holdingEtfCount} 檔追蹤 ETF 持有，點擊查看 ETF 支撐詳細說明`}
+        onClick={(e) => {
+          e.stopPropagation();
+          setActiveEtfDialog({ stockCode, stockName, radar });
+        }}
+      >
+        {label}
+      </button>
+    );
+  }
+
+  function renderHalfYearKlineChart(stockCode: string, currentPrice: number) {
+    const rawRows = klineMap[stockCode] || [];
+    const points = rawRows
+      .map(row => ({
+        date: row.mdate,
+        open: parseFloat(row.open_d),
+        high: parseFloat(row.high_d),
+        low: parseFloat(row.low_d),
+        close: parseFloat(row.close_d),
+      }))
+      .filter(row =>
+        row.date &&
+        Number.isFinite(row.open) &&
+        Number.isFinite(row.high) &&
+        Number.isFinite(row.low) &&
+        Number.isFinite(row.close) &&
+        row.high >= row.low
+      )
+      .slice(-126);
+
+    if (points.length < 12) {
+      return (
+        <div className="wl-kline-panel wl-kline-empty" aria-label="半年 K 線資料不足">
+          <div className="wl-kline-title">半年K線</div>
+          <div className="wl-kline-placeholder">資料累積中</div>
+        </div>
+      );
+    }
+
+    const width = 230;
+    const height = 112;
+    const padX = 8;
+    const padTop = 8;
+    const padBottom = 15;
+    const chartHeight = height - padTop - padBottom;
+    const highs = points.map(point => point.high);
+    const lows = points.map(point => point.low);
+    const maxPrice = Math.max(...highs);
+    const minPrice = Math.min(...lows);
+    const range = Math.max(maxPrice - minPrice, maxPrice * 0.02, 1);
+    const y = (value: number) => padTop + ((maxPrice - value) / range) * chartHeight;
+    const xStep = (width - padX * 2) / Math.max(points.length - 1, 1);
+    const candleWidth = Math.max(1, Math.min(5, xStep * 0.64));
+    const firstClose = points[0].close;
+    const lastClose = points[points.length - 1].close || currentPrice;
+    const halfYearChange = firstClose > 0 ? ((lastClose - firstClose) / firstClose) * 100 : 0;
+    const isTrendUp = halfYearChange >= 0;
+    const ma20 = points.map((_, index) => {
+      if (index < 19) return null;
+      const window = points.slice(index - 19, index + 1);
+      return window.reduce((sum, point) => sum + point.close, 0) / window.length;
+    });
+    const maPath = ma20
+      .map((value, index) => value === null ? '' : `${padX + index * xStep},${y(value)}`)
+      .filter(Boolean)
+      .join(' ');
+    const startLabel = points[0].date.slice(5).replace('-', '/');
+    const endLabel = points[points.length - 1].date.slice(5).replace('-', '/');
+
+    return (
+      <div className="wl-kline-panel" aria-label={`${stockCode} 半年日 K 線`}>
+        <div className="wl-kline-head">
+          <span>半年K線</span>
+          <span className={isTrendUp ? 'text-profit' : 'text-loss'}>
+            {isTrendUp ? '+' : ''}{halfYearChange.toFixed(1)}%
+          </span>
+        </div>
+        <svg className="wl-kline-svg" viewBox={`0 0 ${width} ${height}`} role="img">
+          {[0.25, 0.5, 0.75].map(level => (
+            <line
+              key={level}
+              x1={padX}
+              x2={width - padX}
+              y1={padTop + chartHeight * level}
+              y2={padTop + chartHeight * level}
+              className="wl-kline-grid"
+            />
+          ))}
+          {maPath && (
+            <polyline
+              points={maPath}
+              className="wl-kline-ma"
+              fill="none"
+              vectorEffect="non-scaling-stroke"
+            />
+          )}
+          {points.map((point, index) => {
+            const x = padX + index * xStep;
+            const openY = y(point.open);
+            const closeY = y(point.close);
+            const highY = y(point.high);
+            const lowY = y(point.low);
+            const up = point.close >= point.open;
+            const bodyY = Math.min(openY, closeY);
+            const bodyHeight = Math.max(Math.abs(closeY - openY), 1.4);
+            return (
+              <g key={`${point.date}-${index}`} className={up ? 'wl-kline-up' : 'wl-kline-down'}>
+                <line x1={x} x2={x} y1={highY} y2={lowY} vectorEffect="non-scaling-stroke" />
+                <rect
+                  x={x - candleWidth / 2}
+                  y={bodyY}
+                  width={candleWidth}
+                  height={bodyHeight}
+                  rx="0.8"
+                />
+              </g>
+            );
+          })}
+          <text x={padX} y={height - 3} className="wl-kline-date">{startLabel}</text>
+          <text x={width - padX} y={height - 3} textAnchor="end" className="wl-kline-date">{endLabel}</text>
+        </svg>
       </div>
     );
   }
@@ -310,6 +1136,7 @@ export default function Watchlist() {
 
   // AI 推薦等級轉分數（超高度 > 高度 > 中度 > 低度）
   function getRemarkScore(stockCode: string): number {
+    if (!hasAiFeature) return 0;
     const remark = quantDataMap[stockCode]?.aiQuanBackDataComment?.remark ?? '';
     if (remark.includes('超高')) return 4;
     if (remark.includes('高度')) return 3;
@@ -318,9 +1145,101 @@ export default function Watchlist() {
     return 0;
   }
 
-  // 排序：有訊號 > 無訊號但無警告 > 有警告的排最後；同層內再按 AI 推薦等級（超高度→低度）排序
+  function getCumRetValue(stockCode: string): number | null {
+    const raw = quantDataMap[stockCode]?.aiQuanBackDataComment?.cum_ret;
+    if (!raw) return null;
+    const parsed = parseFloat(String(raw).replace('%', '').replace('+', '').trim());
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  function getChipPtsValue(stockCode: string): number | null {
+    const raw = quantDataMap[stockCode]?.chipStability?.pts;
+    if (raw === undefined || raw === null) return null;
+    const parsed = parseFloat(String(raw));
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  function getSimonsScoreValue(stockCode: string): number | null {
+    const score = simonsRecMap[stockCode]?.score;
+    return Number.isFinite(score) ? score : null;
+  }
+
+  function getSortValue(stockCode: string): number | null {
+    const activeSortKey = hasAiFeature ? sortKey : DEFAULT_WATCHLIST_SORT_KEY;
+    switch (activeSortKey) {
+      case 'recommendationCount': return recommendationCounts[stockCode] || 0;
+      case 'cumRet': return getCumRetValue(stockCode);
+      case 'chipPts': return getChipPtsValue(stockCode);
+      case 'simonsScore': return getSimonsScoreValue(stockCode);
+      default: return null;
+    }
+  }
+
+  function getSortLabel(key: WatchlistSortKey): string {
+    switch (key) {
+      case 'recommendationCount': return '推薦次數';
+      case 'cumRet': return '累計報酬';
+      case 'chipPts': return '籌碼分數';
+      case 'simonsScore': return '股票本質';
+      default: return '股票本質';
+    }
+  }
+
+  function getSortDirectionLabel(direction: WatchlistSortDirection): string {
+    return direction === 'asc' ? '遞增排序' : '遞減排序';
+  }
+
+  function getRemarkFilterForStock(stockCode: string): WatchlistRemarkFilter {
+    if (!hasAiFeature) return 'all';
+    const remark = quantDataMap[stockCode]?.aiQuanBackDataComment?.remark ?? '';
+    return getRemarkFilterFromRemark(remark);
+  }
+
+  function getRemarkFilterLabel(filter: WatchlistRemarkFilter): string {
+    switch (filter) {
+      case 'ultra': return '超高度';
+      case 'high': return '高度';
+      case 'mid': return '中度';
+      case 'low': return '低度';
+      default: return '全部';
+    }
+  }
+
+  function getRemarkFilterIcon(filter: WatchlistRemarkFilter): ReactNode {
+    switch (filter) {
+      case 'ultra': return '💎';
+      case 'high':
+      case 'mid':
+      case 'low':
+        return (
+          <span className={`wl-mineral-icon wl-mineral-${filter}`} aria-hidden="true">
+            <span className="wl-mineral-piece wl-mineral-piece-main" />
+            <span className="wl-mineral-piece wl-mineral-piece-left" />
+            <span className="wl-mineral-piece wl-mineral-piece-right" />
+          </span>
+        );
+      default: return '💎';
+    }
+  }
+
+  const clearCompositeFilters = () => {
+    setFilterAiSignal('all');
+    setFilterAiRemark('all');
+  };
+
+  // 排序：預設用股票本質；同分或缺資料時再用技術訊號與 AI 推薦等級補排序。
   const sortedWatchlist = [...watchlist]
     .sort((a, b) => {
+      const valA = getSortValue(a.stockCode);
+      const valB = getSortValue(b.stockCode);
+      if (valA !== null || valB !== null) {
+        if (valA === null) return 1;
+        if (valB === null) return -1;
+        const activeSortDirection = hasAiFeature ? sortDirection : 'desc';
+        const sortDiff = activeSortDirection === 'asc' ? valA - valB : valB - valA;
+        if (sortDiff !== 0) return sortDiff;
+      }
+
       const sigA = getSignalForStock(a.stockCode);
       const sigB = getSignalForStock(b.stockCode);
       const warnA = getWarningForStock(a.stockCode);
@@ -338,13 +1257,12 @@ export default function Watchlist() {
       return getRemarkScore(b.stockCode) - getRemarkScore(a.stockCode);
     })
     .filter(w => {
-      if (filterSignalOnly) return !!getSignalForStock(w.stockCode);
       if (filterWarnOnly)   return getWarningForStock(w.stockCode)?.level === 'remove';
-      if (filterAiSignal !== 'all') return getAiSignalForStock(w.stockCode) === filterAiSignal;
+      if (hasAiFeature && filterAiSignal !== 'all' && getAiSignalForStock(w.stockCode) !== filterAiSignal) return false;
+      if (hasAiFeature && filterAiRemark !== 'all' && getRemarkFilterForStock(w.stockCode) !== filterAiRemark) return false;
       return true;
     });
 
-  const signalCount = watchlistSignals.length;
   const warningCount = watchlistWarnings.filter(w => w.level === 'remove').length;
 
   // AI 訊號統計
@@ -354,91 +1272,144 @@ export default function Watchlist() {
     return acc;
   }, {} as Record<string, number>);
   const hasAnyQuantData = Object.keys(quantDataMap).length > 0;
+  const latestQuantMeta = getLatestQuantMeta(quantDataMap);
+  const activeEtfRadarCount = Object.keys(activeEtfMap).length;
+  const dataUpdateLabel = latestQuantMeta ? formatMetaDateTime(latestQuantMeta.fetchedAt) : lastAnalyzedAt || '同步中';
+  const dataDateLabel = latestQuantMeta?.dataDate ? latestQuantMeta.dataDate.replace(/-/g, '/') : '同步中';
+  const dataFreshness = hasAiFeature
+    ? getDataFreshness(latestQuantMeta, dataLoading, Boolean(lastAnalyzedAt || hasAnyQuantData))
+    : dataLoading
+      ? { className: 'wl-data-freshness-updating', label: '正在讀取觀察資料與更新價格' }
+      : { className: 'wl-data-freshness-fresh', label: '已使用觀察資料快取' };
+  const activeCompositeFilterCount =
+    (hasAiFeature && filterAiSignal !== 'all' ? 1 : 0)
+    + (hasAiFeature && filterAiRemark !== 'all' ? 1 : 0)
+    + (hasAiFeature && (sortKey !== DEFAULT_WATCHLIST_SORT_KEY || sortDirection !== 'desc') ? 1 : 0);
+  const remarkFilterCounts = watchlist.reduce((acc, w) => {
+    const remark = getRemarkFilterForStock(w.stockCode);
+    if (remark !== 'all') acc[remark] = (acc[remark] || 0) + 1;
+    return acc;
+  }, {} as Record<WatchlistRemarkFilter, number>);
 
   return (
     <div className="watchlist-page">
-      {/* 全頁 Loading Overlay */}
-      {dataLoading && (
-        <div className="wl-loading-overlay">
-          <div className="wl-loading-card">
-            <div className="wl-loading-bear">🐻</div>
-            <div className="wl-loading-rings">
-              <div className="wl-loading-ring wl-ring-1" />
-              <div className="wl-loading-ring wl-ring-2" />
-              <div className="wl-loading-ring wl-ring-3" />
-            </div>
-            <div className="wl-loading-title">資料抓取中</div>
-            <div className="wl-loading-step">{loadingStep}</div>
-            <div className="wl-loading-dots">
-              <span /><span /><span />
-            </div>
-          </div>
-        </div>
-      )}
-
       <div className="page-header">
         <h1 className="page-title">👁️ 觀察名單</h1>
       </div>
 
-      {/* 數據來源與更新時間 */}
-      {watchlist.length > 0 && (
-        <div className="wl-data-source">
-          {lastAnalyzedAt ? (
-            <>
-              <span>📡 IFAlgo K線 API</span>
-              <span className="wl-data-sep">·</span>
-              <span>📅 {latestKlineDate || '—'}</span>
-              <span className="wl-data-sep">·</span>
-              <span>🕐 {lastAnalyzedAt}</span>
-              {getCacheTTL(CACHE_KEYS.WATCHLIST_FULL) > 0 && (
-                <span className="wl-cache-badge">⚡ 快取中</span>
-              )}
-              <button
-                className="wl-refresh-btn"
-                title="重新抓取最新資料"
-                onClick={() => {
-                  clearCache(CACHE_KEYS.WATCHLIST_FULL);
-                  // 同時清除每支股票的 localStorage TTL 快取（量化訊號 + Simons）
-                  const todayStr = new Date().toISOString().split('T')[0];
-                  watchlist.forEach(w => {
-                    clearTTLCache(`ppbears_quant30_${w.stockCode}`);
-                  });
-                  clearTTLCache(`ppbears_simons30_${todayStr.replace(/-/g, '-')}`);
-                  setLastAnalyzedAt(null);
-                  setLiveQuotes({});
-                  setQuantDataMap({});
-                  setSimonsRecMap({});
-                }}
-              >
-                🔄 重新抓取
-              </button>
-            </>
-          ) : watchlistSignalsLoading ? (
-            <span>正在抓取數據中...</span>
-          ) : (
-            <span>進入頁面後自動分析</span>
-          )}
+      {dataLoading && watchlist.length > 0 && (
+        <div className="wl-loading-bar wl-loading-bar-soft">
+          <span className="wl-inline-spinner" />
+          <span>{loadingStep}</span>
         </div>
       )}
 
-      {/* 訊號摘要 */}
-      {signalCount > 0 && (
-        <div
-          className={`wl-alert-banner${filterSignalOnly ? ' wl-alert-banner-active' : ''}`}
-          onClick={() => {
-            setFilterSignalOnly(f => !f);
-            setFilterWarnOnly(false);
-            setFilterAiSignal('all');
-          }}
-          style={{ cursor: 'pointer' }}
-        >
-          <div className="wl-alert-icon">{filterSignalOnly ? '✅' : '🔔'}</div>
-          <div className="wl-alert-text">
-            <div className="wl-alert-title">
-              有 {signalCount} 檔股票出現進場訊號！
-              {filterSignalOnly && <span style={{ marginLeft: 8, fontSize: 12, fontWeight: 700, color: 'var(--primary)' }}>（篩選中，再按取消）</span>}
+      {/* 數據來源與更新時間 */}
+      {watchlist.length > 0 && (
+        <div className="wl-data-source">
+          <div className="wl-data-meta-lines">
+            <span className={`wl-data-freshness ${dataFreshness.className}`}>{dataFreshness.label}</span>
+            <span className="wl-data-meta-today">今天日期：{formatTodayDate()}</span>
+            <span className="wl-data-meta-updated">資料更新：{dataUpdateLabel}</span>
+            <span className="wl-data-meta-updated">資料日期：{dataDateLabel}</span>
+            <span className="wl-data-meta-schedule">固定更新：{getFixedUpdateLabel()}</span>
+            <span className="wl-data-meta-schedule">價格：進頁與盤中背景自動檢查</span>
+            <span className="wl-data-meta-schedule">ETF支撐：{activeEtfRadarCount > 0 ? `已接入 ${activeEtfRadarCount} 檔股票紀錄` : '等待每日持股差異匯入'}</span>
+            {watchlistSignalsLoading && <span className="wl-data-meta-schedule">正在抓取數據中...</span>}
+          </div>
+          <button
+            className="wl-refresh-btn"
+            title={hasAiFeature ? '手動檢查每日 AI 快取並更新價格' : '手動重新整理觀察資料'}
+            disabled={dataLoading}
+            onClick={async () => {
+              clearCache(CACHE_KEYS.WATCHLIST_FULL);
+              clearPersistentCache(WATCHLIST_PERSISTENT_CACHE_KEY);
+              clearSimonsDataTTLCache();
+              if (hasAiFeature) {
+                clearQuantSignalTTLCache();
+                setLoadingStep('正在手動檢查 Simons 每日資料...');
+                await refreshDailyAiCache(watchlist.map(item => item.stockCode));
+                const latest = await fetchDailyAiCacheVersion();
+                if (latest?.version) rememberDailyAiCacheVersion(latest.version, 'watchlist');
+              }
+              // 重新讀取每日快取。
+              setLastAnalyzedAt(null);
+              setUsingWatchlistCache(false);
+              setLiveQuotes({});
+              setKlineMap({});
+              setQuantDataMap({});
+              setSimonsRecMap({});
+              setRefreshKey(k => k + 1);
+            }}
+          >
+            🔄 重新抓取
+          </button>
+        </div>
+      )}
+
+      {infoDialog && (
+        <div className="wl-info-overlay" onClick={() => setInfoDialog(null)}>
+          <div className="wl-info-dialog" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+            <button className="wl-info-close" type="button" onClick={() => setInfoDialog(null)} aria-label="關閉">×</button>
+            <div className="wl-info-title">
+              {infoDialog.stockName} {infoDialog.stockCode}
             </div>
-            <div className="wl-alert-desc">{filterSignalOnly ? '只顯示有進場訊號的股票' : '點擊只顯示有進場訊號的股票 →'}</div>
+            <div className="wl-info-subtitle">💎 股票本質 {infoDialog.rec.score}分</div>
+            <p className="wl-info-text">
+              股票本質 = 地基，用來看這檔股票本身條件是否夠好。
+            </p>
+            <div className="wl-info-rule-list">
+              {hasAiFeature && <div>AI 推薦等級：{infoDialog.quantData?.aiQuanBackDataComment?.remark || '尚無資料'}</div>}
+              <div>PSR 熱度：{infoDialog.rec.psr ?? '—'}</div>
+              <div>Strength 強度：{infoDialog.rec.strength || '—'}</div>
+              {hasAiFeature && <div>籌碼穩定度：{infoDialog.quantData?.chipStability?.pts ?? '—'}</div>}
+              {hasAiFeature && <div>累積報酬：{infoDialog.quantData?.aiQuanBackDataComment?.cum_ret || '—'}</div>}
+            </div>
+            <p className="wl-info-note">
+              這仍然只是輔助判斷，不等於保證會上漲。
+            </p>
+          </div>
+        </div>
+      )}
+
+      {activeEtfDialog && (
+        <div className="wl-info-overlay" onClick={() => setActiveEtfDialog(null)}>
+          <div className="wl-info-dialog" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+            <button className="wl-info-close" type="button" onClick={() => setActiveEtfDialog(null)} aria-label="關閉">×</button>
+            <div className="wl-info-title">
+              {activeEtfDialog.stockName} {activeEtfDialog.stockCode}
+            </div>
+            <div className="wl-info-subtitle">ETF 支撐</div>
+            <p className="wl-info-text">
+              這張小卡只顯示大型台股 ETF 近 5 日的持股異動次數，不用分數呈現。
+            </p>
+            <div className="wl-info-rule-list">
+              <div>{getActiveEtfDetailText(activeEtfDialog.radar)}</div>
+              <div>ETF+N：代表目前有 N 檔追蹤 ETF 持有這支股票。</div>
+              <div>明細會列出近 5 日新進、加碼、減碼、剔除與持有狀態。</div>
+            </div>
+            <p className="wl-info-note">
+              ETF 支撐是資金底盤參考，不等於單獨買賣建議，仍需搭配 AI 進場訊號、股票本質與風險控管。
+            </p>
+          </div>
+        </div>
+      )}
+
+      {smallChipDialog && (
+        <div className="wl-info-overlay" onClick={() => setSmallChipDialog(null)}>
+          <div className="wl-info-dialog" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+            <button className="wl-info-close" type="button" onClick={() => setSmallChipDialog(null)} aria-label="關閉">×</button>
+            <div className="wl-info-title">{smallChipDialog.title}</div>
+            <div className="wl-info-subtitle">{smallChipDialog.subtitle}</div>
+            <p className="wl-info-text">{smallChipDialog.text}</p>
+            <div className="wl-info-rule-list">
+              {smallChipDialog.details.map((detail, index) => (
+                <div key={`${detail}-${index}`}>{detail}</div>
+              ))}
+            </div>
+            {smallChipDialog.note && (
+              <p className="wl-info-note">{smallChipDialog.note}</p>
+            )}
           </div>
         </div>
       )}
@@ -449,8 +1420,7 @@ export default function Watchlist() {
           className={`wl-warn-banner${filterWarnOnly ? ' wl-warn-banner-active' : ''}`}
           onClick={() => {
             setFilterWarnOnly(f => !f);
-            setFilterSignalOnly(false);
-            setFilterAiSignal('all');
+            clearCompositeFilters();
           }}
           style={{ cursor: 'pointer' }}
         >
@@ -466,53 +1436,114 @@ export default function Watchlist() {
       )}
 
       {/* AI 進出場訊號篩選 */}
-      {hasAnyQuantData && watchlist.length > 0 && (
+      {hasAiFeature && hasAnyQuantData && watchlist.length > 0 && (
         <div className="wl-ai-filter-bar">
-          <div className="wl-ai-filter-title">🤖 Simons AI 訊號篩選</div>
-          <div className="wl-ai-filter-cards">
-            <button
-              className={`wl-ai-filter-card wl-ai-fcard-buy${filterAiSignal === 'buy' ? ' active' : ''}`}
-              onClick={() => { setFilterAiSignal(filterAiSignal === 'buy' ? 'all' : 'buy'); setFilterSignalOnly(false); setFilterWarnOnly(false); }}
-            >
-              <div className="wl-ai-fcard-icon wl-ai-ficon-buy">
-                <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
-                  <polyline points="17 6 23 6 23 12" />
-                </svg>
-              </div>
-              <div className="wl-ai-fcard-label">AI進場</div>
-              <div className="wl-ai-fcard-count">{aiSignalCounts['buy'] || 0} 檔</div>
-            </button>
-            <button
-              className={`wl-ai-filter-card wl-ai-fcard-neutral${filterAiSignal === 'neutral' ? ' active' : ''}`}
-              onClick={() => { setFilterAiSignal(filterAiSignal === 'neutral' ? 'all' : 'neutral'); setFilterSignalOnly(false); setFilterWarnOnly(false); }}
-            >
-              <div className="wl-ai-fcard-icon wl-ai-ficon-neutral">
-                <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="5" y1="12" x2="19" y2="12" />
-                </svg>
-              </div>
-              <div className="wl-ai-fcard-label">AI中立</div>
-              <div className="wl-ai-fcard-count">{aiSignalCounts['neutral'] || 0} 檔</div>
-            </button>
-            <button
-              className={`wl-ai-filter-card wl-ai-fcard-sell${filterAiSignal === 'sell' ? ' active' : ''}`}
-              onClick={() => { setFilterAiSignal(filterAiSignal === 'sell' ? 'all' : 'sell'); setFilterSignalOnly(false); setFilterWarnOnly(false); }}
-            >
-              <div className="wl-ai-fcard-icon wl-ai-ficon-sell">
-                <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="23 18 13.5 8.5 8.5 13.5 1 6" />
-                  <polyline points="17 18 23 18 23 12" />
-                </svg>
-              </div>
-              <div className="wl-ai-fcard-label">AI出場</div>
-              <div className="wl-ai-fcard-count">{aiSignalCounts['sell'] || 0} 檔</div>
-            </button>
+          <div className="wl-ai-filter-title">🤖 複合篩選</div>
+          <div className="wl-combo-filter-section wl-combo-filter-section-primary wl-combo-filter-section-signal">
+            <div className="wl-combo-filter-label wl-combo-filter-label-primary">模型進出場</div>
+            <div className="wl-ai-filter-cards">
+              <button
+                className={`wl-ai-filter-card wl-ai-fcard-buy${filterAiSignal === 'buy' ? ' active' : ''}`}
+                onClick={() => { setFilterAiSignal(filterAiSignal === 'buy' ? 'all' : 'buy'); setFilterWarnOnly(false); }}
+              >
+                <div className="wl-ai-fcard-icon wl-ai-ficon-buy">
+                  <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
+                    <polyline points="17 6 23 6 23 12" />
+                  </svg>
+                </div>
+                <div className="wl-ai-fcard-label">AI進場</div>
+                <div className="wl-ai-fcard-count">{aiSignalCounts['buy'] || 0} 檔</div>
+              </button>
+              <button
+                className={`wl-ai-filter-card wl-ai-fcard-neutral${filterAiSignal === 'neutral' ? ' active' : ''}`}
+                onClick={() => { setFilterAiSignal(filterAiSignal === 'neutral' ? 'all' : 'neutral'); setFilterWarnOnly(false); }}
+              >
+                <div className="wl-ai-fcard-icon wl-ai-ficon-neutral">
+                  <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="5" y1="12" x2="19" y2="12" />
+                  </svg>
+                </div>
+                <div className="wl-ai-fcard-label">AI中立</div>
+                <div className="wl-ai-fcard-count">{aiSignalCounts['neutral'] || 0} 檔</div>
+              </button>
+              <button
+                className={`wl-ai-filter-card wl-ai-fcard-sell${filterAiSignal === 'sell' ? ' active' : ''}`}
+                onClick={() => { setFilterAiSignal(filterAiSignal === 'sell' ? 'all' : 'sell'); setFilterWarnOnly(false); }}
+              >
+                <div className="wl-ai-fcard-icon wl-ai-ficon-sell">
+                  <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="23 18 13.5 8.5 8.5 13.5 1 6" />
+                    <polyline points="17 18 23 18 23 12" />
+                  </svg>
+                </div>
+                <div className="wl-ai-fcard-label">AI出場</div>
+                <div className="wl-ai-fcard-count">{aiSignalCounts['sell'] || 0} 檔</div>
+              </button>
+            </div>
           </div>
-          {filterAiSignal !== 'all' && (
+
+          <div className="wl-combo-filter-section wl-combo-filter-section-remark">
+            <div className="wl-combo-filter-label">AI推薦等級</div>
+            <div className="wl-remark-filter-cards">
+              {(['ultra', 'high', 'mid', 'low'] as WatchlistRemarkFilter[]).map(filter => (
+                <button
+                  key={filter}
+                  className={`wl-ai-filter-card wl-remark-filter-card wl-remark-card-${filter}${filterAiRemark === filter ? ' active' : ''}`}
+                  onClick={() => { setFilterAiRemark(filterAiRemark === filter ? 'all' : filter); setFilterWarnOnly(false); }}
+                >
+                  <div className={`wl-ai-fcard-icon wl-remark-ficon wl-remark-ficon-${filter}`}>
+                    {getRemarkFilterIcon(filter)}
+                  </div>
+                  <div className="wl-ai-fcard-label">{getRemarkFilterLabel(filter)}</div>
+                  <div className="wl-ai-fcard-count">{remarkFilterCounts[filter] || 0} 檔</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="wl-combo-filter-section wl-sort-filter-section">
+            <div className="wl-combo-filter-label">排序方式</div>
+            <div className="wl-combo-filter-pills">
+              {(['simonsScore', 'cumRet', 'chipPts', 'recommendationCount'] as WatchlistSortKey[]).map(key => (
+                <button
+                  key={key}
+                  className={`wl-combo-pill wl-sort-pill${sortKey === key ? ' active' : ''}`}
+                  onClick={() => setSortKey(key)}
+                >
+                  {getSortLabel(key)}
+                </button>
+              ))}
+            </div>
+            <div className="wl-sort-direction-row">
+              <span className="wl-sort-direction-label">排序方向</span>
+              <button
+                className={`wl-combo-pill wl-sort-direction-pill${sortDirection === 'desc' ? ' active' : ''}`}
+                onClick={() => setSortDirection('desc')}
+                type="button"
+              >
+                遞減排序
+                <span>高→低</span>
+              </button>
+              <button
+                className={`wl-combo-pill wl-sort-direction-pill${sortDirection === 'asc' ? ' active' : ''}`}
+                onClick={() => setSortDirection('asc')}
+                type="button"
+              >
+                遞增排序
+                <span>低→高</span>
+              </button>
+            </div>
+          </div>
+
+          {activeCompositeFilterCount > 0 && (
             <div className="wl-ai-filter-active-hint">
-              篩選中：{filterAiSignal === 'buy' ? '🔴 AI進場' : filterAiSignal === 'sell' ? '🟢 AI出場' : '⚪ AI中立'}
-              <button className="wl-ai-filter-clear" onClick={() => setFilterAiSignal('all')}>✕ 取消篩選</button>
+              篩選中：
+              {filterAiSignal !== 'all' && <span>{filterAiSignal === 'buy' ? 'AI進場' : filterAiSignal === 'sell' ? 'AI出場' : 'AI中立'}</span>}
+              {filterAiRemark !== 'all' && <span>{getRemarkFilterLabel(filterAiRemark)}</span>}
+              {(sortKey !== DEFAULT_WATCHLIST_SORT_KEY || sortDirection !== 'desc') && <span>排序：{getSortLabel(sortKey)}・{getSortDirectionLabel(sortDirection)}</span>}
+              <strong>{sortedWatchlist.length} 檔符合</strong>
+              <button className="wl-ai-filter-clear" onClick={() => { clearCompositeFilters(); setSortKey(DEFAULT_WATCHLIST_SORT_KEY); setSortDirection('desc'); }}>✕ 清除全部</button>
             </div>
           )}
         </div>
@@ -539,6 +1570,25 @@ export default function Watchlist() {
         </div>
       )}
 
+      {watchlist.length > 0 && sortedWatchlist.length === 0 && (
+        <div className="empty-state">
+          <div className="empty-state-icon">🔎</div>
+          <div className="empty-state-title">沒有符合條件的股票</div>
+          <div className="empty-state-desc">
+            可以放寬其中一個條件，或清除篩選後重新查看全部觀察名單。
+          </div>
+          <button
+            className="btn btn-primary btn-lg"
+            onClick={() => {
+              setFilterWarnOnly(false);
+              clearCompositeFilters();
+            }}
+          >
+            清除所有篩選
+          </button>
+        </div>
+      )}
+
       {/* 觀察清單 */}
       {sortedWatchlist.length > 0 && (
         <div className="wl-list">
@@ -546,6 +1596,8 @@ export default function Watchlist() {
             const signal = getSignalForStock(w.stockCode);
             const warning = getWarningForStock(w.stockCode);
             const simonsRec = simonsRecMap[w.stockCode];
+            const quantData = quantDataMap[w.stockCode];
+            const cleanupAlert = getWatchlistCleanupAlert(w.stockCode);
             const quote = liveQuotes[w.stockCode];
             const currentPrice = quote?.close || w.addedPrice;
             const changeFromAdded = w.addedPrice > 0
@@ -567,18 +1619,41 @@ export default function Watchlist() {
 
                 <div className="wl-card-header">
                   <div className="wl-stock-info">
-                    <div className="wl-stock-name">{w.stockName}</div>
-                    <div className="wl-stock-code">{w.stockCode}</div>
+                    <div className="wl-stock-name-row">
+                      <span className="wl-stock-name">{w.stockName}</span>
+                      {renderRecommendationCountBadge(w.stockCode)}
+                    </div>
+                    <div className="wl-stock-code-row">
+                      <MarketBadge market={marketMap[w.stockCode]?.market} compact />
+                      <span className="wl-stock-code">{w.stockCode}</span>
+                    </div>
                     <div className="wl-rec-meta">
                       <span className="wl-rec-category">{simonsRec?.category || industryMap[w.stockCode] || '—'}</span>
                       {simonsRec && <span className="wl-rec-stars">{getScoreStars(simonsRec.score)}</span>}
                     </div>
-                    <div className="wl-rec-badges">
+                    <div className="wl-primary-badges">
+                      {getAiRecommendationBadge(w.stockCode)}
                       {getAiSignalBadge(w.stockCode)}
-                      {simonsRec && getAdviceBadge(simonsRec.advice)}
-                      {simonsRec && <span className="wl-badge wl-badge-premium">💎 Simons量化評分 {simonsRec.score}分</span>}
                     </div>
-                    {renderAiQuantChips(w.stockCode)}
+                    {simonsRec && (
+                      <div className="wl-score-row">
+                        <button
+                          type="button"
+                          className="wl-badge wl-badge-click wl-badge-premium"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setInfoDialog({ kind: 'score', stockName: w.stockName, stockCode: w.stockCode, rec: simonsRec, quantData });
+                          }}
+                        >
+                          💎 股票本質 {simonsRec.score}分
+                        </button>
+                      </div>
+                    )}
+                    <div className="wl-small-tag-grid">
+                      {renderIndustryTailwindChip(w.stockCode, w.stockName)}
+                      {renderActiveEtfRadarChip(w.stockCode, w.stockName)}
+                      {renderAiQuantChips(w.stockCode, w.stockName)}
+                    </div>
                   </div>
                   <div className="wl-price-info">
                     <div className={`wl-price ${todayIsUp ? 'text-profit' : 'text-loss'}`}>
@@ -589,6 +1664,7 @@ export default function Watchlist() {
                         {todayIsUp ? '▲' : '▼'} {formatPrice(Math.abs(todayChange))}
                       </div>
                     )}
+                    {renderHalfYearKlineChart(w.stockCode, currentPrice)}
                   </div>
                 </div>
 
@@ -637,6 +1713,25 @@ export default function Watchlist() {
                   </div>
                 )}
 
+                {cleanupAlert && (
+                  <div className={`wl-ai-exit-remove-box wl-ai-exit-remove-box-${cleanupAlert.type}`}>
+                    <div>
+                      <div className="wl-ai-exit-remove-title">{cleanupAlert.title}</div>
+                      <div className="wl-ai-exit-remove-desc">{cleanupAlert.desc}</div>
+                    </div>
+                    <button
+                      type="button"
+                      className="wl-ai-exit-remove-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRemove(w.stockCode);
+                      }}
+                    >
+                      一鍵移除觀察
+                    </button>
+                  </div>
+                )}
+
                 {/* 移除按鈕 */}
                 <div className="wl-card-actions">
                   {removeConfirm === w.stockCode ? (
@@ -664,35 +1759,39 @@ export default function Watchlist() {
       {watchlist.length > 0 && (
         <div className="wl-legend">
           <div className="wl-legend-title">📖 訊號與警告說明</div>
-          <div className="wl-legend-section">🤖 AI 進出場訊號（Simons 量化模型）</div>
-          <div className="wl-legend-item">
-            <span className="wl-ai-icon-badge wl-ai-icon-buy" style={{ transform: 'scale(0.8)', transformOrigin: 'left center' }}>
-              <span className="wl-ai-icon-circle wl-ai-circle-buy" style={{ width: 28, height: 28 }}>
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18" /><polyline points="17 6 23 6 23 12" /></svg>
-              </span>
-              <span className="wl-ai-icon-label">AI進場</span>
-            </span>
-            <span>Simons 模型判斷 AI 持倉中，量化策略認為可加碼</span>
-          </div>
-          <div className="wl-legend-item">
-            <span className="wl-ai-icon-badge wl-ai-icon-neutral" style={{ transform: 'scale(0.8)', transformOrigin: 'left center' }}>
-              <span className="wl-ai-icon-circle wl-ai-circle-neutral" style={{ width: 28, height: 28 }}>
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12" /></svg>
-              </span>
-              <span className="wl-ai-icon-label">AI中立</span>
-            </span>
-            <span>Simons 模型無明確方向，建議觀望等待更好時機</span>
-          </div>
-          <div className="wl-legend-item">
-            <span className="wl-ai-icon-badge wl-ai-icon-sell" style={{ transform: 'scale(0.8)', transformOrigin: 'left center' }}>
-              <span className="wl-ai-icon-circle wl-ai-circle-sell" style={{ width: 28, height: 28 }}>
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6" /><polyline points="17 18 23 18 23 12" /></svg>
-              </span>
-              <span className="wl-ai-icon-label">AI出場</span>
-            </span>
-            <span>Simons 模型已出場，量化策略判斷風險升高</span>
-          </div>
-          <div className="wl-legend-section" style={{ marginTop: 12 }}>技術面進場訊號</div>
+          {hasAiFeature && (
+            <>
+              <div className="wl-legend-section">🤖 AI 進出場訊號（Simons 量化模型）</div>
+              <div className="wl-legend-item">
+                <span className="wl-ai-icon-badge wl-ai-icon-buy" style={{ transform: 'scale(0.8)', transformOrigin: 'left center' }}>
+                  <span className="wl-ai-icon-circle wl-ai-circle-buy" style={{ width: 28, height: 28 }}>
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18" /><polyline points="17 6 23 6 23 12" /></svg>
+                  </span>
+                  <span className="wl-ai-icon-label">AI進場</span>
+                </span>
+                <span>Simons 模型判斷 AI 持倉中，量化策略認為可加碼</span>
+              </div>
+              <div className="wl-legend-item">
+                <span className="wl-ai-icon-badge wl-ai-icon-neutral" style={{ transform: 'scale(0.8)', transformOrigin: 'left center' }}>
+                  <span className="wl-ai-icon-circle wl-ai-circle-neutral" style={{ width: 28, height: 28 }}>
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                  </span>
+                  <span className="wl-ai-icon-label">AI中立</span>
+                </span>
+                <span>Simons 模型無明確方向，建議觀望等待更好時機</span>
+              </div>
+              <div className="wl-legend-item">
+                <span className="wl-ai-icon-badge wl-ai-icon-sell" style={{ transform: 'scale(0.8)', transformOrigin: 'left center' }}>
+                  <span className="wl-ai-icon-circle wl-ai-circle-sell" style={{ width: 28, height: 28 }}>
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6" /><polyline points="17 18 23 18 23 12" /></svg>
+                  </span>
+                  <span className="wl-ai-icon-label">AI出場</span>
+                </span>
+                <span>Simons 模型已出場，量化策略判斷風險升高</span>
+              </div>
+            </>
+          )}
+          <div className="wl-legend-section" style={{ marginTop: hasAiFeature ? 12 : 0 }}>技術面進場訊號</div>
           <div className="wl-legend-item">
             <span className="wl-signal-badge wl-signal-both">🔥 雙重確認</span>
             <span>MA5 支撐 + 縮量回檔同時觸發，最強進場訊號</span>

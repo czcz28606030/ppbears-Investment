@@ -1,0 +1,46 @@
+.market-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 58px;
+  height: 28px;
+  padding: 0 10px 0 7px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1;
+  border: 2px solid;
+  white-space: nowrap;
+  box-shadow: inset 0 -3px 0 rgba(43, 33, 24, 0.08), 0 5px 12px rgba(43, 33, 24, 0.1);
+}
+
+.market-badge-icon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.market-badge-listed {
+  color: #0f766e;
+  background: linear-gradient(180deg, #d5fff7, #a7f3d0);
+  border-color: rgba(20, 184, 166, 0.46);
+}
+
+.market-badge-otc {
+  color: #9a3412;
+  background: linear-gradient(180deg, #ffedd5, #fdba74);
+  border-color: rgba(251, 146, 60, 0.5);
+}
+
+.market-badge-compact {
+  min-width: 50px;
+  height: 23px;
+  padding: 0 8px 0 6px;
+  font-size: 11px;
+  border-width: 1.5px;
+  box-shadow: inset 0 -2px 0 rgba(43, 33, 24, 0.08), 0 3px 8px rgba(43, 33, 24, 0.08);
+}
+
+.market-badge-compact .market-badge-icon {
+  font-size: 12px;
+}

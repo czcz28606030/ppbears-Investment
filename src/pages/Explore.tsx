@@ -1,16 +1,27 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { fetchSimonsData, toRecommendation, fetchTWSEAllStocks, fetchTPEXAllStocks, fetchStockQuantData } from '../api';
+import { fetchSimonsData, toRecommendation, fetchOfficialPriceMap, fetchStockQuantData, refreshDailyAiCache, clearQuantSignalTTLCache, clearSimonsDataTTLCache, fetchDailyAiCacheVersion, getKnownDailyAiCacheVersion, rememberDailyAiCacheVersion } from '../api';
 import type { StockRecommendation } from '../types';
-import type { StockQuantData } from '../api';
+import type { OfficialPriceMapEntry, StockQuantData, StockQuantMeta } from '../api';
 import { useStore } from '../store';
-import { getCache, setCache, CACHE_KEYS } from '../cache';
+import { getCache, setCache, clearCache, CACHE_KEYS } from '../cache';
 import AdBanner from '../components/AdBanner';
+import MarketBadge from '../components/MarketBadge';
+import { canAutoRefreshPrices, PRICE_AUTO_REFRESH_MS } from '../utils/priceAutoRefresh';
 import './Explore.css';
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null> {
+  return Promise.race([
+    promise,
+    new Promise<null>(resolve => window.setTimeout(() => resolve(null), ms)),
+  ]);
+}
+
+const DAILY_AI_CACHE_POLL_MS = 90 * 1000;
 
 export default function Explore() {
   const navigate = useNavigate();
-  const { hasFeature, isInWatchlist, addToWatchlist, removeFromWatchlist } = useStore();
+  const { hasFeature, isInWatchlist, addToWatchlist, removeFromWatchlist, watchlist, holdings } = useStore();
   const hasAiFeature = hasFeature('ai_stock_picking');
   const [recommendations, setRecommendations] = useState<StockRecommendation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -29,73 +40,58 @@ export default function Explore() {
   });
   const restored = useRef(savedState.current());
 
+  const restoredStrategy = restored.current?.activeStrategy;
+  const initialStrategy = hasAiFeature
+    ? 'ai'
+    : restoredStrategy && restoredStrategy !== 'ai'
+      ? restoredStrategy
+      : 'A';
+
   const [search, setSearch] = useState(restored.current?.search || '');
-  const [activeStrategy, setActiveStrategy] = useState(restored.current?.activeStrategy || (hasAiFeature ? 'ai' : 'A'));
+  const [activeStrategy, setActiveStrategy] = useState(initialStrategy);
   const [error, setError] = useState('');
-  const [twsePriceMap, setTwsePriceMap] = useState<Record<string, { close: string; change: string; name: string; volume: number; date: string }>>({});
+  const [twsePriceMap, setTwsePriceMap] = useState<Record<string, OfficialPriceMapEntry>>({});
   const [quantDataMap, setQuantDataMap] = useState<Record<string, StockQuantData>>({});
   const [quantLoading, setQuantLoading] = useState(false);
   const [quantProgress, setQuantProgress] = useState(0); // 量化分析進度 (0~100)
   const [quantProgressText, setQuantProgressText] = useState('');
+  const [searchQuantLoading, setSearchQuantLoading] = useState(false);
+  const [searchPriceLoading, setSearchPriceLoading] = useState(false);
   const [aiQualified, setAiQualified] = useState<Set<string>>(new Set()); // 記錄符合「中度以上 + 正報酬」的股票
   const [aiFilterQualified, setAiFilterQualified] = useState(true); // 預設勾選篩選
   const [simonsMeta, setSimonsMeta] = useState<Record<string, any>>({}); // 保存原始 SimonsItem 供重新評分用
+  const [quantMeta, setQuantMeta] = useState<StockQuantMeta | null>(null);
   const resultRef = useRef<HTMLDivElement>(null);
+  const forceFreshQuantRef = useRef(false);
   const pendingScrollY = useRef(restored.current?.scrollY ?? 0);
+  function getTodayString(): string {
+    const today = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+  }
 
-  async function loadData() {
+  async function loadData(forceFresh = false) {
+    if (forceFresh) {
+      clearCache(CACHE_KEYS.TWSE_PRICE_MAP);
+      clearCache(CACHE_KEYS.SIMONS_DATA);
+    }
+
     setLoading(true);
     // 清空舊量化資料，避免重整後新 Phase-1 分數配上舊 quantDataMap 造成數據混滞
     setQuantDataMap({});
     setAiQualified(new Set());
+    setQuantMeta(null);
     if (activeStrategy === 'ai') setQuantLoading(true);
     setError('');
     setRecommendations([]);
     try {
-      // 檢查 TWSE 就最快取（10 分鐘）
-      type TwsePriceMapType = Record<string, { close: string; change: string; name: string; volume: number; date: string }>;
-      const cachedTwse = getCache<TwsePriceMapType>(CACHE_KEYS.TWSE_PRICE_MAP);
+      // 非開盤時只讀既有價格快取，避免進頁面就增加報價請求。
+      type TwsePriceMapType = Record<string, OfficialPriceMapEntry>;
+      const cachedTwse = forceFresh ? null : getCache<TwsePriceMapType>(CACHE_KEYS.TWSE_PRICE_MAP);
       if (cachedTwse) {
         setTwsePriceMap(cachedTwse);
-      } else {
-        // 同時抓 TWSE（上市）+ TPEX（上櫃）全市場資料
-        const [twseAll, tpexAll] = await Promise.all([fetchTWSEAllStocks(), fetchTPEXAllStocks()]);
-
-        const map: TwsePriceMapType = {};
-
-        // TWSE 上市股票
-        for (const s of twseAll) {
-          if (s.ClosingPrice) {
-            // 民國 7 碼 "1150413" → 西元 "20260413"
-            const d = s.Date || '';
-            const date = d.length === 7
-              ? `${parseInt(d.slice(0, 3)) + 1911}${d.slice(3)}`
-              : d.replace(/-/g, '');
-            map[s.Code] = {
-              close: s.ClosingPrice,
-              change: s.Change,
-              name: s.Name || '',
-              volume: Math.floor(parseInt(s.TradeVolume || '0') / 1000),
-              date,
-            };
-          }
-        }
-        // TPEX 上櫃股票（合併，不覆蓋已有的上市資料）
-        for (const s of tpexAll) {
-          if (s.Close && !map[s.SecuritiesCompanyCode]) {
-            const d = s.Date || '';
-            const date = d.length === 7
-              ? `${parseInt(d.slice(0, 3)) + 1911}${d.slice(3)}`
-              : d.replace(/-/g, '');
-            map[s.SecuritiesCompanyCode] = {
-              close: s.Close,
-              change: s.Change || '0',
-              name: s.CompanyName || '',
-              volume: Math.floor(parseInt(s.TradingShares || '0') / 1000),
-              date,
-            };
-          }
-        }
+      } else if (forceFresh || canAutoRefreshPrices()) {
+        const map = await fetchOfficialPriceMap();
         if (Object.keys(map).length > 0) {
           setTwsePriceMap(map);
           setCache(CACHE_KEYS.TWSE_PRICE_MAP, map);
@@ -104,7 +100,7 @@ export default function Explore() {
 
       // 檢查 Simons 快取
       type SimonsCacheData = { recs: StockRecommendation[]; meta: Record<string, any> };
-      const cachedSimons = getCache<SimonsCacheData>(CACHE_KEYS.SIMONS_DATA);
+      const cachedSimons = forceFresh ? null : getCache<SimonsCacheData>(CACHE_KEYS.SIMONS_DATA);
       if (cachedSimons) {
         setSimonsMeta(cachedSimons.meta);
         setRecommendations(cachedSimons.recs);
@@ -112,33 +108,20 @@ export default function Explore() {
         return;
       }
 
-      // 沒有快取 → Try today first, then yesterday, then last few days
-      const today = new Date();
-      const pad = (n: number) => String(n).padStart(2, '0');
-      for (let i = 0; i < 7; i++) {
-        const date = new Date(today);
-        date.setDate(date.getDate() - i);
-        // Skip weekends
-        if (date.getDay() === 0 || date.getDay() === 6) continue;
-        
-        // 使用本地時間格式，避免 toISOString() 轉 UTC 造成日期差一天
-        const dateStr = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
-        const items = await fetchSimonsData(dateStr);
-        if (items.length > 0) {
-          // 保存原始 SimonsItem meta 供後續量化評分使用
-          const meta: Record<string, any> = {};
-          items.forEach(item => {
-            meta[item.coid] = item;
-          });
-          setSimonsMeta(meta);
-          const recs = items.map(item => toRecommendation(item));
-          recs.sort((a, b) => b.score - a.score);
-          setRecommendations(recs);
-          // 寫入 Simons 快取（10 分鐘）
-          setCache<SimonsCacheData>(CACHE_KEYS.SIMONS_DATA, { recs, meta });
-          setLoading(false);
-          return;
-        }
+      const items = await fetchSimonsData(undefined, { forceFresh });
+      if (items.length > 0) {
+        // 保存原始 SimonsItem meta 供後續量化評分使用
+        const meta: Record<string, any> = {};
+        items.forEach(item => {
+          meta[item.coid] = item;
+        });
+        setSimonsMeta(meta);
+        const recs = items.map(item => toRecommendation(item));
+        recs.sort((a, b) => b.score - a.score);
+        setRecommendations(recs);
+        setCache<SimonsCacheData>(CACHE_KEYS.SIMONS_DATA, { recs, meta });
+        setLoading(false);
+        return;
       }
       setError('目前沒有可用的推薦數據');
     } catch {
@@ -150,6 +133,46 @@ export default function Explore() {
   useEffect(() => {
     loadData();
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function checkSharedAiCacheVersion() {
+      if (loading || quantLoading) return;
+      const latest = await fetchDailyAiCacheVersion();
+      if (cancelled || !latest?.version) return;
+      const known = getKnownDailyAiCacheVersion('explore');
+      if (!known) {
+        rememberDailyAiCacheVersion(latest.version, 'explore');
+        return;
+      }
+      if (latest.version !== known) {
+        rememberDailyAiCacheVersion(latest.version, 'explore');
+        clearQuantSignalTTLCache();
+        clearSimonsDataTTLCache();
+        clearCache(CACHE_KEYS.SIMONS_DATA);
+        forceFreshQuantRef.current = true;
+        loadData(true);
+      }
+    }
+
+    checkSharedAiCacheVersion();
+    const timer = window.setInterval(checkSharedAiCacheVersion, DAILY_AI_CACHE_POLL_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [loading, quantLoading]);
+
+  useEffect(() => {
+    if (hasAiFeature && activeStrategy !== 'ai') {
+      setActiveStrategy('ai');
+      return;
+    }
+
+    if (!hasAiFeature && activeStrategy === 'ai') {
+      setActiveStrategy('A');
+    }
+  }, [activeStrategy, hasAiFeature]);
 
   // 資料載入完成後恢復捲動位置
   useEffect(() => {
@@ -192,26 +215,44 @@ export default function Explore() {
     setQuantLoading(true);
     setQuantProgress(0);
     setQuantProgressText(`正在分析 ${recommendations.length} 支股票...`);
-    // 抓所有 recommendations 的量化資料（API 效能許可）
-    let completed = 0;
-    const total = recommendations.length;
-    Promise.all(recommendations.map(r =>
-      fetchStockQuantData(r.coid).then(result => {
-        if (!cancelled) {
-          completed++;
-          setQuantProgress(Math.round((completed / total) * 100));
-          setQuantProgressText(`已分析 ${completed} / ${total} 支`);
+    async function runQuantSync() {
+      let completed = 0;
+      const total = recommendations.length;
+      const results: Array<StockQuantData | null> = Array(total).fill(null);
+      const queue = recommendations.map((rec, index) => ({ rec, index }));
+      const workerCount = Math.min(4, queue.length);
+
+      async function runWorker() {
+        while (queue.length > 0) {
+          const item = queue.shift();
+          if (!item || cancelled) return;
+          const result = await withTimeout(
+            fetchStockQuantData(item.rec.coid, undefined, { forceFresh: forceFreshQuantRef.current }),
+            12000
+          ).catch(() => null);
+          results[item.index] = result;
+          if (!cancelled) {
+            completed++;
+            setQuantProgress(Math.round((completed / total) * 100));
+            setQuantProgressText(`已分析 ${completed} / ${total} 支`);
+          }
         }
-        return result;
-      })
-    )).then(results => {
+      }
+
+      await Promise.all(Array.from({ length: workerCount }, () => runWorker()));
       if (cancelled) return;
+      forceFreshQuantRef.current = false;
       const map: Record<string, StockQuantData> = {};
       const qualified = new Set<string>();
       let updatedRecs: StockRecommendation[] = [];
+      const metas = results.map(result => result?.meta).filter(Boolean) as StockQuantMeta[];
       
       recommendations.forEach((r, i) => {
         const qd = results[i];
+        if (!qd) {
+          updatedRecs.push(r);
+          return;
+        }
         map[r.coid] = qd;
         // 判斷是否符合「中度以上推薦」且「正報酬」
         const remark = qd.aiQuanBackDataComment?.remark ?? '';
@@ -235,6 +276,7 @@ export default function Explore() {
       
       setQuantDataMap(map);
       setAiQualified(qualified);
+      setQuantMeta(getLatestQuantMeta(metas));
       
       // 【NEW】使用新的 Simons 評分重新排序（優先有資料的）
       const recsWithData = updatedRecs.filter(rec => map[rec.coid]?.aiQuanBackDataComment);
@@ -245,11 +287,106 @@ export default function Explore() {
       ];
       setRecommendations(sorted);
       setQuantLoading(false);
-    }).catch(() => { if (!cancelled) setQuantLoading(false); });
+    }
+
+    runQuantSync().catch(() => {
+      if (!cancelled) setQuantLoading(false);
+    });
     return () => { cancelled = true; };
   // 監聽 simonsMeta（每次 loadData 產生新物件），確保重整後一定重新執行
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeStrategy, simonsMeta]);
+
+  function getLatestQuantMeta(metas: StockQuantMeta[]): StockQuantMeta | null {
+    if (metas.length === 0) return null;
+    return metas.sort((a, b) => new Date(b.fetchedAt).getTime() - new Date(a.fetchedAt).getTime())[0];
+  }
+
+  function formatMetaDateTime(value?: string): string {
+    if (!value) return '尚未同步';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${date.getFullYear()}/${pad(date.getMonth() + 1)}/${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  }
+
+  function formatDataDate(value?: string): string {
+    if (!value) return '尚未同步';
+    return value.replace(/^(\d{4})(\d{2})(\d{2})$/, '$1-$2-$3');
+  }
+
+  function formatTodayDate(): string {
+    return getTodayString().replace(/-/g, '/');
+  }
+
+  function getDataUpdateLabel(): string {
+    if (activeStrategy === 'ai') {
+      return quantMeta ? formatMetaDateTime(quantMeta.fetchedAt) : '同步中';
+    }
+
+    const latestOfficialDate = Object.values(twsePriceMap)
+      .map(item => item.date)
+      .filter(Boolean)
+      .sort()
+      .at(-1);
+    return latestOfficialDate ? formatDataDate(latestOfficialDate).replace(/-/g, '/') : '尚未同步';
+  }
+
+  function getDataDateLabel(): string {
+    if (activeStrategy === 'ai') {
+      return quantMeta?.dataDate ? quantMeta.dataDate.replace(/-/g, '/') : '同步中';
+    }
+
+    const latestOfficialDate = Object.values(twsePriceMap)
+      .map(item => item.date)
+      .filter(Boolean)
+      .sort()
+      .at(-1);
+    return latestOfficialDate ? formatDataDate(latestOfficialDate).replace(/-/g, '/') : '同步中';
+  }
+
+  function getDataFreshness() {
+    if (loading || quantLoading || searchQuantLoading || searchPriceLoading) {
+        return { className: 'explore-data-freshness-updating', label: '正在讀取每日快取與更新價格' };
+    }
+
+    if (activeStrategy === 'ai') {
+      if (!quantMeta) {
+        return { className: 'explore-data-freshness-waiting', label: '等待 Simons 最新交易日資料' };
+      }
+
+      if (quantMeta.cacheStatus === 'fresh') {
+        return { className: 'explore-data-freshness-fresh', label: '已重新讀取每日快取' };
+      }
+    }
+
+    if (Object.keys(twsePriceMap).length === 0 && recommendations.length === 0) {
+      return { className: 'explore-data-freshness-waiting', label: '尚未完成同步，請先重新抓取確認' };
+    }
+
+    return { className: 'explore-data-freshness-fresh', label: '已使用每日 AI 訊號快取' };
+  }
+
+  function getFixedUpdateLabel(): string {
+    return activeStrategy === 'ai'
+      ? '08:00 自動檢查；可手動重新抓取'
+      : '08:00 自動檢查；可手動重新抓取';
+  }
+
+  async function handleRefreshData() {
+    setSearchQuantLoading(false);
+    forceFreshQuantRef.current = true;
+    clearQuantSignalTTLCache();
+    clearSimonsDataTTLCache();
+    const stockCodes = [
+      ...watchlist.map(item => item.stockCode),
+      ...holdings.map(item => item.stockCode),
+    ];
+    await refreshDailyAiCache(stockCodes);
+    const latest = await fetchDailyAiCacheVersion();
+    if (latest?.version) rememberDailyAiCacheVersion(latest.version, 'explore');
+    loadData(true);
+  }
 
   // Simons 每日推薦的收盤價 Map（用於與 TWSE/TPEx 日期比較，使用較新的）
   const simonsPriceMap = useMemo(() => {
@@ -277,6 +414,42 @@ export default function Explore() {
     return official?.close || simons?.close || fallback;
   }
 
+  function buildSearchSimonsItem(rec: StockRecommendation, qd: StockQuantData) {
+    const close = getBestClose(rec.coid, rec.close);
+    const gvi = qd.stockInfo?.gvi ?? rec.gvi ?? 0;
+    const mediangvi = qd.stockInfo?.mediangvi ?? rec.mediangvi ?? '0';
+    return {
+      ...rec,
+      close,
+      gvi,
+      mediangvi: String(mediangvi),
+      category: rec.category || twsePriceMap[rec.coid]?.market || '搜尋結果',
+      subindustry: rec.subindustry || rec.category || null,
+      status: rec.status || null,
+      psr: rec.psr || 6,
+      strength: rec.strength || '0',
+      ret_w: rec.ret_w || 'flat',
+      ret_m: rec.ret_m || 'flat',
+      wtcost: rec.wtcost || '0',
+      fcost: rec.fcost || '0',
+      tcost: rec.tcost || null,
+      dcost: rec.dcost || '0',
+      yflow: rec.yflow || '0',
+      tcr_today: rec.tcr_today || '0',
+      fcr_today: rec.fcr_today || '0',
+      unusual: rec.unusual || '',
+      value: rec.value || '',
+      mdate: rec.mdate || getTodayString().replace(/-/g, ''),
+    };
+  }
+
+  function getDisplayRecommendation(rec: StockRecommendation): StockRecommendation {
+    if (!search.trim()) return rec;
+    const qd = quantDataMap[rec.coid];
+    if (!qd?.aiQuanBackDataComment) return rec;
+    return toRecommendation(buildSearchSimonsItem(rec, qd), qd);
+  }
+
   const STRATEGY_CARDS = [
     { id: 'A', title: '穩穩大公司', icon: '🏢', desc: '成交量 > 1,000張\nPSR 評分 ≥ 6', className: 'strategy-card-a' },
     { id: 'B', title: '最近變強公司', icon: '🚀', desc: '週漲 + 月漲雙確認\n籌碼動能強勁', className: 'strategy-card-b' },
@@ -286,6 +459,24 @@ export default function Explore() {
     { id: 'F', title: '便宜好公司', icon: '🏷️', desc: '低於外資 + 投信持股成本\n雙重折價潛在補漲', className: 'strategy-card-f' },
     { id: 'ai', title: 'AI 聰明選股', icon: '🤖', desc: '每日最新大數據\n電腦推薦標的', className: 'strategy-card-ai' }
   ];
+
+  const watchedStockCodes = useMemo(() => {
+    const codes = new Set<string>();
+    watchlist.forEach(item => codes.add(item.stockCode));
+    return codes;
+  }, [watchlist]);
+
+  const heldStockCodes = useMemo(() => {
+    const codes = new Set<string>();
+    holdings
+      .filter(item => item.totalShares > 0)
+      .forEach(item => codes.add(item.stockCode));
+    return codes;
+  }, [holdings]);
+
+  const existingStockCodes = useMemo(() => {
+    return new Set([...watchedStockCodes, ...heldStockCodes]);
+  }, [watchedStockCodes, heldStockCodes]);
 
   const filtered = useMemo(() => {
     if (search.trim()) {
@@ -299,9 +490,13 @@ export default function Explore() {
         close: twse.close,
         advice: 'hold',
         score: 60,
-        category: '搜尋結果',
+        category: heldStockCodes.has(code) ? '已在庫存' : watchedStockCodes.has(code) ? '已在觀察' : '搜尋結果',
         ret_w: 'flat',
-        kidAdvice: '這是您搜尋的股票，可以看看要不要加入庫存喔！',
+        kidAdvice: heldStockCodes.has(code)
+          ? '這檔股票已經在庫存中，可以點進去查看細節。'
+          : watchedStockCodes.has(code)
+            ? '這檔股票已經在觀察名單中，可以點進去查看細節。'
+            : '這是您搜尋的股票，可以看看要不要加入庫存喔！',
       } as StockRecommendation));
     }
 
@@ -310,9 +505,9 @@ export default function Explore() {
       // 若有勾選篩選，只顯示「中度以上推薦 + 正報酬」的股票
       const sorted = [...recommendations].sort((a, b) => b.score - a.score);
       if (aiFilterQualified) {
-        return sorted.filter(r => aiQualified.has(r.coid));
+        return sorted.filter(r => aiQualified.has(r.coid) && !existingStockCodes.has(r.coid));
       }
-      return sorted;
+      return sorted.filter(r => !existingStockCodes.has(r.coid));
     }
 
     // 每日動態策略篩選（從 Simons + TWSE 數據過濾，每天隨數據更新）
@@ -388,8 +583,126 @@ export default function Explore() {
         break;
     }
 
-    return list.sort((a, b) => b.score - a.score).slice(0, 20);
-  }, [recommendations, activeStrategy, search, twsePriceMap, aiQualified, aiFilterQualified]);
+    return list
+      .filter(r => !existingStockCodes.has(r.coid))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 20);
+  }, [recommendations, activeStrategy, search, twsePriceMap, aiQualified, aiFilterQualified, existingStockCodes, watchedStockCodes, heldStockCodes]);
+
+  useEffect(() => {
+    const q = search.trim();
+    if (!q || Object.keys(twsePriceMap).length > 0) {
+      setSearchPriceLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setSearchPriceLoading(true);
+    fetchOfficialPriceMap()
+      .then(map => {
+        if (cancelled) return;
+        if (Object.keys(map).length > 0) {
+          setTwsePriceMap(map);
+          setCache(CACHE_KEYS.TWSE_PRICE_MAP, map);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setSearchPriceLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [search, twsePriceMap]);
+
+  useEffect(() => {
+    const q = search.trim();
+    if (!q || filtered.length === 0) {
+      setSearchQuantLoading(false);
+      return;
+    }
+
+    const targetCodes = filtered
+      .map(rec => rec.coid)
+      .filter(code => !quantDataMap[code])
+      .slice(0, 30);
+    if (targetCodes.length === 0) {
+      setSearchQuantLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    const timerId = window.setTimeout(async () => {
+      setSearchQuantLoading(true);
+      const entries = await Promise.all(
+        targetCodes.map(code =>
+          fetchStockQuantData(code, undefined, { forceFresh: false })
+            .then(data => [code, data] as const)
+            .catch(() => null)
+        )
+      );
+
+      if (!cancelled) {
+        setQuantDataMap(prev => {
+          const next = { ...prev };
+          entries.forEach(entry => {
+            if (!entry) return;
+            const [code, data] = entry;
+            next[code] = data;
+          });
+          return next;
+        });
+        setSearchQuantLoading(false);
+      }
+    }, 300);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timerId);
+    };
+  }, [search, filtered, quantDataMap]);
+
+  useEffect(() => {
+    if (filtered.length === 0) return;
+    let cancelled = false;
+    let running = false;
+
+    async function refreshVisiblePrices() {
+      if (running || cancelled || !canAutoRefreshPrices()) return;
+      running = true;
+      const targetCodes = [...new Set(filtered.map(rec => rec.coid))].slice(0, 60);
+      const officialMap = await fetchOfficialPriceMap().catch(() => ({} as Record<string, OfficialPriceMapEntry>));
+      if (!cancelled) {
+        setTwsePriceMap(prev => {
+          const next = { ...prev };
+          targetCodes.forEach((code) => {
+            const result = officialMap[code];
+            if (!result) return;
+            const existing = next[code];
+            next[code] = {
+              close: result.close,
+              change: result.change ?? existing?.change ?? '0',
+              name: result.name || existing?.name || '',
+              volume: result.volume ?? existing?.volume ?? 0,
+              date: result.date || existing?.date || getTodayString().replace(/-/g, ''),
+              market: existing?.market,
+            };
+          });
+          setCache(CACHE_KEYS.TWSE_PRICE_MAP, next);
+          return next;
+        });
+      }
+      running = false;
+    }
+
+    const intervalId = window.setInterval(refreshVisiblePrices, PRICE_AUTO_REFRESH_MS);
+    document.addEventListener('visibilitychange', refreshVisiblePrices);
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', refreshVisiblePrices);
+    };
+  }, [filtered]);
 
   function getAdviceBadge(advice: string) {
     switch (advice) {
@@ -397,6 +710,21 @@ export default function Explore() {
       case 'sell': return <span className="badge badge-sell">🔴 建議賣出</span>;
       default: return <span className="badge badge-hold">🟡 觀望中</span>;
     }
+  }
+
+  function renderAiEntryBadge(coid: string) {
+    if (quantDataMap[coid]?.currentSignal !== 'buy') return null;
+    return (
+      <span className="ai-entry-badge">
+        <span className="ai-entry-badge-circle">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
+            <polyline points="17 6 23 6 23 12" />
+          </svg>
+        </span>
+        AI進場
+      </span>
+    );
   }
 
   function getScoreStars(score: number): string {
@@ -427,8 +755,8 @@ export default function Explore() {
     return val >= 0 ? 'quant-chip-ret-pos' : 'quant-chip-ret-neg';
   }
 
-  function renderAiQuantChips(coid: string) {
-    if (quantLoading && !quantDataMap[coid]) {
+  function renderAiQuantChips(coid: string, loadingQuant = quantLoading) {
+    if (loadingQuant && !quantDataMap[coid]) {
       return (
         <div className="quant-chips">
           <span className="quant-chip quant-chip-loading">載入中…</span>
@@ -480,10 +808,10 @@ export default function Explore() {
       </div>
 
       {/* 策略選股卡片 */}
-      {!search && (
+      {!hasAiFeature && !search && (
         <section>
           <div className="strategy-grid">
-            {STRATEGY_CARDS.filter(card => card.id !== 'ai' || hasAiFeature).map(card => (
+            {STRATEGY_CARDS.filter(card => card.id !== 'ai').map(card => (
               <div
                 key={card.id}
                 className={`strategy-card ${card.className} ${activeStrategy === card.id ? 'active' : ''}`}
@@ -507,10 +835,10 @@ export default function Explore() {
       {/* 篩選結果列表 */}
       <section>
         <div ref={resultRef} className="filtered-result-header" style={{ marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span>{activeStrategy === 'ai' ? '🤖 AI 每日推薦結果' : `🎯 「${STRATEGY_CARDS.find(c => c.id === activeStrategy)?.title}」策略篩選結果`}</span>
+          <span>{search.trim() ? `🔎 搜尋「${search.trim()}」結果` : activeStrategy === 'ai' ? '🤖 AI 每日推薦結果' : `🎯 「${STRATEGY_CARDS.find(c => c.id === activeStrategy)?.title}」策略篩選結果`}</span>
         </div>
         {/* AI 策略專屬篩選切換按鈕 */}
-        {activeStrategy === 'ai' && (
+        {activeStrategy === 'ai' && !search.trim() && (
           <button
             onClick={() => setAiFilterQualified(v => !v)}
             style={{
@@ -547,27 +875,39 @@ export default function Explore() {
             )}
           </button>
         )}
-        <div style={{ fontSize: '13px', color: 'var(--text-tertiary)', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 600 }}>
-          <span>ℹ️ 資料來源與時間：</span>
-          {activeStrategy === 'ai' ? (
-             <span style={{ color: 'var(--primary)' }}>Simons 量化模型（{recommendations[0]?.mdate ? recommendations[0].mdate.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3') : '最新同步'}）</span>
-          ) : (
-             <span style={{ color: 'var(--primary)' }}>台灣證券交易所 TWSE（今日收盤即時資料）</span>
-          )}
+        <div className="explore-data-meta">
+          <div className="explore-data-meta-lines">
+            <span className={`explore-data-freshness ${getDataFreshness().className}`}>{getDataFreshness().label}</span>
+            <span className="explore-data-meta-today">今天日期：{formatTodayDate()}</span>
+            <span className="explore-data-meta-updated">資料更新：{getDataUpdateLabel()}</span>
+            <span className="explore-data-meta-updated">資料日期：{getDataDateLabel()}</span>
+            <span className="explore-data-meta-schedule">固定更新：{getFixedUpdateLabel()}</span>
+            <span className="explore-data-meta-schedule">價格：進頁與盤中背景自動檢查</span>
+          </div>
+          <button
+            type="button"
+            className="explore-refresh-btn"
+            title="重新抓取最新資料"
+            onClick={handleRefreshData}
+            disabled={loading || quantLoading}
+          >
+            🔄 重新抓取
+          </button>
         </div>
 
-        {(loading || (activeStrategy === 'ai' && quantLoading)) && (
+        {loading && (
           <div className="loading-spinner">
             <div className="spinner" />
             <div className="loading-text">
-              {activeStrategy === 'ai'
-                ? quantProgress > 0
-                  ? quantProgressText
-                  : 'Simons 量化模型計算中... 🐻'
-                : '資料載入中... 🐻'
-              }
+              資料載入中... 🐻
             </div>
-            {activeStrategy === 'ai' && quantProgress > 0 && (
+          </div>
+        )}
+
+        {!loading && activeStrategy === 'ai' && quantLoading && (
+          <div className="loading-spinner">
+            <div className="loading-text">{quantProgress > 0 ? quantProgressText : 'Simons 量化資料背景同步中... 🐻'}</div>
+            {quantProgress > 0 && (
               <div className="explore-progress-bar">
                 <div
                   className="explore-progress-fill"
@@ -582,20 +922,33 @@ export default function Explore() {
           <div className="empty-state">
             <div className="empty-state-icon">😅</div>
             <div className="empty-state-title">{error}</div>
-            <button className="btn btn-primary btn-sm" onClick={loadData}>重試</button>
+            <button className="btn btn-primary btn-sm" onClick={() => loadData()}>重試</button>
           </div>
         )}
 
-        {!loading && !error && !(activeStrategy === 'ai' && quantLoading) && (
+        {!loading && !error && (
           <div className="recommendation-list">
             {filtered.length === 0 && (
-              <div className="empty-state">
-                <div className="empty-state-icon">🔍</div>
-                <div className="empty-state-title">找不到結果</div>
-                <div className="empty-state-desc">試試其他關鍵字或分類吧！</div>
-              </div>
+              search.trim() && searchPriceLoading ? (
+                <div className="loading-spinner">
+                  <div className="spinner" />
+                  <div className="loading-text">正在搜尋全市場股票...</div>
+                </div>
+              ) : (
+                <div className="empty-state">
+                  <div className="empty-state-icon">🔍</div>
+                  <div className="empty-state-title">找不到結果</div>
+                  <div className="empty-state-desc">試試其他關鍵字或分類吧！</div>
+                </div>
+              )
             )}
-            {filtered.map((rec) => (
+            {filtered.map((rec) => {
+              const displayRec = getDisplayRecommendation(rec);
+              const showQuantDetails = activeStrategy === 'ai' || !!search.trim();
+              const hasQuantData = !!quantDataMap[rec.coid]?.aiQuanBackDataComment;
+              const isHeld = heldStockCodes.has(displayRec.coid);
+              const isWatched = isInWatchlist(displayRec.coid);
+              return (
               <div
                 key={rec.coid}
                 className="stock-card recommendation-card"
@@ -603,56 +956,64 @@ export default function Explore() {
               >
                 <div className="rec-left">
                   <div className="rec-header">
-                    <span className="stock-name">{rec.stkname}</span>
-                    <span className="stock-code">{rec.coid}</span>
+                    <MarketBadge market={twsePriceMap[rec.coid]?.market} compact />
+                    <span className="stock-name">{displayRec.stkname}</span>
+                    <span className="stock-code">{displayRec.coid}</span>
                   </div>
                   <div className="rec-meta">
-                    <span className="rec-category">{rec.category}</span>
-                    <span className="rec-stars">{getScoreStars(rec.score)}</span>
+                    <span className="rec-category">{displayRec.category}</span>
+                    <span className="rec-stars">{getScoreStars(displayRec.score)}</span>
                   </div>
                   <div className="rec-badges">
-                     {getAdviceBadge(rec.advice)}
-                     {/* 【NEW】Premium Simons 評分標籤 */}
-                     {activeStrategy === 'ai' && quantDataMap[rec.coid]?.aiQuanBackDataComment ? (
-                       <span className="badge badge-premium">💎 Simons量化評分 {rec.score}分</span>
+                     {renderAiEntryBadge(displayRec.coid)}
+                     {getAdviceBadge(displayRec.advice)}
+                     {hasQuantData ? (
+                       <span className="badge badge-premium">💎 Simons量化評分 {displayRec.score}分</span>
                      ) : (
-                       <span className="badge badge-neutral">評分 {rec.score}分</span>
+                       <span className="badge badge-neutral">評分 {displayRec.score}分</span>
                      )}
                    </div>
-                  {activeStrategy === 'ai' && renderAiQuantChips(rec.coid)}
+                  {showQuantDetails && renderAiQuantChips(displayRec.coid, search.trim() ? searchQuantLoading : quantLoading)}
                 </div>
+                <button
+                  className={`wl-quick-btn wl-spotlight-btn ${isWatched || isHeld ? 'wl-quick-active' : ''} ${wlBusy === displayRec.coid ? 'wl-quick-busy' : ''}`}
+                  title={isHeld ? '已在庫存' : isWatched ? '已加入觀察名單' : '加入觀察名單'}
+                  aria-label={isHeld ? '已在庫存' : isWatched ? '已加入觀察名單' : '加入觀察名單'}
+                  disabled={wlBusy === displayRec.coid || isHeld}
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    if (wlBusy || isHeld) return;
+                    setWlBusy(displayRec.coid);
+                    try {
+                      if (isWatched) {
+                        await removeFromWatchlist(displayRec.coid);
+                      } else {
+                        const result = await addToWatchlist(displayRec.coid, displayRec.stkname, parseFloat(getBestClose(displayRec.coid, displayRec.close)));
+                        if (result.error) alert(result.error);
+                      }
+                    } finally {
+                      setWlBusy(null);
+                    }
+                  }}
+                >
+                  <span className="wl-spotlight-icon">
+                    {wlBusy === displayRec.coid ? '⏳' : isHeld ? '📦' : isWatched ? '✅' : '👁️'}
+                  </span>
+                  <span className="wl-spotlight-label">
+                    {isHeld ? '庫存' : isWatched ? '已觀察' : '觀察'}
+                  </span>
+                </button>
                 <div className="rec-right">
                   <div className="stock-price">
-                    NT${getBestClose(rec.coid, rec.close)}
+                    NT${getBestClose(displayRec.coid, displayRec.close)}
                   </div>
-                  <div className={`rec-trend ${rec.ret_w === 'rise' ? 'text-profit' : 'text-loss'}`}>
-                    {rec.ret_w === 'rise' ? '📈 週漲' : '📉 週跌'}
+                  <div className={`rec-trend ${displayRec.ret_w === 'rise' ? 'text-profit' : 'text-loss'}`}>
+                    {displayRec.ret_w === 'rise' ? '📈 週漲' : '📉 週跌'}
                   </div>
-                  <button
-                    className={`wl-quick-btn ${isInWatchlist(rec.coid) ? 'wl-quick-active' : ''} ${wlBusy === rec.coid ? 'wl-quick-busy' : ''}`}
-                    title={isInWatchlist(rec.coid) ? '已加入觀察名單' : '加入觀察名單'}
-                    disabled={wlBusy === rec.coid}
-                    onClick={async (e) => {
-                      e.stopPropagation();
-                      if (wlBusy) return;
-                      setWlBusy(rec.coid);
-                      try {
-                        if (isInWatchlist(rec.coid)) {
-                          await removeFromWatchlist(rec.coid);
-                        } else {
-                          const result = await addToWatchlist(rec.coid, rec.stkname, parseFloat(getBestClose(rec.coid, rec.close)));
-                          if (result.error) alert(result.error);
-                        }
-                      } finally {
-                        setWlBusy(null);
-                      }
-                    }}
-                  >
-                    {wlBusy === rec.coid ? '⏳' : isInWatchlist(rec.coid) ? '✅' : '👁️'}
-                  </button>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </section>

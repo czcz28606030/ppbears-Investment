@@ -1,0 +1,119 @@
+{
+  "lesson_id": "L087",
+  "stage": 6,
+  "level": 7,
+  "domain": "valuation",
+  "title": "本益比不是越低越好",
+  "summary": "理解本益比要搭配成長、穩定度和產業比較。",
+  "cards": [
+    {
+      "type": "text_image",
+      "title": "先認識：本益比不是越低越好",
+      "body": "理解本益比要搭配成長、穩定度和產業比較。\n\n可以把它想成「買東西比價」：不是只看表面，而是要看裡面有哪些東西、比例怎麼安排、風險在哪裡。",
+      "image_key": "lesson_087_card_01"
+    },
+    {
+      "type": "text_image",
+      "title": "孩子也能懂的重點",
+      "body": "這堂課要記住：價格不等於價值、估值要和同業比較。投資不是猜答案，而是一步一步檢查。",
+      "image_key": "lesson_087_card_02"
+    },
+    {
+      "type": "text_image",
+      "title": "看圖學：價值天平",
+      "body": "看到 價值天平 時，先問自己：圖在比較什麼？時間有多長？變化是一次性的，還是長期趨勢？",
+      "image_key": "lesson_087_card_03"
+    },
+    {
+      "type": "text_image",
+      "title": "自己的小檢查表",
+      "body": "做決定前，可以問三件事：我懂這個工具嗎？我知道可能賠多少嗎？我有沒有照計畫，而不是照情緒？",
+      "image_key": "lesson_087_card_04"
+    }
+  ],
+  "preset_questions": [
+    {
+      "question_type": "choice",
+      "question_text": "安全邊際是在提醒我們什麼？",
+      "options": [
+        "用較合理的價格買，替錯誤留下空間",
+        "越貴越安全",
+        "不用看公司品質",
+        "只看今天漲跌"
+      ],
+      "correct_answer": 0,
+      "explanation": "正確。本益比不是越低越好 的核心不是背名詞，而是理解它能幫我們做什麼，以及風險在哪裡。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "學完「本益比不是越低越好」後，遇到新的投資選擇，第一步最適合做什麼？",
+      "options": [
+        "比較價值、成長和風險後再決定",
+        "只因股價變便宜就一定買",
+        "只看朋友有沒有買",
+        "把所有零用錢一次投入"
+      ],
+      "correct_answer": 0,
+      "explanation": "投資前先檢查內容、成本、風險與自己的目標，比衝動買進更重要。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "只要學會「本益比不是越低越好」，就能保證每次投資都賺錢。",
+      "correct_answer": false,
+      "explanation": "任何投資都不保證獲利。學習的目的，是讓判斷更穩、風險更清楚。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "哪一個行為最符合這堂課的精神？",
+      "options": [
+        "保留安全邊際",
+        "只看一天漲跌",
+        "聽到熱門就立刻買",
+        "完全不用記錄原因"
+      ],
+      "correct_answer": 0,
+      "explanation": "這堂課要練習的是：保留安全邊際。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "答題時只背選項位置就好，因為答案永遠固定。",
+      "correct_answer": false,
+      "explanation": "選項順序會被打亂，也會加入情境題。真正重要的是看懂題目。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "看圖表時，最可靠的做法是哪一個？",
+      "options": [
+        "先看圖表代表什麼，再搭配課程觀念判斷",
+        "看到線往上就一定買",
+        "看到線往下就永遠不能買",
+        "圖表漂亮就代表沒有風險"
+      ],
+      "correct_answer": 0,
+      "explanation": "圖表是輔助工具，要搭配「本益比不是越低越好」的概念和風險一起看。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "如果同學對「本益比不是越低越好」只記得一件事，最應該記得什麼？",
+      "options": [
+        "成長和風險都要一起看",
+        "投資靠運氣就好",
+        "越快下單越厲害",
+        "只要有獎勵就不用理解"
+      ],
+      "correct_answer": 0,
+      "explanation": "很棒。成長和風險都要一起看 是這堂課的重要提醒。"
+    }
+  ],
+  "ai_prompt_context": {
+    "topic": "本益比不是越低越好",
+    "age_hint": "11-15歲",
+    "vocabulary_level": "intermediate",
+    "metaphor_suggestions": [
+      "買東西比價",
+      "價值天平",
+      "檢查表",
+      "安全帶"
+    ]
+  }
+}

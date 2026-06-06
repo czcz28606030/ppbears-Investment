@@ -19,6 +19,10 @@ interface CacheEntry<T> {
   expiresAt: number;
 }
 
+interface PersistentCacheEntry<T> extends CacheEntry<T> {
+  refreshSlot?: string;
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const store: Map<string, CacheEntry<any>> = new Map();
 
@@ -43,6 +47,45 @@ export function clearCache(key: string): void {
   store.delete(key);
 }
 
+/** 讀取可跨頁面刷新保留的快取 */
+export function getPersistentCache<T>(key: string, refreshSlot?: string): T | null {
+  if (typeof localStorage === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const entry = JSON.parse(raw) as PersistentCacheEntry<T>;
+    if (Date.now() > entry.expiresAt || (refreshSlot && entry.refreshSlot !== refreshSlot)) {
+      localStorage.removeItem(key);
+      return null;
+    }
+    return entry.data;
+  } catch {
+    localStorage.removeItem(key);
+    return null;
+  }
+}
+
+/** 寫入可跨頁面刷新保留的快取 */
+export function setPersistentCache<T>(key: string, data: T, ttlMs: number = DEFAULT_TTL_MS, refreshSlot?: string): void {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    const entry: PersistentCacheEntry<T> = {
+      data,
+      expiresAt: Date.now() + ttlMs,
+      refreshSlot,
+    };
+    localStorage.setItem(key, JSON.stringify(entry));
+  } catch {
+    // localStorage 滿了或不可用時，保留記憶體快取即可。
+  }
+}
+
+/** 清除跨頁面刷新保留的快取 */
+export function clearPersistentCache(key: string): void {
+  if (typeof localStorage === 'undefined') return;
+  localStorage.removeItem(key);
+}
+
 /** 清除所有快取 */
 export function clearAllCache(): void {
   store.clear();
@@ -62,5 +105,5 @@ export const CACHE_KEYS = {
   QUANT_DATA:      (code: string) => `quant_${code}`,
   WATCHLIST_QUOTES:'watchlist_quotes',
   WATCHLIST_FULL:  'watchlist_full',      // quotes + quant + simons
-  PORTFOLIO_SIGNALS: 'portfolio_signals',
+  PORTFOLIO_SIGNALS: 'portfolio_signals_v6',
 } as const;

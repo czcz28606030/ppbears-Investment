@@ -97,6 +97,47 @@ CREATE POLICY "Service role can manage simons_daily_snapshots"
   USING (auth.role() = 'service_role');
 
 -- ==========================================================
+-- 2.5 stock_quant_daily_snapshots — 個股每日量化快照
+--    來源：stock?coid= → position.chipStability / stockInfo
+--    用途：個股頁 30/60 天籌碼穩定度趨勢圖
+-- ==========================================================
+CREATE TABLE IF NOT EXISTS public.stock_quant_daily_snapshots (
+  snapshot_date date NOT NULL,
+  coid          text NOT NULL,
+  stkname       text,
+  chip_pts      numeric,          -- 籌碼穩定度 0-10
+  ai_remark     text,             -- '超高度' | '高度' | '中度' | '低度'
+  ai_cum_ret    text,             -- '27.4%'
+  ai_freq       integer,
+  gvi           numeric,
+  mediangvi     numeric,
+  current_signal text,            -- 'buy' | 'sell' | 'neutral'
+  source        text DEFAULT 'ifalgo-stock',
+  collected_at  timestamptz DEFAULT now(),
+  PRIMARY KEY(snapshot_date, coid)
+);
+
+CREATE INDEX IF NOT EXISTS idx_stock_quant_daily_coid
+  ON public.stock_quant_daily_snapshots(coid);
+CREATE INDEX IF NOT EXISTS idx_stock_quant_daily_date
+  ON public.stock_quant_daily_snapshots(snapshot_date DESC);
+CREATE INDEX IF NOT EXISTS idx_stock_quant_daily_chip
+  ON public.stock_quant_daily_snapshots(chip_pts DESC);
+
+ALTER TABLE public.stock_quant_daily_snapshots ENABLE ROW LEVEL SECURITY;
+
+GRANT SELECT ON TABLE public.stock_quant_daily_snapshots TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.stock_quant_daily_snapshots TO service_role;
+
+CREATE POLICY "Authenticated users can read stock_quant_daily_snapshots"
+  ON public.stock_quant_daily_snapshots FOR SELECT
+  USING (auth.role() = 'authenticated');
+
+CREATE POLICY "Service role can manage stock_quant_daily_snapshots"
+  ON public.stock_quant_daily_snapshots FOR ALL
+  USING (auth.role() = 'service_role');
+
+-- ==========================================================
 -- 3. stock_price_history — 個股歷史 K 線
 --    來源：stock?coid= → position.prices[]
 --    深度：5.5 年（2020-11-02 起），1,323 個交易日

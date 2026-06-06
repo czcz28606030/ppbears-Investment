@@ -7,9 +7,10 @@ import {
   CandlestickSeries,
   LineSeries,
   HistogramSeries,
+  createSeriesMarkers,
 } from 'lightweight-charts';
-import type { IChartApi } from 'lightweight-charts';
-import type { StockPrice } from '../types';
+import type { IChartApi, SeriesMarker } from 'lightweight-charts';
+import type { StockPrice, StockTradingSignal } from '../types';
 
 // ── Error Boundary ──────────────────────────────────
 class ChartErrorBoundary extends Component<
@@ -35,6 +36,9 @@ class ChartErrorBoundary extends Component<
 interface StockChartProps {
   prices: StockPrice[];
   stockName: string;
+  tradingSignals?: StockTradingSignal[];
+  showMa5?: boolean;
+  showMa20?: boolean;
 }
 
 function toDateStr(mdate: string): string {
@@ -47,7 +51,56 @@ function toDateStr(mdate: string): string {
   return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }
 
-const StockChartInner = memo(function StockChartInner({ prices, stockName }: StockChartProps) {
+function formatChartDate(time: unknown, withYear = false): string {
+  const raw = typeof time === 'string'
+    ? time
+    : typeof time === 'object' && time !== null && 'year' in time
+      ? `${(time as any).year}-${String((time as any).month).padStart(2, '0')}-${String((time as any).day).padStart(2, '0')}`
+      : '';
+  const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) return String(time ?? '');
+  return withYear ? `${match[1]}/${match[2]}/${match[3]}` : `${match[2]}/${match[3]}`;
+}
+
+const SELL_SIGNAL_TEXTS = new Set(['出場', '賣出', '減碼', 'sell', 'Sell', 'SELL']);
+
+function buildTradingSignalMarkers(
+  tradingSignals: StockTradingSignal[] | undefined,
+  availableDates: Set<string>
+): SeriesMarker<string>[] {
+  if (!tradingSignals?.length) return [];
+
+  const signalByDate = new Map<string, 'buy' | 'sell'>();
+
+  for (const signal of tradingSignals) {
+    if (signal.inDate && availableDates.has(signal.inDate)) {
+      if (!signalByDate.has(signal.inDate)) {
+        signalByDate.set(signal.inDate, 'buy');
+      }
+    }
+
+    if (signal.outDate && availableDates.has(signal.outDate) && SELL_SIGNAL_TEXTS.has(signal.signal)) {
+      signalByDate.set(signal.outDate, 'sell');
+    }
+  }
+
+  return Array.from(signalByDate.entries())
+    .map(([time, signal]) => ({
+      time,
+      position: signal === 'buy' ? 'belowBar' : 'aboveBar',
+      color: signal === 'buy' ? '#8b5cf6' : '#111827',
+      shape: signal === 'buy' ? 'arrowUp' : 'arrowDown',
+    } satisfies SeriesMarker<string>))
+    .sort((a, b) => String(a.time).localeCompare(String(b.time)));
+}
+
+const StockChartInner = memo(function StockChartInner({
+  prices,
+  stockName,
+  tradingSignals,
+  showMa5 = true,
+  showMa20 = true,
+}: StockChartProps) {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
 
@@ -87,6 +140,11 @@ const StockChartInner = memo(function StockChartInner({ prices, stockName }: Sto
         crosshair: {
           mode: CrosshairMode.Normal,
         },
+        localization: {
+          locale: 'zh-TW',
+          dateFormat: 'yyyy/MM/dd',
+          timeFormatter: (time: unknown) => formatChartDate(time, true),
+        },
         rightPriceScale: {
           borderColor: 'rgba(0, 0, 0, 0.06)',
           scaleMargins: { top: 0.05, bottom: 0.25 },
@@ -96,6 +154,7 @@ const StockChartInner = memo(function StockChartInner({ prices, stockName }: Sto
           timeVisible: false,
           rightOffset: 3,
           barSpacing: 8,
+          tickMarkFormatter: (time: unknown) => formatChartDate(time, false),
         },
         width: container.clientWidth,
         height: container.clientHeight,
@@ -131,8 +190,19 @@ const StockChartInner = memo(function StockChartInner({ prices, stockName }: Sto
       });
       candleSeries.setData(uniqueCandles as any);
 
+      const tradingMarkers = buildTradingSignalMarkers(
+        tradingSignals,
+        new Set(uniqueCandles.map(candle => candle.time))
+      );
+      if (tradingMarkers.length > 0) {
+        createSeriesMarkers(candleSeries, tradingMarkers, {
+          autoScale: true,
+          zOrder: 'top',
+        });
+      }
+
       // MA5 均線（黃色）
-      if (uniqueCandles.length >= 5) {
+      if (showMa5 && uniqueCandles.length >= 5) {
         const ma5 = uniqueCandles.map((d, i) => {
           if (i < 4) return null;
           const sum = uniqueCandles.slice(i - 4, i + 1).reduce((acc, v) => acc + v.close, 0);
@@ -150,7 +220,7 @@ const StockChartInner = memo(function StockChartInner({ prices, stockName }: Sto
       }
 
       // MA20 均線（紫色）
-      if (uniqueCandles.length >= 20) {
+      if (showMa20 && uniqueCandles.length >= 20) {
         const ma20 = uniqueCandles.map((d, i) => {
           if (i < 19) return null;
           const sum = uniqueCandles.slice(i - 19, i + 1).reduce((acc, v) => acc + v.close, 0);
@@ -220,7 +290,7 @@ const StockChartInner = memo(function StockChartInner({ prices, stockName }: Sto
     } catch (err) {
       console.warn('[StockChart] chart creation error:', err);
     }
-  }, [prices, stockName]);
+  }, [prices, stockName, tradingSignals, showMa5, showMa20]);
 
   return <div ref={chartContainerRef} style={{ width: '100%', height: '100%' }} />;
 });
@@ -230,7 +300,13 @@ const StockChartInner = memo(function StockChartInner({ prices, stockName }: Sto
  * 完全使用本地 ifalgo 數據，無外部授權限制
  * 包含 Error Boundary 防止圖表錯誤影響整頁
  */
-export default function StockChart({ prices, stockName }: StockChartProps) {
+export default function StockChart({
+  prices,
+  stockName,
+  tradingSignals,
+  showMa5 = true,
+  showMa20 = true,
+}: StockChartProps) {
   const [key, setKey] = useState(0);
 
   const fallback = (
@@ -245,7 +321,13 @@ export default function StockChart({ prices, stockName }: StockChartProps) {
 
   return (
     <ChartErrorBoundary key={key} fallback={fallback}>
-      <StockChartInner prices={prices} stockName={stockName} />
+      <StockChartInner
+        prices={prices}
+        stockName={stockName}
+        tradingSignals={tradingSignals}
+        showMa5={showMa5}
+        showMa20={showMa20}
+      />
     </ChartErrorBoundary>
   );
 }

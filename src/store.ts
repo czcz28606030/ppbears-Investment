@@ -1,16 +1,16 @@
 import { create } from 'zustand';
-import { createClient } from '@supabase/supabase-js';
 import { supabase } from './supabase';
 import type { Session } from '@supabase/supabase-js';
-import type { UserAccount, Trade, Holding, WithdrawalRequest, FeatureOverride, SystemSettings, LessonResult, RewardRule, RewardTriggerType, WalletTransaction, RewardShopItem, RedemptionRequest, WatchlistItem, WatchlistSignal, WatchlistWarning } from './types';
-import { fetchStockData, fetchOfficialClosePrice } from './api';
+import type { UserAccount, Trade, Holding, WithdrawalRequest, FeatureOverride, SystemSettings, LessonResult, RewardRule, RewardTriggerType, WalletTransaction, RewardShopItem, RedemptionRequest, WatchlistItem, WatchlistSignal, WatchlistWarning, DividendPayment, StockData } from './types';
+import { fetchStockData, fetchOfficialPriceMap } from './api';
+import type { OfficialPriceMap } from './api';
 
 // ─── 股價刷新快取控制 ─────────────────────────────────────────────────────────
 let lastPriceRefreshAt: number | null = null;
 
 // ─── 閒置自動登出控制 ─────────────────────────────────────────────────────────
 let idleTimer: ReturnType<typeof setTimeout> | null = null;
-const IDLE_TIMEOUT_MS = 120 * 60 * 1000; // 120 分鐘無操作自動登出
+const IDLE_TIMEOUT_MS = 30 * 60 * 1000; // 30 分鐘無操作自動登出（縮短以確保重開後資料新鮮）
 
 /** 帶 timeout 的 Promise wrapper（逾時回傳 fallback） */
 function withTimeout<T>(promise: PromiseLike<T>, ms: number, fallback: T): Promise<T> {
@@ -101,12 +101,14 @@ interface InvestmentStore {
   children: UserAccount[];
   holdings: Holding[];
   trades: Trade[];
+  dividendPayments: DividendPayment[];
   withdrawalRequests: WithdrawalRequest[];
   featureOverrides: FeatureOverride[];
   systemSettings: SystemSettings;
   allUsers: UserAccount[];
   loading: boolean;
   authLoading: boolean;
+  dataReady: boolean; // true = loadUserData 已完成，可以安全下單
 
   // Learning module (Slice 1–3)
   learningProfile: LearningProfile | null;
@@ -151,6 +153,7 @@ interface InvestmentStore {
 
   // Data
   loadUserData: (userId: string) => Promise<void>;
+  fetchDividendPayments: () => Promise<void>;
 
   // Children Management
   loadChildren: () => Promise<void>;
@@ -172,7 +175,7 @@ interface InvestmentStore {
   // Profile
   updateProfile: (displayName: string, avatarUrl: string) => Promise<{ error: string | null }>;
   uploadAvatar: (file: File) => Promise<{ url: string | null; error: string | null }>;
-  updateBrokerSettings: (brokerFeeRate: number, brokerMinFee: number, brokerTaxRate: number) => Promise<{ error: string | null }>;
+  updateBrokerSettings: (brokerFeeRate: number, brokerMinFee: number, brokerTaxRate: number, stopLossAlertPct: number) => Promise<{ error: string | null }>;
   updateNewsletterStrategy: (strategy: string | null) => Promise<{ error: string | null }>;
 
   // Admin Actions
@@ -192,7 +195,7 @@ interface InvestmentStore {
   getTodayTradeCount: () => number;
 
   // Price Refresh
-  refreshHoldingPrices: () => Promise<void>;
+  refreshHoldingPrices: (options?: { force?: boolean }) => Promise<{ checkedCount: number; priceFoundCount: number; updatedCount: number }>;
 
   // Trade Note
   updateTradeNote: (tradeId: string, note: string) => Promise<{ error: string | null }>;
@@ -206,7 +209,7 @@ interface InvestmentStore {
   addToWatchlist: (stockCode: string, stockName: string, currentPrice: number, note?: string) => Promise<{ error: string | null }>;
   removeFromWatchlist: (stockCode: string) => Promise<{ error: string | null }>;
   isInWatchlist: (stockCode: string) => boolean;
-  checkWatchlistSignals: () => Promise<void>;
+  checkWatchlistSignals: (stockDataMap?: Record<string, StockData | null>) => Promise<void>;
 
   // Getters
   getPortfolioSummary: () => PortfolioSummary;
@@ -259,8 +262,28 @@ function rowToUser(row: Record<string, unknown>): UserAccount {
     brokerFeeRate: row.broker_fee_rate !== undefined ? Number(row.broker_fee_rate) : 0.001425,
     brokerMinFee: row.broker_min_fee !== undefined ? Number(row.broker_min_fee) : 20,
     brokerTaxRate: row.broker_tax_rate !== undefined ? Number(row.broker_tax_rate) : 0.003,
+    stopLossAlertPct: row.stop_loss_alert_pct !== undefined ? Number(row.stop_loss_alert_pct) : 20,
     parentId: (row.parent_id as string) || undefined,
     newsletterStrategy: (row.newsletter_strategy as string) || undefined,
+  };
+}
+
+function rowToDividendPayment(row: Record<string, unknown>): DividendPayment {
+  return {
+    id: row.id as string,
+    userId: row.user_id as string,
+    stockCode: row.stock_code as string,
+    stockName: row.stock_name as string,
+    exDate: row.ex_date as string,
+    lastBuyDate: row.last_buy_date as string,
+    payDate: row.pay_date as string,
+    cashDividend: Number(row.cash_dividend),
+    eligibleShares: Number(row.eligible_shares),
+    amount: Number(row.amount),
+    status: row.status as DividendPayment['status'],
+    paidAt: (row.paid_at as string) || undefined,
+    source: (row.source as string) || 'yahoo',
+    createdAt: row.created_at as string,
   };
 }
 
@@ -321,12 +344,14 @@ export const useStore = create<InvestmentStore>((set, get) => ({
   children: [],
   holdings: [],
   trades: [],
+  dividendPayments: [],
   withdrawalRequests: [],
   featureOverrides: [],
-  systemSettings: { free_max_child_accounts: 2, free_max_holdings: 5, free_max_daily_trades: 10, newsletter_send_hour: 7 },
+  systemSettings: { free_max_child_accounts: 2, free_max_holdings: 5, free_max_daily_trades: 10, newsletter_send_hour: 8 },
   allUsers: [],
   loading: false,
   authLoading: true,
+  dataReady: false, // 初始為 false，loadUserData 完成後才設為 true
   isRecoveryMode: false,
 
   // ─── Learning Module (Slice 1–3) ─────────
@@ -465,7 +490,29 @@ export const useStore = create<InvestmentStore>((set, get) => ({
     if (!supabase) return { error: '資料庫未連線', xpEarned: 0, coinsEarned: 0, levelUp: false, newStreak: 0 };
     const sb = supabase;
     const { user, learningProfile } = get();
+    if (user && learningProfile && (result.score !== 100 || result.questionsCorrect !== result.questionsTotal)) {
+      return { error: 'perfect score required', xpEarned: 0, coinsEarned: 0, levelUp: false, newStreak: learningProfile.streakDays };
+    }
     if (!user || !learningProfile) return { error: '請先登入', xpEarned: 0, coinsEarned: 0, levelUp: false, newStreak: 0 };
+
+    if (get().completedLessonIds.includes(lessonId)) {
+      return { error: 'lesson already completed', xpEarned: 0, coinsEarned: 0, levelUp: false, newStreak: learningProfile.streakDays };
+    }
+
+    const existingProgress = await withTimeout(
+      sb.from('lesson_progress').select('id').eq('user_id', user.id).eq('lesson_id', lessonId).maybeSingle(),
+      10000,
+      { data: null, error: null } as any
+    );
+
+    if (existingProgress.data) {
+      set({
+        completedLessonIds: get().completedLessonIds.includes(lessonId)
+          ? get().completedLessonIds
+          : [...get().completedLessonIds, lessonId],
+      });
+      return { error: 'lesson already completed', xpEarned: 0, coinsEarned: 0, levelUp: false, newStreak: learningProfile.streakDays };
+    }
 
     const today = new Date().toISOString().split('T')[0];
     const isFirstTodayLesson = learningProfile.lastLearnDate !== today;
@@ -493,21 +540,54 @@ export const useStore = create<InvestmentStore>((set, get) => ({
     }
     const newLongestStreak = Math.max(learningProfile.longestStreak, newStreak);
 
-    // 寫入 lesson_progress (5s timeout)
-    const insertResult = await withRetry(() => withTimeout(
-      Promise.resolve(sb.from('lesson_progress').insert([{
-        user_id: user.id,
-        lesson_id: lessonId,
-        score: result.score,
-        xp_earned: xpEarned,
-        time_spent_seconds: result.timeSpentSeconds,
-        questions_correct: result.questionsCorrect,
-        questions_total: result.questionsTotal,
-      }])),
-      12000,
-      { error: { message: 'lesson_progress insert timeout' } } as any
-    ));
-    if (insertResult.error) console.error('lesson_progress insert failed:', insertResult.error.message);
+    const progressPayload = {
+      user_id: user.id,
+      lesson_id: lessonId,
+      score: result.score,
+      xp_earned: xpEarned,
+      time_spent_seconds: result.timeSpentSeconds,
+      questions_correct: result.questionsCorrect,
+      questions_total: result.questionsTotal,
+    };
+
+    const insertResult = await withTimeout(
+      Promise.resolve(
+        sb
+          .from('lesson_progress')
+          .insert([progressPayload])
+          .select('id')
+          .single()
+      ),
+      18000,
+      { data: null, error: { message: 'lesson_progress insert timeout' } } as any
+    );
+    if (insertResult.error) {
+      console.error('lesson_progress insert failed:', insertResult.error.message);
+
+      const verifyResult = await withTimeout(
+        Promise.resolve(
+          sb
+            .from('lesson_progress')
+            .select('id')
+            .eq('user_id', user.id)
+            .eq('lesson_id', lessonId)
+            .maybeSingle()
+        ),
+        12000,
+        { data: null, error: { message: 'lesson_progress verify timeout' } } as any
+      );
+
+      if (!verifyResult.data) {
+        const isDuplicate = insertResult.error.message.includes('duplicate') || insertResult.error.message.includes('unique');
+        return {
+          error: isDuplicate ? '這堂課已經完成過了，請回到學習地圖確認進度。' : '課程進度儲存較慢或失敗，請檢查網路後重新挑戰。',
+          xpEarned: 0,
+          coinsEarned: 0,
+          levelUp: false,
+          newStreak: learningProfile.streakDays,
+        };
+      }
+    }
 
     // 更新 learning_profiles (5s timeout)
     const updateResult = await withRetry(() => withTimeout(
@@ -556,6 +636,7 @@ export const useStore = create<InvestmentStore>((set, get) => ({
     // ── 自動發幣：查詢發幣規則 ─────────────────────────────────────
     // child 帳號：查詢父母的規則；parent 帳號：查詢自己設定的規則
     let coinsEarned = 0;
+    let coinGrantError: string | null = null;
     try {
       // 決定要查誰的規則
       const parentLookupId = user.parentId ?? (user.role === 'parent' ? user.id : null);
@@ -573,7 +654,11 @@ export const useStore = create<InvestmentStore>((set, get) => ({
           12000,
           { data: [] } as any
         ));
-        const rules = (rulesResult.data ?? []).map((r: Record<string, unknown>) => rowToRewardRule(r));
+        if (rulesResult.error) {
+          throw new Error(rulesResult.error.message ?? 'reward_rules query failed');
+        }
+
+        const rules: RewardRule[] = (rulesResult.data ?? []).map((r: Record<string, unknown>) => rowToRewardRule(r));
 
         if (rules.length > 0) {
           const triggeredTypes: RewardTriggerType[] = [];
@@ -586,28 +671,40 @@ export const useStore = create<InvestmentStore>((set, get) => ({
 
           console.log('[completeLesson] triggered types:', triggeredTypes, '/ rules:', rules.length);
 
-          for (const rule of rules) {
-            if (triggeredTypes.includes(rule.triggerType)) {
-              const { error: rpcErr } = await withRetry(() => withTimeout(
-                Promise.resolve(sb.rpc('grant_learning_coins', {
-                  p_user_id: user.id,
-                  p_amount: rule.amount,
-                  p_tx_type: 'earn',
-                  p_source: rule.id,
-                  p_description: (TRIGGER_LABELS as Record<string, string>)[rule.triggerType] ?? rule.triggerLabel ?? rule.triggerType,
-                })),
-                12000,
-                { error: { message: 'grant_learning_coins timeout' } } as any
-              ));
-              if (rpcErr) {
-                console.error('[completeLesson] grant_learning_coins failed:', rpcErr);
-              } else {
-                coinsEarned += rule.amount;
-              }
+          const matchedRules = rules.filter(rule => triggeredTypes.includes(rule.triggerType));
+          const perfectRuleActive = rules.some(rule => rule.triggerType === 'perfect_score');
+          if (result.score === 100 && !perfectRuleActive) {
+            console.warn('[completeLesson] perfect score completed but no active perfect_score rule was found.');
+          }
+
+          for (const rule of matchedRules) {
+            const { error: rpcErr } = await withRetry(() => withTimeout(
+              Promise.resolve(sb.rpc('grant_learning_coins', {
+                p_user_id: user.id,
+                p_amount: rule.amount,
+                p_tx_type: 'earn',
+                p_source: rule.id,
+                p_description: (TRIGGER_LABELS as Record<string, string>)[rule.triggerType] ?? rule.triggerLabel ?? rule.triggerType,
+              })),
+              12000,
+              { error: { message: 'grant_learning_coins timeout' } } as any
+            ));
+            if (rpcErr) {
+              console.error('[completeLesson] grant_learning_coins failed:', rpcErr);
+              coinGrantError = rpcErr.message ?? '學習幣發放失敗';
+            } else {
+              coinsEarned += rule.amount;
             }
           }
 
-          if (coinsEarned > 0) await get().fetchLearningWallet();
+          if (coinsEarned > 0) {
+            await get().fetchLearningWallet();
+            void get().fetchWalletTransactions().catch(err => {
+              console.error('[completeLesson] fetchWalletTransactions failed after coin grant:', err);
+            });
+          } else if (result.score === 100 && perfectRuleActive) {
+            coinGrantError = coinGrantError ?? '完美答題學習幣未成功發放，請查看錢包異動紀錄或稍後重整。';
+          }
         } else {
           console.log('[completeLesson] no active reward rules found for parentId:', parentLookupId);
         }
@@ -616,9 +713,10 @@ export const useStore = create<InvestmentStore>((set, get) => ({
       }
     } catch (e) {
       console.error('[completeLesson] reward coin granting failed:', e);
+      coinGrantError = e instanceof Error ? e.message : '學習幣發放失敗';
     }
 
-    return { error: null, xpEarned, coinsEarned, levelUp, newStreak };
+    return { error: coinGrantError, xpEarned, coinsEarned, levelUp, newStreak };
   },
 
 
@@ -1003,7 +1101,7 @@ export const useStore = create<InvestmentStore>((set, get) => ({
       if (newSession?.user) {
         await get().loadUserData(newSession.user.id);
       } else {
-        set({ user: null, children: [], holdings: [], trades: [], withdrawalRequests: [] });
+        set({ user: null, children: [], holdings: [], trades: [], dividendPayments: [], withdrawalRequests: [] });
       }
     });
 
@@ -1101,7 +1199,7 @@ export const useStore = create<InvestmentStore>((set, get) => ({
 
   logout: async () => {
     // 先立即清除本地狀態（UI 立即回應），signOut 網路請求在背景執行不阻塞
-    set({ user: null, session: null, children: [], holdings: [], trades: [], withdrawalRequests: [], featureOverrides: [], allUsers: [], learningProfile: null, learningWallet: null, learningWalletTxs: [], childrenTxLog: [], completedLessonIds: [], rewardRules: [], shopItems: [], redemptions: [], watchlist: [], watchlistSignals: [], watchlistWarnings: [] });
+    set({ user: null, session: null, children: [], holdings: [], trades: [], dividendPayments: [], withdrawalRequests: [], featureOverrides: [], allUsers: [], learningProfile: null, learningWallet: null, learningWalletTxs: [], childrenTxLog: [], completedLessonIds: [], rewardRules: [], shopItems: [], redemptions: [], watchlist: [], watchlistSignals: [], watchlistWarnings: [] });
     if (supabase) supabase.auth.signOut().catch(() => {}); // 背景執行，失敗不影響 UI
     if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; }
   },
@@ -1109,66 +1207,125 @@ export const useStore = create<InvestmentStore>((set, get) => ({
   // ─── Data Loading ──────────────────────────
   loadUserData: async (userId) => {
     if (!supabase) return;
-    set({ loading: true });
+    const previousUser = get().user;
+    const isInitialLoad = previousUser?.id !== userId;
+    set({ loading: true, dataReady: isInitialLoad ? false : get().dataReady });
 
-    // maybeSingle() 避免找不到資料時回傳 406 錯誤
-    const { data: userData } = await supabase.from('users').select('*').eq('id', userId).maybeSingle();
-    if (!userData) { set({ loading: false }); return; }
+    try {
+      // maybeSingle() 避免找不到資料時回傳 406 錯誤；加 timeout 避免下單區永久卡在同步中。
+      const userRes = await withTimeout(
+        supabase.from('users').select('*').eq('id', userId).maybeSingle(),
+        isInitialLoad ? 15000 : 8000,
+        { data: null, error: { message: 'load user timeout' } } as any
+      );
+      if (userRes.error) console.warn('loadUserData user failed:', userRes.error.message);
+      if (!userRes.data) {
+        set({ loading: false, dataReady: !isInitialLoad && Boolean(previousUser) });
+        return;
+      }
 
-    const currentUser = rowToUser(userData);
-    set({ user: currentUser });
+      const currentUser = rowToUser(userRes.data);
+      set({ user: currentUser });
 
-    // 取得基本資料後，平行查詢其餘資料以加速登入
-    await Promise.all([
-      (async () => {
-        const { data: hData } = await supabase.from('holdings').select('*').eq('user_id', userId);
-        const holdings: Holding[] = (hData || []).map(h => ({
-          stockCode: h.stock_code, stockName: h.stock_name,
-          totalShares: Number(h.total_shares), avgCost: Number(h.avg_cost),
-          currentPrice: Number(h.current_price), industry: h.industry,
-        }));
-        set({ holdings });
-      })(),
-      (async () => {
-        const { data: tData } = await supabase.from('trades').select('*').eq('user_id', userId).order('timestamp', { ascending: false });
-        const trades: Trade[] = (tData || []).map(t => ({
-          id: t.id, stockCode: t.stock_code, stockName: t.stock_name,
-          tradeType: t.trade_type as 'buy' | 'sell',
-          quantity: Number(t.quantity), price: Number(t.price),
-          totalAmount: Number(t.total_amount), reason: t.reason as string | undefined, 
-          profit: t.profit != null ? Number(t.profit) : undefined,
-          timestamp: Number(t.timestamp),
-        }));
-        set({ trades });
-      })(),
-      currentUser.role === 'parent' ? get().loadChildren() : Promise.resolve(),
-      get().loadWithdrawalRequests(),
-      (async () => {
-        const { data: foData } = await supabase.from('feature_overrides').select('*').eq('user_id', userId);
-        const featureOverrides: FeatureOverride[] = (foData || []).map(f => ({
-          userId: f.user_id, featureKey: f.feature_key, enabled: Boolean(f.enabled),
-        }));
-        set({ featureOverrides });
-      })(),
-      (async () => {
-        const { data: stData } = await supabase.from('system_settings').select('*');
-        if (stData) {
-          const newSettings = { ...get().systemSettings };
-          stData.forEach(row => {
-            if (row.setting_key in newSettings) {
-              (newSettings as any)[row.setting_key] = Number(row.setting_value);
-            }
-          });
-          set({ systemSettings: newSettings });
-        }
-      })(),
-      get().fetchWatchlist(),
-    ]);
+      // 取得基本資料後，平行查詢其餘資料以加速登入；每段獨立保護，避免單一慢查詢鎖死下單。
+      await Promise.allSettled([
+        (async () => {
+          const res = await withTimeout(
+            supabase.from('holdings').select('*').eq('user_id', userId),
+            10000,
+            { data: null, error: { message: 'holdings timeout' } } as any
+          );
+          if (res.error) { console.warn('loadUserData holdings failed:', res.error.message); return; }
+          const rows = (res.data || []) as Record<string, any>[];
+          const holdings: Holding[] = rows.map(h => ({
+            stockCode: h.stock_code, stockName: h.stock_name,
+            totalShares: Number(h.total_shares), avgCost: Number(h.avg_cost),
+            currentPrice: Number(h.current_price), industry: h.industry,
+          }));
+          set({ holdings });
+        })(),
+        (async () => {
+          const res = await withTimeout(
+            supabase.from('trades').select('*').eq('user_id', userId).order('timestamp', { ascending: false }),
+            10000,
+            { data: null, error: { message: 'trades timeout' } } as any
+          );
+          if (res.error) { console.warn('loadUserData trades failed:', res.error.message); return; }
+          const rows = (res.data || []) as Record<string, any>[];
+          const trades: Trade[] = rows.map(t => ({
+            id: t.id, stockCode: t.stock_code, stockName: t.stock_name,
+            tradeType: t.trade_type as 'buy' | 'sell',
+            quantity: Number(t.quantity), price: Number(t.price),
+            totalAmount: Number(t.total_amount), reason: t.reason as string | undefined,
+            profit: t.profit != null ? Number(t.profit) : undefined,
+            timestamp: Number(t.timestamp),
+          }));
+          set({ trades });
+        })(),
+        currentUser.role === 'parent' ? get().loadChildren() : Promise.resolve(),
+        get().loadWithdrawalRequests(),
+        get().fetchDividendPayments(),
+        (async () => {
+          const res = await withTimeout(
+            supabase.from('feature_overrides').select('*').eq('user_id', userId),
+            8000,
+            { data: null, error: { message: 'feature overrides timeout' } } as any
+          );
+          if (res.error) { console.warn('loadUserData feature overrides failed:', res.error.message); return; }
+          const rows = (res.data || []) as Record<string, any>[];
+          const featureOverrides: FeatureOverride[] = rows.map(f => ({
+            userId: f.user_id, featureKey: f.feature_key, enabled: Boolean(f.enabled),
+          }));
+          set({ featureOverrides });
+        })(),
+        (async () => {
+          const res = await withTimeout(
+            supabase.from('system_settings').select('*'),
+            8000,
+            { data: null, error: { message: 'system settings timeout' } } as any
+          );
+          if (res.error) { console.warn('loadUserData settings failed:', res.error.message); return; }
+          if (res.data) {
+            const newSettings = { ...get().systemSettings };
+            (res.data as Record<string, any>[]).forEach(row => {
+              if (row.setting_key in newSettings) {
+                (newSettings as any)[row.setting_key] = Number(row.setting_value);
+              }
+            });
+            set({ systemSettings: newSettings });
+          }
+        })(),
+        get().fetchWatchlist(),
+      ]);
 
-    set({ loading: false });
+      set({ loading: false, dataReady: true }); // 所有關鍵資料已嘗試同步，開放下單
+    } catch (err) {
+      console.error('loadUserData error:', err);
+      set({ loading: false, dataReady: !isInitialLoad && Boolean(previousUser) });
+    }
   },
 
   // ─── Parent Actions ────────────────────────
+  fetchDividendPayments: async () => {
+    if (!supabase) return;
+    const { user } = get();
+    if (!user) return;
+    try {
+      const { data, error } = await supabase
+        .from('dividend_payments')
+        .select('*')
+        .order('pay_date', { ascending: false })
+        .order('created_at', { ascending: false });
+      if (error) {
+        console.warn('fetchDividendPayments failed:', error.message);
+        return;
+      }
+      set({ dividendPayments: (data || []).map(rowToDividendPayment) });
+    } catch (err) {
+      console.warn('fetchDividendPayments error:', err);
+    }
+  },
+
   loadChildren: async () => {
     if (!supabase) return;
     const { user } = get();
@@ -1214,23 +1371,23 @@ export const useStore = create<InvestmentStore>((set, get) => ({
       return { error: `免費帳號最多只能建立 ${systemSettings.free_max_child_accounts} 個副帳號！\n升級 Premium 可解鎖無限副帳號 💎` };
     }
     try {
-      // 建立隔離臨時 client 進行 signUp，避免搶佔父帳號 auth lock
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
-      const tempClient = createClient(supabaseUrl, supabaseAnonKey, {
-        auth: { storageKey: `sb-temp-${Date.now()}`, persistSession: false, autoRefreshToken: false },
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) return { error: sessionError.message };
+      const token = sessionData.session?.access_token;
+      if (!token) return { error: '登入狀態已失效，請重新登入' };
+
+      const response = await fetch('/api/create-child-account', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ email, password, displayName, avatar, initialBalance }),
       });
-      const { data, error } = await tempClient.auth.signUp({ email, password });
-      if (error) return { error: error.message };
-      if (!data.user) return { error: '無法建立副帳號' };
-      const { error: insertError } = await supabase.from('users').insert([{
-        id: data.user.id, email, display_name: displayName, avatar,
-        role: 'child', parent_id: user.id,
-        available_balance: initialBalance, initial_balance: initialBalance,
-      }]);
-      if (insertError) return { error: insertError.message };
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) return { error: result.error || '建立副帳號失敗' };
       await get().loadChildren();
-      return { error: null, needsConfirmation: !data.session };
+      return { error: null, needsConfirmation: false };
     } catch (e) { return { error: String(e) }; }
   },
 
@@ -1310,47 +1467,55 @@ export const useStore = create<InvestmentStore>((set, get) => ({
 
   approveWithdrawal: async (requestId) => {
     if (!supabase) return { error: '資料庫未連線' };
-    const { withdrawalRequests } = get();
-    const req = withdrawalRequests.find(r => r.id === requestId);
-    if (!req) return { error: '找不到此申請' };
+    try {
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) return { error: sessionError.message };
+      const token = sessionData.session?.access_token;
+      if (!token) return { error: '登入狀態已失效，請重新登入' };
 
-    const { data: child } = await supabase.from('users').select('available_balance').eq('id', req.childId).single();
-    if (!child) return { error: '找不到副帳號' };
+      const response = await fetch('/api/withdrawal-request', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ requestId, action: 'approve' }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) return { error: result.error || '同意出金失敗' };
 
-    const oldBalance = Number(child.available_balance);
-    if (oldBalance < req.amount) return { error: '副帳號餘額不足，無法出金' };
-
-    // 只扣除可用餘額（永久減少，無上限概念）
-    const { error: updateError } = await supabase.from('users').update({
-      available_balance: oldBalance - req.amount,
-    }).eq('id', req.childId);
-    if (updateError) return { error: updateError.message };
-
-    await supabase.from('withdrawal_requests').update({
-      status: 'approved',
-      reviewed_at: new Date().toISOString(),
-    }).eq('id', requestId);
-
-    await supabase.from('trades').insert([{
-      user_id: req.childId, stock_code: 'WD', stock_name: '提款出金',
-      trade_type: 'withdraw', quantity: 1, price: req.amount,
-      total_amount: req.amount, reason: '家長已核准提款',
-      timestamp: Date.now()
-    }]);
-
-    await get().loadWithdrawalRequests();
-    await get().loadChildren();
-    return { error: null };
+      await get().loadWithdrawalRequests();
+      await get().loadChildren();
+      return { error: null };
+    } catch (e) {
+      return { error: e instanceof Error ? e.message : '同意出金失敗' };
+    }
   },
 
   rejectWithdrawal: async (requestId) => {
     if (!supabase) return { error: '資料庫未連線' };
-    await supabase.from('withdrawal_requests').update({
-      status: 'rejected',
-      reviewed_at: new Date().toISOString(),
-    }).eq('id', requestId);
-    await get().loadWithdrawalRequests();
-    return { error: null };
+    try {
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) return { error: sessionError.message };
+      const token = sessionData.session?.access_token;
+      if (!token) return { error: '登入狀態已失效，請重新登入' };
+
+      const response = await fetch('/api/withdrawal-request', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ requestId, action: 'reject' }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) return { error: result.error || '拒絕出金失敗' };
+
+      await get().loadWithdrawalRequests();
+      return { error: null };
+    } catch (e) {
+      return { error: e instanceof Error ? e.message : '拒絕出金失敗' };
+    }
   },
 
   // ─── Child Actions ─────────────────────────
@@ -1372,27 +1537,40 @@ export const useStore = create<InvestmentStore>((set, get) => ({
   },
 
   // ─── Price Refresh ──────────────────────────
-  refreshHoldingPrices: async () => {
+  refreshHoldingPrices: async (options = {}) => {
     const { user, holdings } = get();
-    if (!supabase || !user || holdings.length === 0) return;
+    if (!supabase || !user || holdings.length === 0) {
+      return { checkedCount: 0, priceFoundCount: 0, updatedCount: 0 };
+    }
 
     // ── 快取判斷：盤中 5 分鐘、盤後/假日 24 小時 ──────────────────────────
     const now = Date.now();
     const ttl = isMarketOpen() ? 5 * 60 * 1000 : 24 * 60 * 60 * 1000;
-    if (lastPriceRefreshAt !== null && now - lastPriceRefreshAt < ttl) return;
+    if (!options.force && lastPriceRefreshAt !== null && now - lastPriceRefreshAt < ttl) {
+      return { checkedCount: holdings.length, priceFoundCount: 0, updatedCount: 0 };
+    }
     lastPriceRefreshAt = now;
 
-    // 1. 同時取官方 TWSE/TPEx（快取，快速）與 ifalgo（最新當日收盤，即時）
+    // 1. 同時取雲端官方價格 map、逐檔官方價與 ifalgo。
+    //    雲端 map 可避開本機逐檔 proxy 502 時整批無法更新的問題。
     //    比較兩者日期，使用較新的那筆 → 解決官方 API 盤後延遲問題
-    const [officialResults, stockDatas] = await Promise.all([
-      Promise.all(holdings.map(h => fetchOfficialClosePrice(h.stockCode))),
+    const [officialPriceMap, stockDatas] = await Promise.all([
+      fetchOfficialPriceMap().catch((): OfficialPriceMap => ({})),
       Promise.all(holdings.map(h => fetchStockData(h.stockCode))),
     ]);
 
     // 2. 找出有新價格且與現有不同的持股
     const updates: { stockCode: string; newPrice: number }[] = [];
+    let priceFoundCount = 0;
     const updatedHoldings = holdings.map((h, i) => {
-      const official = officialResults[i];
+      const officialFromMap = officialPriceMap[h.stockCode];
+      const official = officialFromMap
+        ? {
+            price: Number(officialFromMap.close),
+            name: officialFromMap.name,
+            date: officialFromMap.date,
+          }
+        : null;
       const stockRes = stockDatas[i];
 
       // ifalgo 最新收盤
@@ -1417,6 +1595,10 @@ export const useStore = create<InvestmentStore>((set, get) => ({
         newPrice = ifalgoPrice;
       }
 
+      if (!isNaN(newPrice) && newPrice > 0) {
+        priceFoundCount++;
+      }
+
       if (!isNaN(newPrice) && newPrice > 0 && newPrice !== h.currentPrice) {
         updates.push({ stockCode: h.stockCode, newPrice });
         return { ...h, currentPrice: newPrice };
@@ -1437,6 +1619,11 @@ export const useStore = create<InvestmentStore>((set, get) => ({
       // 4. 同步更新 store，觸發所有頁面 re-render
       set({ holdings: updatedHoldings });
     }
+    return {
+      checkedCount: holdings.length,
+      priceFoundCount,
+      updatedCount: updates.length,
+    };
   },
 
   // ─── Trade Note ────────────────────────────
@@ -1458,7 +1645,7 @@ export const useStore = create<InvestmentStore>((set, get) => ({
 
   // ─── Trading ───────────────────────────────
   executeBuy: async (stockCode, stockName, quantity, price, industry, reason) => {
-    const { user, holdings, trades } = get();
+    const { user, holdings, trades, watchlist } = get();
     if (!user || !supabase) return { success: false, message: '尚未登入' };
     if (quantity <= 0) return { success: false, message: '至少要買 1 股喔！' };
 
@@ -1501,7 +1688,27 @@ export const useStore = create<InvestmentStore>((set, get) => ({
         ? holdings.map((h, i) => i === existingIdx
             ? { ...h, totalShares: newSharesNum, avgCost: newAvgCostNum, currentPrice: price } : h)
         : [...holdings, { stockCode, stockName, totalShares: newSharesNum, avgCost: newAvgCostNum, currentPrice: price, industry: industry || '' }];
-      set({ user: { ...user, availableBalance: newBalance }, trades: [newTrade, ...trades], holdings: newHoldings });
+      const isWatched = watchlist.some(w => w.stockCode === stockCode);
+      set({
+        user: { ...user, availableBalance: newBalance },
+        trades: [newTrade, ...trades],
+        holdings: newHoldings,
+        watchlist: isWatched ? watchlist.filter(w => w.stockCode !== stockCode) : watchlist,
+      });
+
+      if (isWatched) {
+        withWriteTimeout(
+          supabase
+            .from('watchlist')
+            .delete()
+            .eq('user_id', user.id)
+            .eq('stock_code', stockCode),
+          10000
+        ).catch(err => {
+          console.warn('remove watchlist after buy failed:', err);
+        });
+      }
+
       return { success: true, message: `成功買入 ${stockName} ${quantity} 股 🎉` };
     } catch (err) {
       console.error('executeBuy error:', err);
@@ -1628,19 +1835,34 @@ export const useStore = create<InvestmentStore>((set, get) => ({
     return { error: null };
   },
 
-  updateBrokerSettings: async (brokerFeeRate, brokerMinFee, brokerTaxRate) => {
+  updateBrokerSettings: async (brokerFeeRate, brokerMinFee, brokerTaxRate, stopLossAlertPct) => {
     if (!supabase) return { error: '資料庫未連線' };
-    const { user } = get();
+    const { user, children } = get();
     if (!user || user.role !== 'parent') return { error: '只有主帳號可以修改手續費設定' };
 
-    const { error } = await supabase.from('users').update({
+    const settingsPatch = {
       broker_fee_rate: brokerFeeRate,
       broker_min_fee: brokerMinFee,
       broker_tax_rate: brokerTaxRate,
-    }).eq('id', user.id);
+      stop_loss_alert_pct: stopLossAlertPct,
+    };
+
+    const { error } = await supabase
+      .from('users')
+      .update(settingsPatch)
+      .or(`id.eq.${user.id},parent_id.eq.${user.id}`);
 
     if (error) return { error: error.message };
-    set({ user: { ...user, brokerFeeRate, brokerMinFee, brokerTaxRate } });
+    set({
+      user: { ...user, brokerFeeRate, brokerMinFee, brokerTaxRate, stopLossAlertPct },
+      children: children.map(child => ({
+        ...child,
+        brokerFeeRate,
+        brokerMinFee,
+        brokerTaxRate,
+        stopLossAlertPct,
+      })),
+    });
     return { error: null };
   },
 
@@ -1858,8 +2080,11 @@ export const useStore = create<InvestmentStore>((set, get) => ({
 
   addToWatchlist: async (stockCode, stockName, currentPrice, note) => {
     if (!supabase) return { error: '資料庫未連線' };
-    const { user, watchlist } = get();
+    const { user, watchlist, holdings } = get();
     if (!user) return { error: '尚未登入' };
+    if (holdings.some(h => h.stockCode === stockCode && h.totalShares > 0)) {
+      return { error: '這檔股票已經在庫存中，不需要再加入觀察名單' };
+    }
     // 防止重複加入
     if (watchlist.some(w => w.stockCode === stockCode)) {
       return { error: '這檔股票已在觀察名單中' };
@@ -1892,6 +2117,15 @@ export const useStore = create<InvestmentStore>((set, get) => ({
     }
     // 背景同步真正的 DB id（不阻塞 UI）
     get().fetchWatchlist();
+    fetch(`/api/app-cache?type=stock-quant-snapshot&coid=${encodeURIComponent(stockCode)}&stockName=${encodeURIComponent(stockName)}`, {
+      cache: 'no-store',
+      headers: {
+        accept: 'application/json',
+        ...(get().session?.access_token ? { Authorization: `Bearer ${get().session!.access_token}` } : {}),
+      },
+    }).catch(err => {
+      console.warn('watchlist quant snapshot warmup failed:', err);
+    });
     return { error: null };
   },
 
@@ -1913,7 +2147,7 @@ export const useStore = create<InvestmentStore>((set, get) => ({
     return get().watchlist.some(w => w.stockCode === stockCode);
   },
 
-  checkWatchlistSignals: async () => {
+  checkWatchlistSignals: async (stockDataMap) => {
     const { watchlist } = get();
     if (watchlist.length === 0) {
       set({ watchlistSignals: [], watchlistSignalsLoading: false });
@@ -1923,10 +2157,12 @@ export const useStore = create<InvestmentStore>((set, get) => ({
 
     const signals: WatchlistSignal[] = [];
 
-    // 平行抓取所有觀察股票的 K 線資料
-    const stockDatas = await Promise.all(
-      watchlist.map(w => fetchStockData(w.stockCode).catch(() => null))
-    );
+    // 優先使用觀察名單頁已抓好的 K 線資料，避免同一次進頁重複打 API。
+    const stockDatas = stockDataMap
+      ? watchlist.map(w => stockDataMap[w.stockCode] ?? null)
+      : await Promise.all(
+          watchlist.map(w => fetchStockData(w.stockCode).catch(() => null))
+        );
 
     for (let i = 0; i < watchlist.length; i++) {
       const w = watchlist[i];
@@ -2078,4 +2314,3 @@ export const useStore = create<InvestmentStore>((set, get) => ({
     return { totalMarketValue, totalCost, totalProfitLoss, profitLossPct, cashBalance: user.availableBalance, totalAssets: user.availableBalance + totalMarketValue };
   },
 }));
-

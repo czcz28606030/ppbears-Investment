@@ -133,6 +133,27 @@
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 
+.settings-input-wrap {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.settings-input-wrap .settings-input {
+  width: 100%;
+  padding-right: 42px;
+}
+
+.settings-input-suffix {
+  position: absolute;
+  right: 14px;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--text-secondary);
+  pointer-events: none;
+}
+
 .settings-input:focus {
   border-color: var(--primary);
   box-shadow: 0 0 0 3px rgba(255, 107, 107, 0.15);
@@ -148,6 +169,17 @@
   flex: 1;
   font-size: 14px;
   color: var(--text-primary);
+}
+
+.settings-helper {
+  margin: 0 20px 16px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255, 193, 7, 0.12);
+  color: #7a5800;
+  font-size: 12.5px;
+  line-height: 1.5;
+  font-weight: 700;
 }
 
 .role-badge {

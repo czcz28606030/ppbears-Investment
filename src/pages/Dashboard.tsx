@@ -1,84 +1,346 @@
 import { useState, useEffect } from 'react';
+import type { MouseEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useStore, formatMoney, formatPrice } from '../store';
-import { fetchStockData, fetchExDividendCalendar, type ExDividendInfo } from '../api';
+import { useStore, formatMoney } from '../store';
+import { fetchHomeMarketSummary, type HomeMarketSummary } from '../api';
 import AdBanner from '../components/AdBanner';
 import './Dashboard.css';
 
+const MOOD_ICON: Record<HomeMarketSummary['marketMood']['primary'], string> = {
+  貪婪: '🔥',
+  樂觀: '☀️',
+  放鬆: '🍃',
+  冷靜: '🧊',
+};
+
+const MOOD_CLASS: Record<HomeMarketSummary['marketMood']['primary'], string> = {
+  貪婪: 'greedy',
+  樂觀: 'upbeat',
+  放鬆: 'relaxed',
+  冷靜: 'calm',
+};
+
+function mapValue(value: number, min: number, max: number, top: number, bottom: number): number {
+  return bottom - ((value - min) / (max - min)) * (bottom - top);
+}
+
+function clampValue(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
+function pointsToPath(points: Array<{ x: number; y: number }>): string {
+  return points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x.toFixed(1)} ${point.y.toFixed(1)}`).join(' ');
+}
+
+function monthLabelToDate(label: string): string {
+  const [year, month] = label.split('/');
+  if (!year || !month) return label;
+  return `${year}-${month.padStart(2, '0')}-01`;
+}
+
+function formatChartNumber(value: number, digits: number): string {
+  return value.toLocaleString('en-US', {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  });
+}
+
+function polarPoint(cx: number, cy: number, radius: number, angleDeg: number): { x: number; y: number } {
+  const angle = (angleDeg * Math.PI) / 180;
+  return {
+    x: cx + Math.cos(angle) * radius,
+    y: cy + Math.sin(angle) * radius,
+  };
+}
+
+function getMonthlyGaugeScore(label: string, score: number, directionScore?: number): number {
+  if (typeof directionScore === 'number' && Number.isFinite(directionScore)) return clampValue(directionScore, 0, 100);
+  const normalized = String(label || '');
+  if (normalized.includes('偏多') || normalized.includes('多')) return 82;
+  if (normalized.includes('偏空') || normalized.includes('偏弱') || normalized.includes('空')) return 18;
+  if (normalized.includes('穩健')) return 62;
+  return clampValue(score, 0, 100);
+}
+
+function MarketMomentumChart({ summary }: { summary: HomeMarketSummary }) {
+  const [hoverIndex, setHoverIndex] = useState<number | null>(null);
+  const [showGuide, setShowGuide] = useState(false);
+  const width = 640;
+  const height = 360;
+  const chart = { left: 54, right: 50, top: 44, bottom: 44 };
+  const chartWidth = width - chart.left - chart.right;
+  const chartHeight = height - chart.top - chart.bottom;
+  const [momentumMin, momentumMax] = summary.marketFundMomentum.momentumRange;
+  const [taiexMin, taiexMax] = summary.marketFundMomentum.taiexRange;
+  const points = summary.marketFundMomentum.points;
+  const zeroY = mapValue(0, momentumMin, momentumMax, chart.top, chart.top + chartHeight);
+  const barGap = 5;
+  const barWidth = Math.max(5, chartWidth / points.length - barGap);
+  const linePoints = points.map((point, index) => ({
+    x: chart.left + (index / Math.max(points.length - 1, 1)) * chartWidth,
+    y: mapValue(point.taiex, taiexMin, taiexMax, chart.top, chart.top + chartHeight),
+  }));
+  const momentumTicks = [0, -0.3, -0.6, -0.9, -1.2, -1.5];
+  const taiexTicks = [48000, 46000, 44000, 42000, 40000, 38000, 36000, 34000, 32000, 30000, 28000, 26000, 24000, 22000, 20000, 18000, 16000, 14000, 12000, 10000, 8000, 6000, 4000, 2000];
+  const hoveredPoint = hoverIndex === null ? null : points[hoverIndex];
+  const hoveredLinePoint = hoverIndex === null ? null : linePoints[hoverIndex];
+  const tooltipX = hoveredLinePoint ? Math.min(Math.max(hoveredLinePoint.x - 96, chart.left + 8), width - chart.right - 210) : 0;
+  const tooltipY = hoveredLinePoint ? Math.min(Math.max(hoveredLinePoint.y - 66, chart.top + 8), chart.top + chartHeight - 88) : 0;
+
+  function handleChartPointerMove(event: MouseEvent<SVGRectElement>) {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const svgX = ((event.clientX - rect.left) / rect.width) * width;
+    const ratio = clampValue((svgX - chart.left) / chartWidth, 0, 1);
+    const nextIndex = Math.round(ratio * (points.length - 1));
+    setHoverIndex(nextIndex);
+  }
+
+  return (
+    <div className="macro-chart-with-guide">
+      <button
+        type="button"
+        className="macro-chart-help-button"
+        aria-expanded={showGuide}
+        aria-label="查看市場資金動能圖說明"
+        onClick={() => setShowGuide(current => !current)}
+      >
+        ?
+      </button>
+      <svg className="macro-chart-svg" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="市場資金動能圖">
+        <text x={width / 2} y="24" textAnchor="middle" className="macro-chart-title-svg">市場資金動能圖</text>
+        {momentumTicks.map(tick => {
+          const y = mapValue(tick, momentumMin, momentumMax, chart.top, chart.top + chartHeight);
+          return (
+            <g key={tick}>
+              <line x1={chart.left} x2={width - chart.right} y1={y} y2={y} className="macro-grid-line" />
+              <text x={chart.left - 10} y={y + 4} textAnchor="end" className="macro-axis-text">{tick === 0 ? '0' : tick.toFixed(1)}</text>
+            </g>
+          );
+        })}
+        {taiexTicks.map(tick => {
+          const y = mapValue(tick, taiexMin, taiexMax, chart.top, chart.top + chartHeight);
+          return <text key={tick} x={width - chart.right + 8} y={y + 4} className="macro-axis-text">{tick.toLocaleString('en-US')}</text>;
+        })}
+        <text x="15" y={height / 2} transform={`rotate(-90 15 ${height / 2})`} textAnchor="middle" className="macro-axis-label">市場資金動能</text>
+        {points.map((point, index) => {
+          const x = chart.left + index * (chartWidth / points.length) + barGap / 2;
+          const y = mapValue(point.moneyMomentum, momentumMin, momentumMax, chart.top, chart.top + chartHeight);
+          return (
+            <rect
+              key={`${point.label}-${index}`}
+              x={x}
+              y={Math.min(y, zeroY)}
+              width={barWidth}
+              height={Math.max(2, Math.abs(zeroY - y))}
+              className={`macro-money-bar ${point.moneyMomentum >= 0 ? 'positive' : 'negative'}`}
+            />
+          );
+        })}
+        <path d={pointsToPath(linePoints)} className="macro-taiex-line" />
+        {hoveredPoint && hoveredLinePoint && (
+          <g className="macro-hover-layer">
+            <line x1={hoveredLinePoint.x} x2={hoveredLinePoint.x} y1={chart.top} y2={chart.top + chartHeight} className="macro-hover-line" />
+            <circle cx={hoveredLinePoint.x} cy={hoveredLinePoint.y} r="4.2" className="macro-hover-dot" />
+            <rect x={chart.left - 48} y={mapValue(hoveredPoint.moneyMomentum, momentumMin, momentumMax, chart.top, chart.top + chartHeight) - 12} width="48" height="22" rx="3" className="macro-hover-axis-tag" />
+            <text x={chart.left - 24} y={mapValue(hoveredPoint.moneyMomentum, momentumMin, momentumMax, chart.top, chart.top + chartHeight) + 4} textAnchor="middle" className="macro-hover-axis-text">{hoveredPoint.moneyMomentum.toFixed(3)}</text>
+            <rect x={width - chart.right + 4} y={hoveredLinePoint.y - 12} width="58" height="22" rx="3" className="macro-hover-axis-tag" />
+            <text x={width - chart.right + 33} y={hoveredLinePoint.y + 4} textAnchor="middle" className="macro-hover-axis-text">{formatChartNumber(hoveredPoint.taiex, 2)}</text>
+            <rect x={hoveredLinePoint.x - 39} y={height - chart.bottom + 8} width="78" height="24" rx="3" className="macro-hover-axis-tag" />
+            <text x={hoveredLinePoint.x} y={height - chart.bottom + 24} textAnchor="middle" className="macro-hover-axis-text">{monthLabelToDate(hoveredPoint.label)}</text>
+            <g transform={`translate(${tooltipX} ${tooltipY})`}>
+              <rect width="202" height="76" rx="4" className="macro-tooltip-box" />
+              <text x="12" y="23" className="macro-tooltip-date">{monthLabelToDate(hoveredPoint.label)}</text>
+              <circle cx="16" cy="43" r="5" className="macro-tooltip-money-dot" />
+              <text x="28" y="47" className="macro-tooltip-label">市場資金動能</text>
+              <text x="186" y="47" textAnchor="end" className="macro-tooltip-value">{hoveredPoint.moneyMomentum.toFixed(4)}</text>
+              <circle cx="16" cy="63" r="5" className="macro-tooltip-taiex-dot" />
+              <text x="28" y="67" className="macro-tooltip-label">大盤月K</text>
+              <text x="186" y="67" textAnchor="end" className="macro-tooltip-value">{formatChartNumber(hoveredPoint.taiex, 1)}</text>
+            </g>
+          </g>
+        )}
+        <text x={chart.left} y={height - 10} className="macro-axis-text">Jul</text>
+        <text x={chart.left + chartWidth * 0.15} y={height - 10} className="macro-axis-text bold">2023</text>
+        <text x={chart.left + chartWidth * 0.29} y={height - 10} className="macro-axis-text">Jul</text>
+        <text x={chart.left + chartWidth * 0.42} y={height - 10} className="macro-axis-text bold">2024</text>
+        <text x={chart.left + chartWidth * 0.56} y={height - 10} className="macro-axis-text">Jul</text>
+        <text x={chart.left + chartWidth * 0.72} y={height - 10} className="macro-axis-text bold">2025</text>
+        <text x={chart.left + chartWidth * 0.85} y={height - 10} className="macro-axis-text">Jul</text>
+        <text x={chart.left + chartWidth * 0.93} y={height - 10} className="macro-axis-text bold">2026</text>
+        <rect
+          x={chart.left}
+          y={chart.top}
+          width={chartWidth}
+          height={chartHeight}
+          className="macro-chart-hit-area"
+          onMouseMove={handleChartPointerMove}
+          onMouseLeave={() => setHoverIndex(null)}
+        />
+      </svg>
+      {showGuide && (
+        <div className="macro-chart-guide" role="note">
+          <h3>這張圖可以看什麼</h3>
+          <p>柱體是 IFalgo 模型的市場資金動能；紅色代表動能轉正，綠色代表仍在 0 以下，藍線是大盤月 K。</p>
+          <ul>
+            <li>柱體往 0 靠近，代表模型中的資金壓力減輕。</li>
+            <li>柱體往下擴大，代表模型中的資金動能轉弱。</li>
+            <li>藍線上升且柱體同步改善，表示行情上漲較有資金動能配合。</li>
+            <li>藍線創高但柱體沒有改善，可能代表行情較集中或資金動能沒有同步跟上。</li>
+          </ul>
+          <p>這不是外資匯入金額，也不是成交量；不能直接用來判斷外資有沒有進場。</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MarginMaintenanceChart({ summary }: { summary: HomeMarketSummary }) {
+  const width = 640;
+  const height = 180;
+  const chart = { left: 50, right: 42, top: 38, bottom: 34 };
+  const chartWidth = width - chart.left - chart.right;
+  const chartHeight = height - chart.top - chart.bottom;
+  const min = 145;
+  const max = 168;
+  const points = summary.marginMaintenance.points.map((point, index) => ({
+    x: chart.left + (index / Math.max(summary.marginMaintenance.points.length - 1, 1)) * chartWidth,
+    y: mapValue(point.rate, min, max, chart.top, chart.top + chartHeight),
+  }));
+  const ticks = [168, 165, 160, 155, 150, 145];
+
+  return (
+    <svg className="macro-chart-svg margin" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="大盤融資維持率">
+      <text x={width / 2} y="22" textAnchor="middle" className="macro-chart-title-svg">大盤融資維持率</text>
+      <text x={width - chart.right + 4} y="22" className="macro-axis-text">單位%</text>
+      {ticks.map(tick => {
+        const y = mapValue(tick, min, max, chart.top, chart.top + chartHeight);
+        return (
+          <g key={tick}>
+            <line x1={chart.left} x2={width - chart.right} y1={y} y2={y} className="macro-grid-line" />
+            <text x={width - chart.right + 8} y={y + 4} className="macro-axis-text">{tick}</text>
+          </g>
+        );
+      })}
+      <path d={pointsToPath(points)} className="macro-taiex-line" />
+      <text x={chart.left - 24} y={height - 4} className="macro-axis-text">2025/12/01</text>
+      <text x={chart.left + chartWidth * 0.22} y={height - 4} className="macro-axis-text">2026/01/01</text>
+      <text x={chart.left + chartWidth * 0.42} y={height - 4} className="macro-axis-text">2026/02/01</text>
+      <text x={chart.left + chartWidth * 0.62} y={height - 4} className="macro-axis-text">2026/03/01</text>
+      <text x={chart.left + chartWidth * 0.81} y={height - 4} className="macro-axis-text">2026/04/01</text>
+      <text x={width - chart.right - 28} y={height - 4} className="macro-axis-text">2026/05/01</text>
+    </svg>
+  );
+}
+
+function MonthlyGauge({
+  score,
+  label,
+  monthLabel,
+  directionScore,
+}: {
+  score: number;
+  label: string;
+  monthLabel: string;
+  directionScore?: number;
+}) {
+  const gaugeScore = getMonthlyGaugeScore(label, score, directionScore);
+  const rotation = -90 + (gaugeScore / 100) * 180;
+  const needle = polarPoint(85, 92, 47, rotation - 90);
+  const title = `AI ${monthLabel}預測多空`;
+  const centerText = label || `${score}分`;
+  return (
+    <div className="macro-gauge-block">
+      <div className="macro-gauge-title"><span>☀️</span> {title}</div>
+      <svg viewBox="0 0 170 122" className="macro-gauge-svg cute" role="img" aria-label={`${title} ${centerText}`}>
+        <path d="M24 92 A61 61 0 0 1 146 92" className="cute-gauge-track" />
+        <path d="M24 92 A61 61 0 0 1 85 31" className="cute-gauge-arc calm" />
+        <path d="M85 31 A61 61 0 0 1 146 92" className="cute-gauge-arc bright" />
+        <circle cx="43" cy="66" r="5" className="cute-dot calm" />
+        <circle cx="85" cy="31" r="6" className="cute-dot middle" />
+        <circle cx="128" cy="66" r="5" className="cute-dot bright" />
+        <line x1="85" y1="92" x2={needle.x} y2={needle.y} className="cute-gauge-needle-line" />
+        <circle cx={needle.x} cy={needle.y} r="4.5" className="cute-gauge-needle-tip" />
+        <circle cx="85" cy="92" r="8" className="cute-gauge-center" />
+        <text x="85" y="112" textAnchor="middle" className="cute-gauge-score">{centerText}</text>
+      </svg>
+    </div>
+  );
+}
+
+function DailyGauge({ score, maxScore }: { score: number; maxScore: number }) {
+  const clampedScore = Math.max(0, Math.min(maxScore, score));
+  const needleAngle = 180 + (clampedScore / maxScore) * 180;
+  const needle = polarPoint(85, 84, 45, needleAngle);
+  const tickValues = Array.from({ length: maxScore + 1 }, (_, value) => value);
+  return (
+    <div className="macro-gauge-block daily">
+      <div className="macro-gauge-title"><span>⚡</span> AI今日預測多空</div>
+      <svg viewBox="0 0 170 122" className="macro-gauge-svg daily cute" role="img" aria-label={`AI今日預測多空 ${score}分`}>
+        <path d="M23 84 A62 62 0 0 1 147 84" className="cute-daily-track" />
+        <path d="M23 84 A62 62 0 0 1 69 28" className="cute-daily-segment cool" />
+        <path d="M69 28 A62 62 0 0 1 118 38" className="cute-daily-segment soft" />
+        <path d="M118 38 A62 62 0 0 1 147 84" className="cute-daily-segment hot" />
+        {tickValues.map(value => {
+          const angle = 180 + (value / maxScore) * 180;
+          const label = polarPoint(85, 84, 43, angle);
+          const tickOuter = polarPoint(85, 84, 61, angle);
+          const tickInner = polarPoint(85, 84, 53, angle);
+          return (
+            <g key={value}>
+              <line x1={tickInner.x} y1={tickInner.y} x2={tickOuter.x} y2={tickOuter.y} className="cute-daily-tick" />
+              <text x={label.x} y={label.y + 4} textAnchor="middle" className="macro-daily-number">{value}</text>
+            </g>
+          );
+        })}
+        <line x1="85" y1="84" x2={needle.x} y2={needle.y} className="cute-daily-needle-line" />
+        <circle cx={needle.x} cy={needle.y} r="4.5" className="cute-gauge-needle-tip" />
+        <circle cx="85" cy="84" r="7" className="cute-gauge-center" />
+        <text x="85" y="112" textAnchor="middle" className="cute-gauge-score">{score}/{maxScore}</text>
+      </svg>
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { user, holdings, trades: allTrades, getPortfolioSummary, requestWithdrawal, refreshHoldingPrices } = useStore();
+  const { user, trades: allTrades, getPortfolioSummary, requestWithdrawal, isPremiumUser } = useStore();
   const trades = allTrades.slice(0, 5);
   const summary = getPortfolioSummary();
+  const canViewSimonsModel = isPremiumUser();
   const [showWithdrawal, setShowWithdrawal] = useState(false);
   const [wAmount, setWAmount] = useState('');
   const [wReason, setWReason] = useState('');
   const [wError, setWError] = useState('');
   const [wLoading, setWLoading] = useState(false);
-  
-  const [liveQuotes, setLiveQuotes] = useState<Record<string, any>>({});
-  const [exDivCalendar, setExDivCalendar] = useState<Map<string, ExDividendInfo>>(new Map());
+  const [marketSummary, setMarketSummary] = useState<HomeMarketSummary | null>(null);
+  const [marketLoading, setMarketLoading] = useState(true);
+  const [marketError, setMarketError] = useState('');
+  const [showMoodGuide, setShowMoodGuide] = useState(false);
 
   useEffect(() => {
-    async function fetchLive() {
-      if (holdings.length === 0) {
-        setLiveQuotes({});
-        return;
-      }
-      
-      // 先同步最新收盤價到 Supabase 與 store（確保所有頁面數據一致）
-      await refreshHoldingPrices();
-
-      // 使用 IFalgo 即時資料計算今日漲跌顯示（支援上市與上櫃股）
-      const stockDatas = await Promise.all(
-        holdings.map(h => fetchStockData(h.stockCode))
-      );
-      const [, exDivMap] = await Promise.all([
-        Promise.resolve(),
-        fetchExDividendCalendar(),
-      ]);
-      
-      setExDivCalendar(exDivMap);
-      
-      const quotesMap: Record<string, any> = {};
-      
-      holdings.forEach((h, idx) => {
-        const stockRes = stockDatas[idx];
-        if (stockRes && stockRes.prices && stockRes.prices.length >= 2) {
-           const prices = stockRes.prices;
-           const latest = prices[prices.length - 1];
-           const prev = prices[prices.length - 2];
-           
-           const close = parseFloat(latest.close_d);
-           const prevClose = parseFloat(prev.close_d);
-
-           // ─── 只有當最新 K 線資料是「今天」才計算今日損益 ───
-           // 若最新資料是昨天或更早（例如開盤前、假日），漲跌視為 0
-           const todayStr = new Date().toISOString().split('T')[0].replace(/-/g, '');
-           // mdate 格式可能是 "20240411" 或 "2024-04-11"，統一去除 "-"
-           const latestDateStr = (latest.mdate || '').replace(/-/g, '');
-           const isMarketDataFromToday = latestDateStr === todayStr;
-
-           const changeAmount = isMarketDataFromToday ? (close - prevClose) : 0;
-           
-           quotesMap[h.stockCode] = {
-             ClosingPrice: latest.close_d,
-             Change: changeAmount.toString()
-           };
-        } else if (stockRes && stockRes.prices && stockRes.prices.length === 1) {
-           // 新上市掛牌等極端狀況只有一天資料
-           const latest = stockRes.prices[0];
-           quotesMap[h.stockCode] = {
-             ClosingPrice: latest.close_d,
-             Change: '0'
-           };
-        }
-      });
-      setLiveQuotes(quotesMap);
+    if (!canViewSimonsModel) {
+      setMarketSummary(null);
+      setMarketError('');
+      setMarketLoading(false);
+      return;
     }
-    fetchLive();
-  }, [holdings.length]); // 依賴 holdings.length：首次載入 + 持股數量改變時觸發
 
+    let cancelled = false;
+    async function loadMarketSummary() {
+      setMarketLoading(true);
+      setMarketError('');
+      const summaryData = await fetchHomeMarketSummary();
+      if (cancelled) return;
+      if (summaryData) {
+        setMarketSummary(summaryData);
+      } else {
+        setMarketError('目前沒有可用的 Simons 市場資料');
+      }
+      setMarketLoading(false);
+    }
+    loadMarketSummary();
+    return () => { cancelled = true; };
+  }, [canViewSimonsModel]);
 
   const profitClass = summary.totalProfitLoss >= 0 ? 'profit' : 'loss';
   const greetingEmoji = summary.totalProfitLoss >= 0 ? '😊' : '💪';
@@ -174,6 +436,10 @@ export default function Dashboard() {
           <span className="qa-icon">🕒</span>
           <span className="qa-label">交易紀錄</span>
         </button>
+        <button className="quick-action-btn" onClick={() => navigate('/dividends')}>
+          <span className="qa-icon">💰</span>
+          <span className="qa-label">股利紀錄</span>
+        </button>
         {user?.isAdmin && (
           <button className="quick-action-btn" onClick={() => navigate('/backtest')}>
             <span className="qa-icon">📊</span>
@@ -234,119 +500,103 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* 我的持股 */}
-      {holdings.length > 0 && (
-        <section>
+      {canViewSimonsModel && (
+        <section className="market-panel">
           <div className="section-header">
-            <h2 className="section-title">📊 我的持股</h2>
-            <span className="section-action" onClick={() => navigate('/portfolio')}>查看全部</span>
+            <h2 className="section-title">📊 Simons 量化模型</h2>
+            <span className="market-source">{marketSummary ? `更新時間：${marketSummary.updateDate}` : '同步中'}</span>
           </div>
-          <div className="holdings-preview" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            {holdings.map((h) => {
-              const quote = liveQuotes[h.stockCode];
-              
-              const currentPrice = quote ? parseFloat(quote.ClosingPrice) : h.currentPrice;
-              const liveChangeAmt = quote && quote.Change ? parseFloat(quote.Change) : 0;
-              const prevPrice = currentPrice - liveChangeAmt;
-              const liveChangePct = prevPrice > 0 ? (liveChangeAmt / prevPrice) * 100 : 0;
-              
-              const totalCost = h.avgCost * h.totalShares;
-              const totalPnL = (currentPrice - h.avgCost) * h.totalShares;
-              const totalPnLPct = h.avgCost > 0 ? ((currentPrice - h.avgCost) / h.avgCost * 100) : 0;
-              const isProfit = totalPnL >= 0;
 
-              return (
-                <div key={h.stockCode} className="card" onClick={() => navigate(`/stock/${h.stockCode}`)} style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '16px', cursor: 'pointer' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f5f5f5', paddingBottom: '12px' }}>
-                     <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        <div style={{ fontWeight: 800, fontSize: '16px', color: 'var(--text-primary)' }}>
-                           {h.stockName}
-                        </div>
-                        <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', fontWeight: 500, marginTop: '2px' }}>
-                           {h.stockCode}
-                        </div>
-                     </div>
-                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <div className={liveChangeAmt >= 0 ? 'text-profit' : 'text-loss'} style={{ display: 'inline-flex', alignItems: 'center', fontSize: '13px', padding: '2px 6px', background: liveChangeAmt >= 0 ? 'var(--profit-bg)' : 'var(--loss-bg)', borderRadius: '6px', fontWeight: 600 }}>
-                          {liveChangeAmt >= 0 ? '▲' : '▼'} {formatPrice(Math.abs(liveChangeAmt))} ({liveChangePct >= 0 ? '+' : ''}{liveChangePct.toFixed(2)}%)
-                        </div>
-                        <div className={liveChangeAmt >= 0 ? 'text-profit' : 'text-loss'} style={{ display: 'flex', alignItems: 'baseline', gap: '2px' }}>
-                           <span style={{ fontSize: '14px', fontWeight: 700 }}>NT</span>
-                           <span style={{ fontWeight: 800, fontSize: '38px', lineHeight: '1', letterSpacing: '-0.5px' }}>{formatPrice(currentPrice)}</span>
-                        </div>
-                     </div>
-                  </div>
-                  
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', fontSize: '13px', paddingTop: '4px' }}>
-                     <div style={{ display: 'flex', flexDirection: 'column', background: '#fafafa', padding: '10px', borderRadius: '10px' }}>
-                        <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '4px', fontWeight: 600 }}>成交均價</div>
-                        <div style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '15px' }}>
-                           {formatPrice(h.avgCost)}
-                        </div>
-                     </div>
-                     <div style={{ display: 'flex', flexDirection: 'column', background: '#fafafa', padding: '10px', borderRadius: '10px' }}>
-                        <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '4px', fontWeight: 600 }}>現值</div>
-                        <div style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '15px' }}>
-                           {formatMoney(currentPrice * h.totalShares)}
-                        </div>
-                     </div>
-                     <div style={{ display: 'flex', flexDirection: 'column', background: '#fafafa', padding: '10px', borderRadius: '10px' }}>
-                        <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '4px', fontWeight: 600 }}>付出成本</div>
-                        <div style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '15px' }}>
-                           {formatMoney(totalCost)}
-                        </div>
-                     </div>
-                     <div style={{ display: 'flex', flexDirection: 'column', background: '#fafafa', padding: '10px', borderRadius: '10px' }}>
-                        <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '4px', fontWeight: 600 }}>預估損益</div>
-                        <div className={isProfit ? 'text-profit' : 'text-loss'} style={{ fontWeight: 800, fontSize: '15px' }}>
-                           {isProfit ? '+' : ''}{formatMoney(totalPnL)}
-                        </div>
-                     </div>
-                     <div style={{ display: 'flex', flexDirection: 'column', background: '#fafafa', padding: '10px', borderRadius: '10px' }}>
-                        <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '4px', fontWeight: 600 }}>股數</div>
-                        <div style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '15px' }}>
-                           {h.totalShares} 股
-                        </div>
-                     </div>
-                     <div style={{ display: 'flex', flexDirection: 'column', background: '#fafafa', padding: '10px', borderRadius: '10px' }}>
-                        <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '4px', fontWeight: 600 }}>報酬率</div>
-                        <div className={isProfit ? 'text-profit' : 'text-loss'} style={{ fontWeight: 800, fontSize: '15px' }}>
-                           {isProfit ? '+' : ''}{totalPnLPct.toFixed(2)}%
-                        </div>
-                     </div>
-                  </div>
+          {marketLoading && (
+            <div className="market-loading-card">
+              <div className="market-loading-title">正在整理市場量化資料...</div>
+              <div className="market-loading-line"></div>
+              <div className="market-loading-line short"></div>
+            </div>
+          )}
 
-                  {/* 預估現金股利（僅當有除息公告時顯示）*/}
-                  {(() => {
-                    const exDiv = exDivCalendar.get(h.stockCode);
-                    if (!exDiv) return null;
-                    const totalDiv = exDiv.cashDividend * h.totalShares;
-                    return (
-                      <div style={{ borderTop: '1px solid #f0f0f0', paddingTop: '10px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <div style={{ color: 'var(--text-secondary)', fontSize: '12px', fontWeight: 600, marginBottom: '2px' }}>💰 預估現金股利</div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                          <span style={{ fontWeight: 800, fontSize: '16px', color: '#e67e00' }}>NT$ {formatMoney(totalDiv)}</span>
-                          <span style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>{exDiv.cashDividend.toFixed(2)} 元 / 股</span>
-                        </div>
-                        <div style={{ display: 'flex', gap: '16px', fontSize: '11.5px', color: 'var(--text-tertiary)', marginTop: '2px' }}>
-                          <span>📅 除息日：<b style={{ color: 'var(--text-secondary)' }}>{exDiv.exDateStr}</b></span>
-                          <span>💸 預估發放：<b style={{ color: 'var(--text-secondary)' }}>{exDiv.estimatedPayDateStr}</b></span>
-                        </div>
-                        <div style={{ fontSize: '10.5px', color: '#aaa', marginTop: '1px' }}>＊發放日依公司公告為準，預估為除息後 45 天</div>
-                      </div>
-                    );
-                  })()}
+          {!marketLoading && marketError && (
+            <div className="market-error-card">
+              <div className="market-error-title">暫時抓不到市場資料</div>
+              <div className="market-error-desc">{marketError}</div>
+            </div>
+          )}
+
+          {!marketLoading && marketSummary && (
+            <div className="macro-dashboard-card">
+              <div className="macro-dashboard-top">
+                <span><span className="macro-cute-token">🧸</span> 更新時間: {marketSummary.updateDate}</span>
+                <span className="macro-score-badge">
+                  <b>{marketSummary.monthLabel}</b> 月預測：<strong>{marketSummary.monthlyPrediction.label || '觀察中'}</strong>
+                </span>
+              </div>
+
+              <div className="macro-dashboard-grid">
+                <div className="macro-mood-panel">
+                  <button
+                    type="button"
+                    className="macro-chart-help-button macro-mood-help-button"
+                    aria-expanded={showMoodGuide}
+                    aria-label="查看今日市場氛圍說明"
+                    onClick={() => setShowMoodGuide(current => !current)}
+                  >
+                    ?
+                  </button>
+                  <div className={`macro-mood-selected ${MOOD_CLASS[marketSummary.marketMood.primary]}`}>
+                    <div className="macro-mood-selected-icon">{MOOD_ICON[marketSummary.marketMood.primary]}</div>
+                    <div>
+                      <div className="macro-mood-selected-kicker">今日市場氛圍</div>
+                      <h3>{marketSummary.marketMood.primary}</h3>
+                      <p>{marketSummary.marketMood.reason}</p>
+                    </div>
+                  </div>
+                  {showMoodGuide && (
+                    <div className="macro-chart-guide macro-mood-guide" role="note">
+                      <h3>今日市場氛圍怎麼判斷</h3>
+                      <p>這裡每天讀 IFalgo 公開數據，並依照目前整理到的作者樣本規則推估今天的市場氛圍。</p>
+                      <ul>
+                        <li>貪婪：AI日預測偏熱，但月線或總體訊號沒有完全同步，短線追價感較強。</li>
+                        <li>樂觀：市場方向偏正面，但還不到過熱追價或壓力完全放鬆。</li>
+                        <li>放鬆：AI月預測偏多，且融資維持率明顯高於安全線，槓桿壓力較低。</li>
+                        <li>冷靜：AI日預測偏低、月線偏空或融資安全距離不足，需要保守觀察。</li>
+                      </ul>
+                      <p>目前顯示「{marketSummary.marketMood.primary}」是因為：{marketSummary.marketMood.reason}</p>
+                    </div>
+                  )}
                 </div>
-              );
-            })}
-          </div>
+
+                <div className="macro-momentum-large">
+                  <MarketMomentumChart summary={marketSummary} />
+                </div>
+
+                <div className="macro-prediction-row">
+                  <MonthlyGauge
+                    score={marketSummary.monthlyPrediction.score}
+                    label={marketSummary.monthlyPrediction.label}
+                    monthLabel={marketSummary.monthLabel}
+                    directionScore={marketSummary.monthlyPrediction.directionScore}
+                  />
+                  <DailyGauge score={marketSummary.dailyPrediction.score} maxScore={marketSummary.dailyPrediction.maxScore} />
+                </div>
+
+                <div className="macro-margin-row">
+                  <MarginMaintenanceChart summary={marketSummary} />
+                  <div className="macro-margin-stats">
+                    <div>今日 {marketSummary.marginMaintenance.todayRate.toFixed(2)}%</div>
+                    <div>安全邊際 {marketSummary.marginMaintenance.safeLine.toFixed(2)}%</div>
+                    <div>最小值 {marketSummary.marginMaintenance.minLine.toFixed(2)}%</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </section>
       )}
 
 
 
       {/* 空狀態 */}
-      {holdings.length === 0 && trades.length === 0 && (
+      {trades.length === 0 && summary.totalMarketValue === 0 && (
         <div className="empty-state">
           <div className="empty-state-icon">🐻</div>
           <div className="empty-state-title">歡迎來到小熊投資家！</div>

@@ -1,44 +1,496 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore, formatMoney, formatPrice } from '../store';
-import type { Holding } from '../types';
-import { fetchStockQuantData, clearTTLCache } from '../api';
-import { getCache, setCache, clearCache, getCacheTTL, CACHE_KEYS } from '../cache';
+import type { Holding, StockTradingSignal, Trade } from '../types';
+import { fetchOfficialPriceMap, fetchStockQuantData, fetchStockTradingSignals, fetchSimonsRecommendationCounts, clearOfficialPriceMapCache, refreshDailyAiCache, clearQuantSignalTTLCache, fetchDailyAiCacheVersion, getKnownDailyAiCacheVersion, rememberDailyAiCacheVersion, fetchActiveEtfRadarMap } from '../api';
+import type { ActiveEtfRadarItem, OfficialPriceMapEntry, StockQuantData, StockQuantMeta } from '../api';
+import { getCache, setCache, clearCache, getPersistentCache, setPersistentCache, clearPersistentCache, CACHE_KEYS } from '../cache';
+import MarketBadge from '../components/MarketBadge';
+import { canAutoRefreshPrices, PRICE_AUTO_REFRESH_MS } from '../utils/priceAutoRefresh';
+import { getIndustryTailwind, getIndustryTailwindScore } from '../utils/industryTailwinds';
+import { calculateAddPriority } from '../utils/addPriority';
 import './Portfolio.css';
+
+type PortfolioAiSignal = {
+  primaryLabel: string;
+  primaryType: 'buy' | 'sell' | 'neutral';
+  primaryIcon: string;
+  streakCount?: number;
+  cumRet?: string;
+  chipPts?: number;
+};
+type ActiveEtfInfoDialog = {
+  stockCode: string;
+  stockName: string;
+  radar: ActiveEtfRadarItem;
+};
+
+type SignalCacheData = {
+  _date: string;
+  _holdingKeys: string;
+  _refreshSlot?: string;
+  _createdAt?: number;
+  _quantMeta?: StockQuantMeta;
+  [stockCode: string]: PortfolioAiSignal | StockQuantMeta | string | number | undefined;
+};
+
+function getChipLabel(pts: number | undefined): string {
+  if (pts === undefined || !Number.isFinite(pts)) return '--';
+  if (pts >= 9) return '最乾淨';
+  if (pts >= 7) return '非常穩定';
+  if (pts >= 5) return '穩定';
+  if (pts >= 3) return '普通';
+  return '凌亂';
+}
+
+function getChipClass(pts: number | undefined): string {
+  if (pts === undefined || !Number.isFinite(pts)) return '';
+  if (pts >= 7) return 'holding-quant-chip-pts-high';
+  if (pts >= 4) return 'holding-quant-chip-pts-mid';
+  return 'holding-quant-chip-pts-low';
+}
+
+function getCumRetClass(cumRet?: string): string {
+  const value = parseFloat(cumRet || '');
+  if (!Number.isFinite(value)) return '';
+  return value >= 0 ? 'holding-quant-chip-ret-pos' : 'holding-quant-chip-ret-neg';
+}
+
+function formatCumRet(cumRet?: string): string {
+  if (!cumRet) return '--';
+  return cumRet.startsWith('-') ? cumRet : `+${cumRet}`;
+}
+
+function parseReturnPct(value?: string): number | null {
+  const n = parseFloat(String(value || '').replace(/[%％,+]/g, '').trim());
+  return Number.isFinite(n) ? n : null;
+}
+
+function calculateSignalCumRet(signals?: StockTradingSignal[]): string | undefined {
+  if (!signals || signals.length === 0) return undefined;
+  const returns = signals
+    .map(signal => parseReturnPct(signal.returnPct))
+    .filter((value): value is number => value !== null);
+  if (returns.length === 0) return undefined;
+  const compounded = returns.reduce((equity, value) => equity * (1 + value / 100), 1);
+  return `${((compounded - 1) * 100).toFixed(1)}%`;
+}
+
+type FinMindPriceRow = {
+  close: number;
+};
+
+const PORTFOLIO_SIGNAL_TTL_MS = 18 * 60 * 60 * 1000;
+const PORTFOLIO_PERSISTENT_CACHE_KEY = 'ppbears_portfolio_signals_v6';
+const DAILY_AI_CACHE_POLL_MS = 90 * 1000;
+const DATA_REFRESH_SCHEDULE = [
+  { label: '08:00', minutes: 8 * 60 },
+];
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) => {
+      window.setTimeout(() => reject(new Error('portfolio signal timeout')), ms);
+    }),
+  ]);
+}
+
+function toTaiwanDateString(timestamp: number): string {
+  return new Date(timestamp + 8 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
+function getTodayString(): string {
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}
+
+function getRefreshSlotInfo() {
+  const now = new Date();
+  const minutesNow = now.getHours() * 60 + now.getMinutes();
+  let currentIndex = DATA_REFRESH_SCHEDULE.findIndex(slot => minutesNow < slot.minutes) - 1;
+  let slotDate = new Date(now);
+  if (currentIndex < 0) {
+    currentIndex = DATA_REFRESH_SCHEDULE.length - 1;
+    slotDate.setDate(slotDate.getDate() - 1);
+  }
+  const currentSlot = DATA_REFRESH_SCHEDULE[currentIndex];
+  const nextSlot = DATA_REFRESH_SCHEDULE[(currentIndex + 1) % DATA_REFRESH_SCHEDULE.length];
+  slotDate.setHours(Math.floor(currentSlot.minutes / 60), currentSlot.minutes % 60, 0, 0);
+  const nextDate = new Date(now);
+  nextDate.setHours(Math.floor(nextSlot.minutes / 60), nextSlot.minutes % 60, 0, 0);
+  if (nextSlot.minutes <= minutesNow) nextDate.setDate(nextDate.getDate() + 1);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const dateKey = `${slotDate.getFullYear()}-${pad(slotDate.getMonth() + 1)}-${pad(slotDate.getDate())}`;
+  return {
+    key: `${dateKey}-${currentSlot.label}`,
+    ttlMs: Math.max(5 * 60 * 1000, nextDate.getTime() - now.getTime()),
+    startedAt: slotDate,
+  };
+}
+
+function formatSignalTimestamp(timestamp = Date.now()): string {
+  const now = new Date(timestamp);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+}
+
+function formatMetaDateTime(value?: string): string {
+  if (!value) return '尚未同步';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}/${pad(date.getMonth() + 1)}/${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function formatTodayDate(): string {
+  return getTodayString().replace(/-/g, '/');
+}
+
+function getFixedUpdateLabel(): string {
+  return '08:00 自動檢查；可手動重新抓取';
+}
+
+function getLatestQuantMeta(metas: StockQuantMeta[]): StockQuantMeta | null {
+  if (metas.length === 0) return null;
+  return metas.sort((a, b) => new Date(b.fetchedAt).getTime() - new Date(a.fetchedAt).getTime())[0];
+}
+
+function getDataFreshness(meta: StockQuantMeta | null, loading: boolean, hasData: boolean, priceRefreshError: string | null) {
+  if (loading) {
+    return { className: 'pf-data-freshness-updating', label: '正在讀取每日快取與更新價格' };
+  }
+  if (priceRefreshError) {
+    return { className: 'pf-data-freshness-stale', label: priceRefreshError };
+  }
+  if (!hasData) {
+    return { className: 'pf-data-freshness-waiting', label: '等待 Simons 最新交易日資料' };
+  }
+
+  if (meta?.cacheStatus === 'fresh') {
+    return { className: 'pf-data-freshness-fresh', label: '已重新讀取每日快取' };
+  }
+
+  return { className: 'pf-data-freshness-fresh', label: '已使用每日 AI 訊號快取' };
+}
+
+function isFreshTodaySignalCache(cached: SignalCacheData | null, holdingKeys: string): cached is SignalCacheData {
+  if (!cached || cached._holdingKeys !== holdingKeys) return false;
+  const cacheDate = cached._date?.slice(0, 10);
+  return cacheDate === getTodayString();
+}
+
+function getCurrentHoldingStartDate(stockCode: string, trades: Trade[]): string | undefined {
+  let shares = 0;
+  let startTimestamp: number | null = null;
+  const stockTrades = trades
+    .filter(t => t.stockCode === stockCode && (t.tradeType === 'buy' || t.tradeType === 'sell'))
+    .sort((a, b) => a.timestamp - b.timestamp);
+
+  for (const trade of stockTrades) {
+    if (trade.tradeType === 'buy') {
+      if (shares <= 0) startTimestamp = trade.timestamp;
+      shares += trade.quantity;
+    } else {
+      shares -= trade.quantity;
+      if (shares <= 0) {
+        shares = 0;
+        startTimestamp = null;
+      }
+    }
+  }
+
+  return startTimestamp ? toTaiwanDateString(startTimestamp) : undefined;
+}
 
 export default function Portfolio() {
   const navigate = useNavigate();
-  const { holdings, getPortfolioSummary, hasFeature, refreshHoldingPrices } = useStore();
+  const { holdings, trades, getPortfolioSummary, hasFeature, refreshHoldingPrices } = useStore();
   const hasAiFeature = hasFeature('ai_portfolio_advice');
   const summary = getPortfolioSummary();
-
-  // 進入庫存頁時，自動從 TWSE 刷新所有持股現價
-  useEffect(() => {
-    refreshHoldingPrices();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
 
   const pl = summary.totalProfitLoss;
   const isProfit = pl >= 0;
 
-  const [aiSignals, setAiSignals] = useState<Record<string, {
-    primaryLabel: string;
-    primaryType: 'buy' | 'sell' | 'neutral';
-    primaryIcon: string;
-  }>>({});
+  const [aiSignals, setAiSignals] = useState<Record<string, PortfolioAiSignal>>({});
   const [signalDataDate, setSignalDataDate] = useState<string>('');;
+  const [priceRefreshing, setPriceRefreshing] = useState(false);
+  const [priceRefreshError, setPriceRefreshError] = useState<string | null>(null);
   const [signalsLoading, setSignalsLoading] = useState(false);
   const [loadingMsg, setLoadingMsg] = useState('正在載入資料...');
   const [loadingProgress, setLoadingProgress] = useState(0); // 0-100
   const [refreshKey, setRefreshKey] = useState(0); // 遞增來強制重新抓取
+  const [, setUsingSignalCache] = useState(false);
+  const [marketMap, setMarketMap] = useState<Record<string, OfficialPriceMapEntry>>({});
+  const [recommendationCounts, setRecommendationCounts] = useState<Record<string, number>>({});
+  const [activeEtfMap, setActiveEtfMap] = useState<Record<string, ActiveEtfRadarItem>>({});
+  const [activeEtfDialog, setActiveEtfDialog] = useState<ActiveEtfInfoDialog | null>(null);
+  const [quantMeta, setQuantMeta] = useState<StockQuantMeta | null>(null);
   const [enableCustomSignal, setEnableCustomSignal] = useState(() => {
     return localStorage.getItem('ppbears_custom_signal') === 'true';
   });
+  const isRefreshing = priceRefreshing || signalsLoading;
+
+  const runPriceRefresh = useCallback(async (force: boolean, message: string) => {
+    if (holdings.length === 0) return;
+
+    if (force) clearOfficialPriceMapCache();
+    setPriceRefreshError(null);
+    setPriceRefreshing(true);
+    setLoadingMsg(message);
+    setLoadingProgress(8);
+
+    let mountedProgress = true;
+    const progressTimer = window.setInterval(() => {
+      if (!mountedProgress) return;
+      setLoadingProgress(prev => Math.min(prev + 7, 48));
+    }, 280);
+
+    try {
+      const result = await refreshHoldingPrices({ force });
+      if (result.checkedCount > 0 && result.priceFoundCount === 0) {
+        setPriceRefreshError('價格抓取失敗，畫面仍是上次庫存價格');
+      }
+      setLoadingProgress(prev => Math.max(prev, 62));
+      return result;
+    } catch {
+      setPriceRefreshError('價格抓取失敗，畫面仍是上次庫存價格');
+      return { checkedCount: holdings.length, priceFoundCount: 0, updatedCount: 0 };
+    } finally {
+      mountedProgress = false;
+      window.clearInterval(progressTimer);
+      setLoadingProgress(100);
+      await new Promise(resolve => window.setTimeout(resolve, 250));
+      setPriceRefreshing(false);
+    }
+  }, [holdings.length, refreshHoldingPrices]);
+
+  // 進入庫存頁時只在開盤期間自動確認價格；收盤與休市時保留上次價格。
+  useEffect(() => {
+    if (canAutoRefreshPrices()) {
+      runPriceRefresh(true, '正在更新持股價格...');
+    }
+  }, [runPriceRefresh]);
+
+  useEffect(() => {
+    if (holdings.length === 0) return;
+
+    function refreshPricesIfVisible() {
+      if (canAutoRefreshPrices()) {
+        runPriceRefresh(true, '正在同步盤中持股價格...');
+      }
+    }
+
+    const intervalId = window.setInterval(refreshPricesIfVisible, PRICE_AUTO_REFRESH_MS);
+    document.addEventListener('visibilitychange', refreshPricesIfVisible);
+    return () => {
+      window.clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', refreshPricesIfVisible);
+    };
+  }, [holdings.length, runPriceRefresh]);
 
   const toggleCustomSignal = (val: boolean) => {
     setEnableCustomSignal(val);
     localStorage.setItem('ppbears_custom_signal', String(val));
   };
+
+  const holdingStartDates = useMemo(() => {
+    const dates: Record<string, string | undefined> = {};
+    holdings.forEach(h => {
+      dates[h.stockCode] = getCurrentHoldingStartDate(h.stockCode, trades);
+    });
+    return dates;
+  }, [holdings, trades]);
+
+  useEffect(() => {
+    const codes = holdings
+      .filter(h => h.totalShares > 0)
+      .map(h => h.stockCode);
+    if (codes.length === 0) {
+      setRecommendationCounts({});
+      setActiveEtfMap({});
+      return;
+    }
+
+    let mounted = true;
+    fetchSimonsRecommendationCounts(codes, 90).then(counts => {
+      if (mounted) setRecommendationCounts(counts);
+    });
+    fetchActiveEtfRadarMap(codes, 5).then(items => {
+      if (mounted) setActiveEtfMap(items);
+    });
+
+    return () => { mounted = false; };
+  }, [holdings, refreshKey]);
+
+  useEffect(() => {
+    if (holdings.length === 0) return;
+    let cancelled = false;
+    async function checkSharedAiCacheVersion() {
+      if (isRefreshing) return;
+      const latest = await fetchDailyAiCacheVersion();
+      if (cancelled || !latest?.version) return;
+      const known = getKnownDailyAiCacheVersion('portfolio');
+      if (!known) {
+        rememberDailyAiCacheVersion(latest.version, 'portfolio');
+        return;
+      }
+      if (latest.version !== known) {
+        rememberDailyAiCacheVersion(latest.version, 'portfolio');
+        clearCache(CACHE_KEYS.PORTFOLIO_SIGNALS);
+        clearPersistentCache(PORTFOLIO_PERSISTENT_CACHE_KEY);
+        clearQuantSignalTTLCache();
+        setAiSignals({});
+        setSignalDataDate('');
+        setQuantMeta(null);
+        setLoadingProgress(0);
+        setLoadingMsg('偵測到全站資料已更新，正在重新分析...');
+        setRefreshKey(k => k + 1);
+      }
+    }
+
+    checkSharedAiCacheVersion();
+    const timer = window.setInterval(checkSharedAiCacheVersion, DAILY_AI_CACHE_POLL_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [holdings.length, isRefreshing]);
+
+  function renderRecommendationCountBadge(stockCode: string) {
+    const count = recommendationCounts[stockCode] || 0;
+    if (count <= 1) return null;
+    return (
+      <span className="holding-rec-count-badge" title="最近90天內重複出現在找股票推薦">
+        推薦X{count}
+      </span>
+    );
+  }
+
+  function renderMemberQuantChips(signal?: PortfolioAiSignal) {
+    if (!signal) return null;
+    const hasCumRet = Boolean(signal.cumRet);
+    const hasChipPts = signal.chipPts !== undefined && Number.isFinite(signal.chipPts);
+    if (!hasCumRet && !hasChipPts) return null;
+
+    return (
+      <>
+        <span className={`holding-quant-chip holding-quant-chip-ret ${getCumRetClass(signal.cumRet)}`}>
+          📊 累積報酬 {formatCumRet(signal.cumRet)}
+        </span>
+        {hasChipPts && (
+          <span className={`holding-quant-chip holding-quant-chip-pts ${getChipClass(signal.chipPts)}`}>
+            🔒 籌碼 {signal.chipPts!.toFixed(0)}分 {getChipLabel(signal.chipPts)}
+          </span>
+        )}
+      </>
+    );
+  }
+
+  function renderIndustryTailwindChip(stockCode: string) {
+    const tailwind = getIndustryTailwind(stockCode);
+    if (!tailwind) return null;
+    return (
+      <span
+        className={`holding-quant-chip holding-tailwind-chip holding-tailwind-chip-${tailwind.level}`}
+        title={`${tailwind.source}：${tailwind.reason} 風險：${tailwind.risk}`}
+      >
+        科技順風 {tailwind.score}/10
+      </span>
+    );
+  }
+
+  function getActiveEtfActionLabel(action: ActiveEtfRadarItem['etfs'][number]['action']): string {
+    switch (action) {
+      case 'added': return '新進';
+      case 'increased': return '加碼';
+      case 'decreased': return '減碼';
+      case 'removed': return '剔除';
+      default: return '持有';
+    }
+  }
+
+  function getActiveEtfDetailText(radar: ActiveEtfRadarItem): string {
+    const detail = radar.etfs
+      .map(item => `${item.etfName || item.etfCode} ${getActiveEtfActionLabel(item.action)}`)
+      .join('、');
+    return `近${radar.days}日：新進${radar.addedEtfCount}、加碼${radar.increasedEtfCount}、減碼${radar.decreasedEtfCount}、剔除${radar.removedEtfCount}。${detail || '尚無 ETF 明細'}。資料日：${radar.latestDate || '待同步'}。`;
+  }
+
+  function renderActiveEtfRadarChip(stockCode: string, stockName: string) {
+    const radar = activeEtfMap[stockCode];
+    if (!radar) return null;
+    if (radar.holdingEtfCount <= 0) return null;
+    const label = `ETF+${radar.holdingEtfCount}`;
+    return (
+      <button
+        type="button"
+        className={`holding-quant-chip holding-active-etf-chip holding-active-etf-chip-${radar.signal}`}
+        title={`目前有 ${radar.holdingEtfCount} 檔追蹤 ETF 持有，點擊查看 ETF 支撐詳細說明`}
+        onClick={(e) => {
+          e.stopPropagation();
+          setActiveEtfDialog({ stockCode, stockName, radar });
+        }}
+      >
+        {label}
+      </button>
+    );
+  }
+
+  function renderAddPriorityChip(stockCode: string, signal?: PortfolioAiSignal) {
+    const cumRetPct = parseReturnPct(signal?.cumRet);
+    const priority = calculateAddPriority({
+      aiSignal: signal?.primaryType ?? null,
+      techTailwindScore: getIndustryTailwindScore(stockCode),
+      activeEtfScore: activeEtfMap[stockCode]?.score ?? null,
+      activeEtfSignal: activeEtfMap[stockCode]?.signal ?? null,
+      recommendationCount: recommendationCounts[stockCode] || 0,
+      chipPts: signal?.chipPts ?? null,
+      cumRetPct,
+    });
+    return (
+      <span
+        className={`holding-quant-chip holding-add-priority-chip holding-add-priority-chip-${priority.level}`}
+        title={`加碼時機：${priority.label}｜${priority.reason}`}
+      >
+        加碼時機 {priority.score}分
+      </span>
+    );
+  }
+
+  function renderProfitLossLevelBadge(profitLossPct: number, signal?: PortfolioAiSignal) {
+    if (!Number.isFinite(profitLossPct)) return null;
+    if (!signal || signal.primaryType === 'neutral') return null;
+
+    if (signal.primaryType === 'buy') {
+      if (profitLossPct >= 20) {
+        return <span className="holding-pl-level-badge holding-pl-level-profit-strong">◇ 順勢加碼</span>;
+      }
+      if (profitLossPct >= 0) {
+        return <span className="holding-pl-level-badge holding-pl-level-profit">△ 小心加碼</span>;
+      }
+      if (profitLossPct > -10) {
+        return <span className="holding-pl-level-badge holding-pl-level-buy-dip">○ 低檔觀察</span>;
+      }
+      if (profitLossPct > -20) {
+        return <span className="holding-pl-level-badge holding-pl-level-buy-cautious">○ 謹慎觀察</span>;
+      }
+      return <span className="holding-pl-level-badge holding-pl-level-risk-first">☠ 風險優先</span>;
+    }
+
+    if (signal.primaryType === 'sell') {
+      if (profitLossPct <= -20) {
+        return <span className="holding-pl-level-badge holding-pl-level-stop">☠ 建議停損</span>;
+      }
+      if (profitLossPct >= 20) {
+        return <span className="holding-pl-level-badge holding-pl-level-take-profit">◇ 分批停利</span>;
+      }
+      return <span className="holding-pl-level-badge holding-pl-level-loss">○ 持續觀察</span>;
+    }
+
+    return null;
+  }
 
   useEffect(() => {
     let mounted = true;
@@ -50,38 +502,48 @@ export default function Portfolio() {
       }
       if (mounted) setLoadingProgress(0);
 
-      // 檢查快取（5 分鐘）
-      type SignalCacheData = typeof aiSignals & { _date: string; _holdingKeys: string };
-      const holdingKeys = holdings.map(h => h.stockCode).sort().join(',');
+      // 只有今天且仍在 TTL 內的快取才直接使用；否則進頁自動重新分析。
+      const holdingKeys = holdings
+        .map(h => `${h.stockCode}:${h.totalShares}:${h.avgCost}:${h.currentPrice}:${holdingStartDates[h.stockCode] ?? ''}`)
+        .sort()
+        .join(',');
       const cacheKey = CACHE_KEYS.PORTFOLIO_SIGNALS;
-      const cached = getCache<SignalCacheData>(cacheKey);
-      if (refreshKey === 0 && cached && cached._holdingKeys === holdingKeys) {
+      const refreshSlot = getRefreshSlotInfo();
+      const cached = refreshKey === 0
+        ? getCache<SignalCacheData>(cacheKey) || getPersistentCache<SignalCacheData>(PORTFOLIO_PERSISTENT_CACHE_KEY, refreshSlot.key)
+        : null;
+      const canUseCachedSignals = refreshKey === 0 && isFreshTodaySignalCache(cached, holdingKeys) && cached._refreshSlot === refreshSlot.key;
+      if (canUseCachedSignals) {
         if (mounted) {
-          const { _date, _holdingKeys: _k, ...cachedSignals } = cached;
-          setAiSignals(cachedSignals);
-          setSignalDataDate(_date);
+          const cachedSignals: Record<string, PortfolioAiSignal> = {};
+          Object.entries(cached).forEach(([key, value]) => {
+            if (key.startsWith('_')) return;
+            cachedSignals[key] = value as PortfolioAiSignal;
+          });
+          setAiSignals(cachedSignals as Record<string, PortfolioAiSignal>);
+          setSignalDataDate(cached._date);
+          setQuantMeta(cached._quantMeta || null);
+          setUsingSignalCache(true);
+          setCache(cacheKey, cached, refreshSlot.ttlMs);
         }
         return;
       }
 
       if (mounted) {
+        setUsingSignalCache(false);
         setSignalsLoading(true);
         setLoadingProgress(5);
         setLoadingMsg('正在連線 AI 量化分析...');
       }
       
-      const signals: Record<string, {
-        primaryLabel: string;
-        primaryType: 'buy' | 'sell' | 'neutral';
-        primaryIcon: string;
-      }> = {};
+      const signals: Record<string, PortfolioAiSignal> = {};
+      const forceFresh = refreshKey > 0;
+      const quantMetas: StockQuantMeta[] = [];
 
       if (hasAiFeature) {
         // 記錄 Simons 量化模型爬取時間
         if (mounted) {
-          const now = new Date();
-          const pad = (n: number) => String(n).padStart(2, '0');
-          setSignalDataDate(`${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`);
+          setSignalDataDate(formatSignalTimestamp());
         }
         try {
           // 並行取得 AI 量化訊號
@@ -89,14 +551,35 @@ export default function Portfolio() {
 
           let doneCount = 0;
           await Promise.all(holdings.map(async (h) => {
-            const quantData = await fetchStockQuantData(h.stockCode).catch(() => null);
+            const quantData = await withTimeout(
+              fetchStockQuantData(h.stockCode, holdingStartDates[h.stockCode], { forceFresh }),
+              12000
+            ).catch(() => null);
+            if (quantData?.meta) quantMetas.push(quantData.meta);
+            let displayQuantData: StockQuantData | null = quantData;
+            if (!displayQuantData?.aiQuanBackDataComment?.cum_ret) {
+              const liveQuantData = await withTimeout(
+                fetchStockQuantData(h.stockCode, undefined, { forceFresh: true }),
+                10000
+              ).catch(() => null);
+              if (liveQuantData?.meta) quantMetas.push(liveQuantData.meta);
+              if (liveQuantData?.aiQuanBackDataComment?.cum_ret || !displayQuantData) {
+                displayQuantData = liveQuantData;
+              }
+            }
+            const fallbackCumRet = displayQuantData?.aiQuanBackDataComment?.cum_ret
+              ? undefined
+              : calculateSignalCumRet(
+                  (await withTimeout(fetchStockTradingSignals(h.stockCode), 8000).catch(() => null))?.signals
+                );
 
             // ── 主訊號：使用 fetchStockQuantData 裡已解析的 currentSignal ──
             let primaryLabel: string;
             let primaryType: 'buy' | 'sell' | 'neutral';
             let primaryIcon: string;
 
-            const sig = quantData?.currentSignal ?? 'neutral';
+            const signalSource = quantData || displayQuantData;
+            const sig = signalSource?.currentSignal ?? 'neutral';
             if (sig === 'buy') {
               primaryLabel = 'AI 加碼'; primaryType = 'buy'; primaryIcon = '🚀';
             } else if (sig === 'sell') {
@@ -105,7 +588,18 @@ export default function Portfolio() {
               primaryLabel = 'AI 中立'; primaryType = 'neutral'; primaryIcon = '⚖️';
             }
 
-            signals[h.stockCode] = { primaryLabel, primaryType, primaryIcon };
+            const streak = signalSource?.signalStreak;
+            const streakCount = sig !== 'neutral' && streak?.signal === sig ? streak.count : 0;
+            const chipPtsRaw = signalSource?.chipStability?.pts;
+            const chipPts = chipPtsRaw !== undefined && chipPtsRaw !== null ? parseFloat(String(chipPtsRaw)) : undefined;
+            signals[h.stockCode] = {
+              primaryLabel,
+              primaryType,
+              primaryIcon,
+              streakCount,
+              cumRet: displayQuantData?.aiQuanBackDataComment?.cum_ret || fallbackCumRet,
+              chipPts: Number.isFinite(chipPts) ? chipPts : undefined,
+            };
             doneCount++;
             if (mounted) {
               const pct = 20 + Math.round((doneCount / holdings.length) * 70);
@@ -124,11 +618,15 @@ export default function Portfolio() {
              start.setDate(start.getDate() - 150);
              const _pad2 = (n: number) => String(n).padStart(2, '0');
              const dateStr = `${start.getFullYear()}-${_pad2(start.getMonth() + 1)}-${_pad2(start.getDate())}`;
-             const res = await fetch(`https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockPrice&data_id=${h.stockCode}&start_date=${dateStr}`);
+             const res = await withTimeout(
+               fetch(`https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockPrice&data_id=${h.stockCode}&start_date=${dateStr}`),
+               12000
+             );
              const json = await res.json();
-             const data = json.data;
+             const data = json.data as FinMindPriceRow[] | undefined;
              if (data && data.length >= 60) {
-               const closes = data.map((d: any) => d.close);
+               const closes = data.map((d) => Number(d.close)).filter(close => Number.isFinite(close));
+               if (closes.length < 60) return;
                const getSMA = (arr: number[], period: number, offset: number = 0) => {
                  const slice = arr.slice(arr.length - period - offset, arr.length - offset);
                  return slice.reduce((a, b) => a + b, 0) / period;
@@ -159,49 +657,73 @@ export default function Portfolio() {
         await new Promise(r => setTimeout(r, 400));
         setAiSignals(signals);
         setSignalsLoading(false);
-        // 寫入快取（5 分鐘）
-        const now = new Date();
-        const pad = (n: number) => String(n).padStart(2, '0');
-        const dateStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
-        setCache(cacheKey, { ...signals, _date: dateStr, _holdingKeys: holdingKeys }, 5 * 60 * 1000);
+        // 寫入短效快取，避免切頁時重複分析，但過期後進頁會自動更新。
+        const createdAt = Date.now();
+        const dateStr = formatSignalTimestamp(createdAt);
+        const latestQuantMeta = getLatestQuantMeta(quantMetas);
+        setSignalDataDate(dateStr);
+        setQuantMeta(latestQuantMeta);
+        setUsingSignalCache(false);
+        const cacheData: SignalCacheData = {
+          ...signals,
+          _date: dateStr,
+          _holdingKeys: holdingKeys,
+          _refreshSlot: refreshSlot.key,
+          _createdAt: createdAt,
+          _quantMeta: latestQuantMeta || undefined,
+        };
+        const ttlMs = Math.min(PORTFOLIO_SIGNAL_TTL_MS, refreshSlot.ttlMs);
+        setCache(cacheKey, cacheData, ttlMs);
+        setPersistentCache(PORTFOLIO_PERSISTENT_CACHE_KEY, cacheData, ttlMs, refreshSlot.key);
       }
     }
-    loadSignals();
+    loadSignals().catch(err => {
+      console.error('Portfolio signal loader failed', err);
+      if (mounted) {
+        setSignalsLoading(false);
+        setLoadingMsg('分析暫時逾時，已先顯示庫存資料');
+        setUsingSignalCache(false);
+      }
+    });
     return () => { mounted = false; };
-  }, [holdings, hasAiFeature, enableCustomSignal, refreshKey]);
+  }, [holdings, holdingStartDates, hasAiFeature, enableCustomSignal, refreshKey]);
+
+  useEffect(() => {
+    let mounted = true;
+    if (holdings.length === 0) return;
+    const cachedOfficialMap = getCache<Record<string, OfficialPriceMapEntry>>(CACHE_KEYS.TWSE_PRICE_MAP);
+    if (cachedOfficialMap && mounted) setMarketMap(cachedOfficialMap);
+    if (!canAutoRefreshPrices() && cachedOfficialMap) {
+      return () => { mounted = false; };
+    }
+    fetchOfficialPriceMap()
+      .then(map => {
+        if (mounted) {
+          setMarketMap(map);
+          if (Object.keys(map).length > 0) setCache(CACHE_KEYS.TWSE_PRICE_MAP, map);
+        }
+      })
+      .catch(() => {});
+    return () => { mounted = false; };
+  }, [holdings.length]);
+
+  const dataUpdateLabel = quantMeta ? formatMetaDateTime(quantMeta.fetchedAt) : signalDataDate || '載入中...';
+  const dataDateLabel = quantMeta?.dataDate ? quantMeta.dataDate.replace(/-/g, '/') : '同步中';
+  const dataFreshness = getDataFreshness(quantMeta, isRefreshing, Boolean(signalDataDate || quantMeta), priceRefreshError);
 
   return (
     <div className="portfolio">
-      {/* AI 訊號抓取 Loading Overlay */}
-      {signalsLoading && holdings.length > 0 && (
-        <div className="pf-loading-overlay">
-          <div className="pf-loading-card">
-            <div className="pf-loading-icon">📊</div>
-            <div className="pf-loading-rings">
-              <div className="pf-loading-ring pf-ring-1" />
-              <div className="pf-loading-ring pf-ring-2" />
-              <div className="pf-loading-ring pf-ring-3" />
-            </div>
-            <div className="pf-loading-title">AI 訊號分析中</div>
-            <div className="pf-loading-step">{loadingMsg}</div>
-            {/* 進度條 */}
-            <div className="pf-progress-bar-wrap">
-              <div
-                className="pf-progress-bar-fill"
-                style={{ width: `${loadingProgress}%` }}
-              />
-            </div>
-            <div className="pf-progress-pct">{loadingProgress}%</div>
-            <div className="pf-loading-dots">
-              <span /><span /><span />
-            </div>
-          </div>
-        </div>
-      )}
-
       <div className="page-header">
         <h1 className="page-title">💼 我的庫存</h1>
       </div>
+
+      {isRefreshing && holdings.length > 0 && (
+        <div className={`pf-loading-bar ${priceRefreshing ? 'pf-loading-bar-price' : ''}`}>
+          <span className="pf-inline-spinner" />
+          <span>{loadingMsg}</span>
+          <span className="pf-loading-pct">{loadingProgress}%</span>
+        </div>
+      )}
 
       {/* 總覽卡片 */}
       <div className={`card portfolio-summary-card ${summary.totalCost > 0 ? (isProfit ? 'card-profit' : 'card-loss') : 'card-primary'}`}>
@@ -264,32 +786,47 @@ export default function Portfolio() {
       </div>
 
       {/* 資料來源小字 */}
-      <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', marginBottom: '16px', marginTop: '6px', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 600, flexWrap: 'wrap' }}>
-        <span>ℹ️ 資料來源與時間：</span>
+      <div className="pf-data-source">
         {hasAiFeature ? (
           <>
-            <span style={{ color: 'var(--primary)' }}>AI 量化分析（{signalDataDate || '載入中...'}）</span>
-            {getCacheTTL(CACHE_KEYS.PORTFOLIO_SIGNALS) > 0 && (
-              <span className="pf-cache-badge">⚡ 快取中</span>
-            )}
-            {signalDataDate && (
-              <button
-                className="pf-refresh-btn"
-                title="重新抓取最新 AI 訊號"
-                onClick={() => {
-                  clearCache(CACHE_KEYS.PORTFOLIO_SIGNALS);
-                  // 同時清除每支持股的 localStorage TTL 快取（量化訊號）
-                  holdings.forEach(h => clearTTLCache(`ppbears_quant30_${h.stockCode}`));
-                  setAiSignals({});
-                  setSignalDataDate('');
-                  setLoadingProgress(0);
-                  // 遞增 refreshKey 強制 useEffect 重新執行
-                  setRefreshKey(k => k + 1);
-                }}
-              >
-                🔄 重新抓取
-              </button>
-            )}
+            <div className="pf-data-meta-lines">
+              <span className={`pf-data-freshness ${dataFreshness.className}`}>{dataFreshness.label}</span>
+              <span className="pf-data-meta-today">今天日期：{formatTodayDate()}</span>
+              <span className="pf-data-meta-updated">資料更新：{dataUpdateLabel}</span>
+              <span className="pf-data-meta-updated">資料日期：{dataDateLabel}</span>
+              <span className="pf-data-meta-schedule">固定更新：{getFixedUpdateLabel()}</span>
+              <span className="pf-data-meta-schedule">價格：進頁與盤中背景自動檢查</span>
+            </div>
+            <button
+              className="pf-refresh-btn"
+              title="手動檢查每日 AI 快取並更新價格"
+              disabled={isRefreshing}
+              onClick={async () => {
+                clearCache(CACHE_KEYS.PORTFOLIO_SIGNALS);
+                clearPersistentCache(PORTFOLIO_PERSISTENT_CACHE_KEY);
+                clearQuantSignalTTLCache();
+                setAiSignals({});
+                setSignalDataDate('');
+                setQuantMeta(null);
+                setLoadingProgress(0);
+                setLoadingMsg('正在手動檢查 Simons 每日資料...');
+                await refreshDailyAiCache(holdings.map(h => h.stockCode));
+                const latest = await fetchDailyAiCacheVersion();
+                if (latest?.version) rememberDailyAiCacheVersion(latest.version, 'portfolio');
+                await runPriceRefresh(true, '正在重新抓取持股價格...');
+                // 遞增 refreshKey 重新讀取每日 AI 快取。
+                setRefreshKey(k => k + 1);
+              }}
+            >
+              {isRefreshing ? (
+                <>
+                  <span className="pf-btn-spinner" />
+                  抓取中
+                </>
+              ) : (
+                <>🔄 重新抓取</>
+              )}
+            </button>
           </>
         ) : enableCustomSignal ? (
           <span style={{ color: 'var(--primary)' }}>FinMind 技術指標（近 150 日）</span>
@@ -297,6 +834,29 @@ export default function Portfolio() {
           <span style={{ color: 'var(--text-tertiary)' }}>台灣證券交易所 TWSE（持倉成本為入場均價）</span>
         )}
       </div>
+
+      {activeEtfDialog && (
+        <div className="pf-etf-info-overlay" onClick={() => setActiveEtfDialog(null)}>
+          <div className="pf-etf-info-dialog" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+            <button className="pf-etf-info-close" type="button" onClick={() => setActiveEtfDialog(null)} aria-label="關閉">×</button>
+            <div className="pf-etf-info-title">
+              {activeEtfDialog.stockName} {activeEtfDialog.stockCode}
+            </div>
+            <div className="pf-etf-info-subtitle">ETF 支撐</div>
+            <p className="pf-etf-info-text">
+              這張小卡顯示大型台股 ETF 近 5 日對這檔股票的持股異動次數，用來補強建倉與加碼信心，不用分數呈現。
+            </p>
+            <div className="pf-etf-info-rule-list">
+              <div>{getActiveEtfDetailText(activeEtfDialog.radar)}</div>
+              <div>ETF+N：代表目前有 N 檔追蹤 ETF 持有這支股票。</div>
+              <div>明細會列出近 5 日新進、加碼、減碼、剔除與持有狀態。</div>
+            </div>
+            <p className="pf-etf-info-note">
+              ETF 支撐是資金底盤參考，不等於單獨買賣建議，仍需搭配加碼時機、股票本質與風險控管。
+            </p>
+          </div>
+        </div>
+      )}
 
 
       {/* 持股列表 */}
@@ -316,6 +876,7 @@ export default function Portfolio() {
               const itemPLPct = ((h.currentPrice - h.avgCost) / h.avgCost * 100);
               const itemIsProfit = itemPL >= 0;
               const signal = aiSignals[h.stockCode];
+              const memberQuantChips = hasAiFeature ? renderMemberQuantChips(signal) : null;
               return (
                 <div
                   key={h.stockCode}
@@ -328,13 +889,34 @@ export default function Portfolio() {
                         <div className={`signal-badge signal-badge-${signal.primaryType}`}>
                           <span className="signal-badge-icon">{signal.primaryIcon}</span>
                           <span className="signal-badge-text">{signal.primaryLabel}</span>
+                          {signal.streakCount !== undefined && signal.streakCount > 1 && (
+                            <span className="signal-badge-count">X{signal.streakCount}</span>
+                          )}
+                        </div>
+                      ) : hasAiFeature ? (
+                        <div className="signal-badge signal-badge-loading" aria-label="AI 訊號讀取中">
+                          <span className="signal-badge-loading-dot" />
+                          <span className="signal-badge-text">讀取中</span>
                         </div>
                       ) : (
                         <div className="holding-emoji">{itemIsProfit ? '😊' : '😢'}</div>
                       )}
-                      <div>
-                        <div className="holding-name">{h.stockName}</div>
-                        <div className="holding-code">{h.stockCode}</div>
+                      <div className="holding-info">
+                        <div className="holding-name-line">
+                          <span className="holding-name">{h.stockName}</span>
+                          <MarketBadge market={marketMap[h.stockCode]?.market} compact />
+                        </div>
+                        <div className="holding-code-market-line">
+                          <span className="holding-code">{h.stockCode}</span>
+                        </div>
+                        <div className={`holding-rec-line${hasAiFeature ? ' holding-rec-line-quant' : ''}`}>
+                          {renderAddPriorityChip(h.stockCode, signal)}
+                          {renderIndustryTailwindChip(h.stockCode)}
+                          {renderActiveEtfRadarChip(h.stockCode, h.stockName)}
+                          {memberQuantChips}
+                          {!hasAiFeature && renderRecommendationCountBadge(h.stockCode)}
+                          {!hasAiFeature && renderProfitLossLevelBadge(itemPLPct, signal)}
+                        </div>
                       </div>
                     </div>
                     <div className="holding-center">

@@ -21,6 +21,7 @@ export default function ProfileSettings() {
   const [brokerFeeRate, setBrokerFeeRate] = useState(user?.brokerFeeRate?.toString() || '0.001425');
   const [brokerMinFee, setBrokerMinFee] = useState(user?.brokerMinFee?.toString() || '20');
   const [brokerTaxRate, setBrokerTaxRate] = useState(user?.brokerTaxRate?.toString() || '0.003');
+  const [stopLossAlertPct, setStopLossAlertPct] = useState(user?.stopLossAlertPct?.toString() || '20');
 
   const [newsletterStrategy, setNewsletterStrategy] = useState<string>(user?.newsletterStrategy || 'A');
   const [strategySaving, setStrategySaving] = useState(false);
@@ -81,7 +82,9 @@ export default function ProfileSettings() {
       const bfr = parseFloat(brokerFeeRate) || 0;
       const bmf = parseFloat(brokerMinFee) || 0;
       const btr = parseFloat(brokerTaxRate) || 0;
-      const bResult = await updateBrokerSettings(bfr, bmf, btr);
+      const slp = Math.min(80, Math.max(1, parseFloat(stopLossAlertPct) || 20));
+      setStopLossAlertPct(String(slp));
+      const bResult = await updateBrokerSettings(bfr, bmf, btr, slp);
       if (bResult.error) brokerError = bResult.error;
     }
 
@@ -189,11 +192,11 @@ export default function ProfileSettings() {
         <div className="settings-section-title">券商交易手續費設定</div>
         {user?.role === 'parent' ? (
           <p style={{ fontSize: '13px', color: '#888', marginBottom: '12px', padding: '0 20px' }}>
-            這些設定會同步套用到您與所有副帳號的下單計算中，讓投資體驗更貼近真實。公定券商手續費為 0.1425%，證券交易稅為 0.3%。
+            這些設定會同步套用到您與所有副帳號的下單計算中，讓投資體驗更貼近真實。公定券商手續費為 0.1425%，證券交易稅為 0.3%。停損提醒預設為跌幅 20%。
           </p>
         ) : (
           <p style={{ fontSize: '13px', color: '#888', marginBottom: '12px', padding: '0 20px' }}>
-            以下為目前主帳號設定的手續費率，讓您的投資體驗更貼近真實市場（僅供檢視）。
+            以下為目前主帳號設定的交易與停損提醒參數，讓下單前先看清楚可能承擔的風險（僅供檢視）。
           </p>
         )}
         <div className="settings-item">
@@ -230,6 +233,26 @@ export default function ProfileSettings() {
             placeholder="例如 0.003"
             disabled={user?.role !== 'parent'}
           />
+        </div>
+        <div className="settings-item">
+          <label className="settings-label">🛡️ 停損提醒跌幅</label>
+          <div className="settings-input-wrap">
+            <input
+              type="number"
+              min="1"
+              max="80"
+              step="1"
+              className="settings-input"
+              value={stopLossAlertPct}
+              onChange={(e) => setStopLossAlertPct(e.target.value)}
+              placeholder="例如 20"
+              disabled={user?.role !== 'parent'}
+            />
+            <span className="settings-input-suffix">%</span>
+          </div>
+        </div>
+        <div className="settings-helper">
+          下單時會用這個跌幅計算停損價與可能損失，讓孩子先確認這筆交易的風險能不能承受。
         </div>
       </div>
 

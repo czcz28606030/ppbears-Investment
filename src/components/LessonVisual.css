@@ -1,0 +1,123 @@
+.lesson-visual {
+  width: 100%;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  background:
+    radial-gradient(circle at 82% 18%, rgba(255, 202, 58, 0.24), transparent 22%),
+    linear-gradient(180deg, #fff9e8, #eef8ff);
+  border: 2px solid rgba(108, 92, 231, 0.14);
+  box-shadow: inset 0 -5px 0 rgba(35, 70, 90, 0.06);
+}
+
+.lesson-visual svg {
+  display: block;
+  width: 100%;
+  min-height: 132px;
+}
+
+.lesson-visual-grid {
+  stroke: rgba(86, 98, 115, 0.16);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 6;
+}
+
+.lesson-visual-line {
+  fill: none;
+  stroke: #1682c8;
+  stroke-width: 5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.lesson-visual-area {
+  fill: rgba(80, 201, 255, 0.18);
+}
+
+.lesson-visual-dot {
+  fill: #ff725f;
+  stroke: #fff;
+  stroke-width: 3;
+}
+
+.lesson-visual-ma {
+  fill: none;
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+
+.lesson-visual-ma-fast { stroke: #ff725f; }
+.lesson-visual-ma-slow { stroke: #6c5ce7; }
+
+.lesson-visual-wick {
+  stroke: #334155;
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+.lesson-visual-candle-up {
+  fill: #e9413f;
+  stroke: #b8292a;
+  stroke-width: 2;
+}
+
+.lesson-visual-candle-down {
+  fill: #2ac892;
+  stroke: #11815f;
+  stroke-width: 2;
+}
+
+.lesson-visual-mini-bars rect,
+.lesson-visual-bars rect {
+  fill: #ffca3a;
+  stroke: rgba(138, 77, 0, 0.18);
+  stroke-width: 2;
+}
+
+.lesson-visual-panel {
+  fill: rgba(255, 255, 255, 0.72);
+  stroke: rgba(108, 92, 231, 0.18);
+  stroke-width: 2;
+}
+
+.lesson-visual-label,
+.lesson-visual-caption,
+.lesson-visual-legend text {
+  fill: #334155;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.lesson-visual-price {
+  fill: #173635;
+  font-size: 28px;
+  font-weight: 900;
+}
+
+.lesson-visual-arrow {
+  fill: rgba(255, 114, 95, 0.18);
+  stroke: #ff725f;
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.lesson-visual-stop {
+  stroke: #e9413f;
+  stroke-width: 4;
+  stroke-dasharray: 7 7;
+}
+
+.lesson-visual-shield {
+  fill: rgba(42, 200, 146, 0.2);
+  stroke: #11815f;
+  stroke-width: 4;
+  stroke-linejoin: round;
+}
+
+.lesson-visual-check {
+  fill: none;
+  stroke: #11815f;
+  stroke-width: 7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}

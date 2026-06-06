@@ -1,12 +1,140 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { fetchStockData, fetchSimonsData, fetchStockQuantData, toRecommendation, POPULAR_STOCKS, fetchTWSEStockPrice, fetchTPEXStockPrice, getOrGenerateKidFriendlyDesc, fetchTWSEDividendYields, getFreshStockAnalysis, calculateSimonsScore } from '../api';
-import type { StockQuantData } from '../api';
+import { fetchStockData, fetchSimonsData, fetchStockQuantData, fetchInstitutionCostData, fetchStockQuantHistory, fetchStockTradingSignals, fetchSimonsInstitutionCostData, toRecommendation, POPULAR_STOCKS, fetchTWSEStockPrice, fetchTPEXStockPrice, getOrGenerateKidFriendlyDesc, fetchTWSEDividendYields, getFreshStockAnalysis, calculateSimonsScore, clearQuantSignalTTLCache, clearSimonsDataTTLCache, fetchDailyAiCacheVersion, getKnownDailyAiCacheVersion, rememberDailyAiCacheVersion, fetchActiveEtfRadarMap, fetchSimonsRecommendationCounts } from '../api';
+import type { ActiveEtfRadarItem, InstitutionCostData, SimonsInstitutionCostData, StockQuantData, StockQuantHistoryPoint } from '../api';
 import type { TWSTEStockQuote, TPEXStockQuote } from '../api';
 import { useStore, formatPrice, formatMoney } from '../store';
-import type { StockData, StockPrice, StockRecommendation, StockLiveAnalysis, SimonsItem } from '../types';
+import type { StockData, StockPrice, StockRecommendation, StockLiveAnalysis, SimonsItem, StockTradingSignal } from '../types';
 import StockChart from '../components/TradingViewChart';
+import MarketBadge from '../components/MarketBadge';
+import { calculateAddPriority } from '../utils/addPriority';
+import { getIndustryTailwind, getIndustryTailwindScore } from '../utils/industryTailwinds';
 import './StockDetail.css';
+
+type ChipHistoryDays = 30 | 60;
+const DAILY_AI_CACHE_POLL_MS = 90 * 1000;
+
+function formatTrendDate(date: string): string {
+  const [, month, day] = date.split('-');
+  return month && day ? `${month}/${day}` : date;
+}
+
+function ChipStabilityTrendChart({
+  points,
+  days,
+  loading,
+}: {
+  points: StockQuantHistoryPoint[];
+  days: ChipHistoryDays;
+  loading: boolean;
+}) {
+  const visiblePoints = points.slice(-days);
+  const width = 640;
+  const height = 190;
+  const chart = { left: 38, top: 16, right: 14, bottom: 34 };
+  const chartWidth = width - chart.left - chart.right;
+  const chartHeight = height - chart.top - chart.bottom;
+  const valueToY = (value: number) => chart.top + ((10 - value) / 10) * chartHeight;
+  const xForIndex = (index: number) => {
+    if (visiblePoints.length <= 1) return chart.left + chartWidth / 2;
+    return chart.left + (index / (visiblePoints.length - 1)) * chartWidth;
+  };
+
+  const path = visiblePoints
+    .map((point, index) => `${index === 0 ? 'M' : 'L'} ${xForIndex(index).toFixed(1)} ${valueToY(point.chipPts).toFixed(1)}`)
+    .join(' ');
+  const areaPath = visiblePoints.length > 1
+    ? `${path} L ${xForIndex(visiblePoints.length - 1).toFixed(1)} ${chart.top + chartHeight} L ${chart.left} ${chart.top + chartHeight} Z`
+    : '';
+  const latest = visiblePoints[visiblePoints.length - 1] ?? null;
+  const first = visiblePoints[0] ?? null;
+  const avg = visiblePoints.length > 0
+    ? visiblePoints.reduce((sum, point) => sum + point.chipPts, 0) / visiblePoints.length
+    : null;
+  const delta = latest && first ? latest.chipPts - first.chipPts : null;
+  const trendClass = delta === null ? 'flat' : delta >= 0.5 ? 'up' : delta <= -0.5 ? 'down' : 'flat';
+  const trendLabel = delta === null ? '等待資料' : delta >= 0.5 ? '轉穩' : delta <= -0.5 ? '轉亂' : '持平';
+  const labelIndexes = visiblePoints.length > 2
+    ? [0, Math.floor((visiblePoints.length - 1) / 2), visiblePoints.length - 1]
+    : visiblePoints.map((_, index) => index);
+
+  return (
+    <div className="chip-history-card">
+      <div className="chip-history-summary">
+        <div>
+          <div className="chip-history-kicker">籌碼穩定度趨勢</div>
+          <div className="chip-history-title">{days} 天追蹤</div>
+        </div>
+        <div className="chip-history-stats">
+          <div>
+            <span>最新</span>
+            <strong>{latest ? latest.chipPts.toFixed(1) : '--'}</strong>
+          </div>
+          <div>
+            <span>平均</span>
+            <strong>{avg !== null ? avg.toFixed(1) : '--'}</strong>
+          </div>
+          <div className={`chip-history-trend ${trendClass}`}>
+            <span>{trendLabel}</span>
+            <strong>{delta !== null ? `${delta >= 0 ? '+' : ''}${delta.toFixed(1)}` : '--'}</strong>
+          </div>
+        </div>
+      </div>
+
+      <div className="chip-history-plot-wrap">
+        {loading ? (
+          <div className="chip-history-empty">正在讀取籌碼歷史資料...</div>
+        ) : visiblePoints.length === 0 ? (
+          <div className="chip-history-empty">目前還沒有歷史快照，今晚收集後會開始累積。</div>
+        ) : (
+          <svg className="chip-history-plot" viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`近 ${days} 天籌碼穩定度趨勢`}>
+            {[0, 5, 10].map(value => (
+              <g key={value}>
+                <line
+                  x1={chart.left}
+                  x2={width - chart.right}
+                  y1={valueToY(value)}
+                  y2={valueToY(value)}
+                  className="chip-history-grid-line"
+                />
+                <text x="8" y={valueToY(value) + 4} className="chip-history-axis-text">{value}</text>
+              </g>
+            ))}
+            {areaPath && <path d={areaPath} className="chip-history-area" />}
+            {path && <path d={path} className="chip-history-line" />}
+            {visiblePoints.map((point, index) => (
+              <circle
+                key={`${point.date}-${index}`}
+                cx={xForIndex(index)}
+                cy={valueToY(point.chipPts)}
+                r={index === visiblePoints.length - 1 ? 4.8 : 3.2}
+                className={index === visiblePoints.length - 1 ? 'chip-history-dot latest' : 'chip-history-dot'}
+              >
+                <title>{`${point.date} ${point.chipPts.toFixed(1)} 分`}</title>
+              </circle>
+            ))}
+            {labelIndexes.map(index => (
+              <text
+                key={`label-${index}`}
+                x={xForIndex(index)}
+                y={height - 10}
+                textAnchor={index === 0 ? 'start' : index === visiblePoints.length - 1 ? 'end' : 'middle'}
+                className="chip-history-axis-text"
+              >
+                {formatTrendDate(visiblePoints[index].date)}
+              </text>
+            ))}
+          </svg>
+        )}
+      </div>
+
+      <div className="chip-history-foot">
+        <span>已累積 {visiblePoints.length} 筆</span>
+        {latest && <span>最新日期 {latest.date}</span>}
+      </div>
+    </div>
+  );
+}
 
 export default function StockDetail() {
   const { code } = useParams<{ code: string }>();
@@ -19,6 +147,10 @@ export default function StockDetail() {
   const [tpexQuote, setTpexQuote] = useState<TPEXStockQuote | null>(null);
   const [loading, setLoading] = useState(true);
   const [descLoading, setDescLoading] = useState(true);
+  const [quantLoading, setQuantLoading] = useState(true);
+  const [institutionCostLoading, setInstitutionCostLoading] = useState(true);
+  const [pageReleased, setPageReleased] = useState(false);
+  const [isStockMiniBarVisible, setStockMiniBarVisible] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
   const [kidDesc, setKidDesc] = useState('');
   const [liveAnalysis, setLiveAnalysis] = useState<StockLiveAnalysis | null>(null);
@@ -27,12 +159,51 @@ export default function StockDetail() {
   const [analysisRetryTick, setAnalysisRetryTick] = useState(0);
   const [tradeMode, setTradeMode] = useState<'buy' | 'sell' | null>(null);
   const [quantity, setQuantity] = useState('');
+  const [tradeUnit, setTradeUnit] = useState<'share' | 'lot'>('share');
   const [tradeReason, setTradeReason] = useState('');
   const [tradeResult, setTradeResult] = useState<{ success: boolean; message: string } | null>(null);
   const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
   const [isTrading, setIsTrading] = useState(false);
   const [latestYield, setLatestYield] = useState<number | null>(null);
   const [quantData, setQuantData] = useState<StockQuantData | null>(null);
+  const [quantHistory, setQuantHistory] = useState<StockQuantHistoryPoint[]>([]);
+  const [quantHistoryDays, setQuantHistoryDays] = useState<ChipHistoryDays>(60);
+  const [quantHistoryLoading, setQuantHistoryLoading] = useState(false);
+  const [activeEtfRadar, setActiveEtfRadar] = useState<ActiveEtfRadarItem | null>(null);
+  const [activeEtfLoading, setActiveEtfLoading] = useState(false);
+  const [recommendationCount, setRecommendationCount] = useState(0);
+  const [institutionCostData, setInstitutionCostData] = useState<InstitutionCostData | null>(null);
+  const [simonsInstitutionCostData, setSimonsInstitutionCostData] = useState<SimonsInstitutionCostData | null>(null);
+  const [tradingSignals, setTradingSignals] = useState<StockTradingSignal[]>([]);
+  const [tradingSignalDate, setTradingSignalDate] = useState('');
+  const [tradingSignalUpdatedAt, setTradingSignalUpdatedAt] = useState('');
+  const [tradingSignalLoading, setTradingSignalLoading] = useState(false);
+  const [tradingSignalError, setTradingSignalError] = useState<string | null>(null);
+  const [showMa5, setShowMa5] = useState(true);
+  const [showMa20, setShowMa20] = useState(true);
+
+  useLayoutEffect(() => {
+    if (!code) return;
+    setStockMiniBarVisible(false);
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  }, [code]);
+
+  useEffect(() => {
+    if (!pageReleased) {
+      setStockMiniBarVisible(false);
+      return;
+    }
+
+    const handleScroll = () => {
+      setStockMiniBarVisible(window.scrollY > 260);
+    };
+
+    handleScroll();
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, [pageReleased, code]);
 
   useEffect(() => {
     if (!activeTooltip) return;
@@ -49,7 +220,8 @@ export default function StockDetail() {
     };
   }, [activeTooltip]);
   
-  const { user, holdings, executeBuy, executeSell, getPortfolioSummary, hasFeature, isInWatchlist, addToWatchlist, removeFromWatchlist } = useStore();
+  const { user, holdings, dataReady, executeBuy, executeSell, getPortfolioSummary, hasFeature, isInWatchlist, addToWatchlist, removeFromWatchlist } = useStore();
+  const hasAiFeature = hasFeature('ai_stock_picking');
   const holding = holdings.find(h => h.stockCode === code);
   const summary = getPortfolioSummary();
   const [wlBusy, setWlBusy] = useState(false);
@@ -154,7 +326,14 @@ export default function StockDetail() {
   }, [relatedStocks.length]);
 
   // ─── Risk Warning State ───────────────────────────────
-  type RiskWarning = { title: string; message: string; tip: string; icon: string };
+  type RiskWarning = {
+    title: string;
+    message: string;
+    tip: string;
+    icon: string;
+    level?: 'info' | 'caution' | 'danger';
+    details?: Array<{ label: string; value: string; tone?: 'normal' | 'profit' | 'loss' | 'warning' }>;
+  };
   const [pendingWarnings, setPendingWarnings] = useState<RiskWarning[]>([]);
   const [showWarningModal, setShowWarningModal] = useState(false);
   const analysisRequestRef = useRef<{ key: string; startedAt: number }>({ key: '', startedAt: 0 });
@@ -165,12 +344,17 @@ export default function StockDetail() {
     // 切換到不同股票時，重置所有下單狀態，避免 isTrading 卡住
     setTradeMode(null);
     setQuantity('');
+    setTradeUnit('share');
     setTradeReason('');
     setTradeResult(null);
     setIsTrading(false);
     setLiveAnalysis(null);
     setAnalysisError(null);
     setAnalysisRetryTick(0);
+    setDescLoading(true);
+    setQuantLoading(true);
+    setInstitutionCostLoading(true);
+    setPageReleased(false);
     analysisRequestRef.current = { key: '', startedAt: 0 };
     setStockData(null);
     setLatestPrice(null);
@@ -178,11 +362,162 @@ export default function StockDetail() {
     setTpexQuote(null);
     setKidDesc('');
     setQuantData(null);
+    setQuantHistory([]);
+    setActiveEtfRadar(null);
+    setRecommendationCount(0);
+    setInstitutionCostData(null);
+    setSimonsInstitutionCostData(null);
+    setTradingSignals([]);
+    setTradingSignalDate('');
+    setTradingSignalUpdatedAt('');
+    setTradingSignalError(null);
     if (code) loadStock(code);
   }, [code]);
 
+  useEffect(() => {
+    if (!code) return;
+    let cancelled = false;
+    setActiveEtfLoading(true);
+    setActiveEtfRadar(null);
+    setRecommendationCount(0);
+
+    Promise.all([
+      fetchActiveEtfRadarMap([code], 5),
+      fetchSimonsRecommendationCounts([code], 90),
+    ])
+      .then(([radarMap, counts]) => {
+        if (cancelled) return;
+        setActiveEtfRadar(radarMap[code] ?? null);
+        setRecommendationCount(counts[code] || 0);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setActiveEtfRadar(null);
+          setRecommendationCount(0);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setActiveEtfLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [code]);
+
+  useEffect(() => {
+    if (!code) return;
+    if (!hasAiFeature) {
+      setTradingSignals([]);
+      setTradingSignalDate('');
+      setTradingSignalUpdatedAt('');
+      setTradingSignalLoading(false);
+      setTradingSignalError(null);
+      return;
+    }
+
+    let cancelled = false;
+    setTradingSignalLoading(true);
+    setTradingSignalError(null);
+    fetchStockTradingSignals(code)
+      .then(payload => {
+        if (cancelled) return;
+        if (!payload) {
+          setTradingSignals([]);
+          setTradingSignalDate('');
+          setTradingSignalUpdatedAt('');
+          setTradingSignalError('進出場訊號讀取失敗');
+          return;
+        }
+        setTradingSignals(payload.signals);
+        setTradingSignalDate(payload.dataDate);
+        setTradingSignalUpdatedAt(payload.signalUpdatedAt);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setTradingSignals([]);
+          setTradingSignalDate('');
+          setTradingSignalUpdatedAt('');
+          setTradingSignalError('進出場訊號讀取失敗');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setTradingSignalLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [code, hasAiFeature, user?.id]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadQuantHistory() {
+      if (!code) return;
+      setQuantHistoryLoading(true);
+      const points = await fetchStockQuantHistory(code, 60);
+      if (!cancelled) {
+        setQuantHistory(points);
+        setQuantHistoryLoading(false);
+      }
+    }
+
+    void loadQuantHistory();
+    return () => {
+      cancelled = true;
+    };
+  }, [code]);
+
+  useEffect(() => {
+    if (!code) return;
+    const stockCode = code;
+    let cancelled = false;
+    async function checkSharedAiCacheVersion() {
+      if (loading) return;
+      const latest = await fetchDailyAiCacheVersion();
+      if (cancelled || !latest?.version) return;
+      const known = getKnownDailyAiCacheVersion('stock-detail');
+      if (!known) {
+        rememberDailyAiCacheVersion(latest.version, 'stock-detail');
+        return;
+      }
+      if (latest.version !== known) {
+        rememberDailyAiCacheVersion(latest.version, 'stock-detail');
+        clearQuantSignalTTLCache();
+        clearSimonsDataTTLCache();
+        setQuantLoading(true);
+        fetchSimonsData(undefined, { forceFresh: true })
+          .then(items => {
+            if (cancelled) return;
+            const match = items.find(item => item.coid === stockCode);
+            if (match) {
+              setSimonsMeta(match);
+              setRecommendation(toRecommendation(match));
+            }
+          })
+          .catch(() => {});
+        fetchStockQuantData(stockCode, undefined, { forceFresh: true })
+          .then(qd => { if (!cancelled) setQuantData(qd); })
+          .catch(() => {})
+          .finally(() => { if (!cancelled) setQuantLoading(false); });
+        fetchStockQuantHistory(stockCode, 60)
+          .then(points => { if (!cancelled) setQuantHistory(points); })
+          .catch(() => {});
+      }
+    }
+
+    checkSharedAiCacheVersion();
+    const timer = window.setInterval(checkSharedAiCacheVersion, DAILY_AI_CACHE_POLL_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [code, loading]);
+
   async function loadStock(coid: string) {
     setLoading(true);
+    setQuantLoading(true);
+    setInstitutionCostLoading(true);
     try {
       // 同時載入 ifalgo 資料、TWSE（上市）即時行情
       const [stockRes, twseRes] = await Promise.all([
@@ -237,13 +572,26 @@ export default function StockDetail() {
     // 先把 loading 設為 false，讓 PPBear 即時整理可以立即觸發
     setLoading(false);
 
-    // Simons 量化模型詳細資料非同步載入（不阻塞主流程）
-    fetchStockQuantData(coid).then(qd => setQuantData(qd)).catch(() => {});
+    // Simons 量化模型與籌碼成本非同步載入，但首次進頁會等它們結束後再揭露完整頁面。
+    fetchStockQuantData(coid)
+      .then(qd => setQuantData(qd))
+      .catch(() => {})
+      .finally(() => setQuantLoading(false));
+    Promise.all([
+      fetchInstitutionCostData(coid),
+      fetchSimonsInstitutionCostData(coid),
+    ])
+      .then(([institutionData, simonsCostData]) => {
+        setInstitutionCostData(institutionData);
+        setSimonsInstitutionCostData(simonsCostData);
+      })
+      .catch(() => {})
+      .finally(() => setInstitutionCostLoading(false));
   }
 
   // 【NEW】當量化數據加載完成時，如果是 Premium 會員且有 AI 推薦等級，重新用 Simons 評分計算
   useEffect(() => {
-    if (!quantData?.aiQuanBackDataComment || !simonsMeta || !hasFeature('ai_stock_picking')) return;
+    if (!quantData?.aiQuanBackDataComment || !simonsMeta || !hasAiFeature) return;
     // 已有量化數據 + 是 Premium 會員 + 有 SimonsItem 原始數據 → 用 Simons 評分重新計算
     const simonsResult = calculateSimonsScore(simonsMeta, quantData);
     setRecommendation({
@@ -253,7 +601,7 @@ export default function StockDetail() {
       kidAdvice: simonsResult.kidText,
       score: simonsResult.score,
     });
-  }, [quantData, simonsMeta, hasFeature('ai_stock_picking')]);
+  }, [quantData, simonsMeta, hasAiFeature]);
 
   // 非同步載入公司介紹
   useEffect(() => {
@@ -350,6 +698,16 @@ export default function StockDetail() {
     tpexQuote?.CompanyName,
   ]);
 
+  // 首屏只等待行情、量化與籌碼成本；公司介紹與 AI 三面向整理可用快取/背景補齊，
+  // 避免外部 AI 或新聞來源延遲時把整個個股頁卡在進度畫面。
+  const initialPageReady = !loading && !quantLoading && !institutionCostLoading;
+
+  useEffect(() => {
+    if (initialPageReady) {
+      setPageReleased(true);
+    }
+  }, [initialPageReady]);
+
   // 價格選擇邏輯：比較官方 API 更新日期與 ifalgo 日期，使用最新的那筆
   // TWSE/TPEx OpenAPI 盤後有 1~3 小時延遲；ifalgo 通常更即時
   // 民國 7 碼 "1150413" → 西元 "20260413"
@@ -371,49 +729,147 @@ export default function StockDetail() {
         ? parseFloat(tpexQuote.Close)
         : ifalgoClose;
 
+  const quantityNumber = parseInt(quantity, 10);
+  const tradeShares = Number.isFinite(quantityNumber) && quantityNumber > 0
+    ? quantityNumber * (tradeUnit === 'lot' ? 1000 : 1)
+    : 0;
+  const tradeUnitLabel = tradeUnit === 'lot' ? '張' : '股';
+
   async function handleTrade() {
     if (!code || !tradeMode || price <= 0) return;
-    const qty = parseInt(quantity);
+    const qty = tradeShares;
 
     // ─── Only check risk on BUY ──────────────────────────────────────
     if (tradeMode === 'buy') {
       const warnings: RiskWarning[] = [];
       const totalAssets = summary.totalAssets;
       const buyAmount = qty * price;
+      const feeRate = user?.brokerFeeRate ?? 0.001425;
+      const minFee = user?.brokerMinFee ?? 20;
+      const estimatedFee = Math.max(minFee, Math.round(buyAmount * feeRate));
+      const finalBuyCost = buyAmount + estimatedFee;
+      const stopLossPct = Math.min(80, Math.max(1, user?.stopLossAlertPct ?? 20));
+      const stopLossPrice = price * (1 - stopLossPct / 100);
+      const existingShares = holding?.totalShares ?? 0;
+      const existingAvgCost = holding?.avgCost ?? 0;
+      const existingCost = existingShares * existingAvgCost;
+      const existingMarketValue = existingShares * price;
+      const existingPnL = existingMarketValue - existingCost;
+      const existingPnLPct = existingCost > 0 ? (existingPnL / existingCost) * 100 : 0;
+      const newShares = existingShares + qty;
+      const newAvgCost = newShares > 0 ? (existingCost + buyAmount) / newShares : price;
+      const newPositionValue = newShares * price;
+      const newPositionWeight = totalAssets > 0 ? (newPositionValue / totalAssets) * 100 : 0;
+      const newPositionCost = existingCost + buyAmount;
+      const balanceAfter = user ? user.availableBalance - finalBuyCost : null;
+      const addOnStopLossLoss = Math.round(Math.max(0, price - stopLossPrice) * qty);
+      const wholePositionStopLossPnL = Math.round((stopLossPrice - newAvgCost) * newShares);
+      const addOnDetails: RiskWarning['details'] = holding ? [
+        { label: '目前持股', value: `${existingShares.toLocaleString('zh-TW')} 股` },
+        { label: '目前平均成本', value: `NT$ ${formatPrice(existingAvgCost)}` },
+        { label: '目前價格', value: `NT$ ${formatPrice(price)}` },
+        {
+          label: '目前帳面損益',
+          value: `${existingPnL >= 0 ? '+' : '-'}NT$ ${formatMoney(Math.abs(existingPnL))} (${existingPnLPct >= 0 ? '+' : ''}${existingPnLPct.toFixed(1)}%)`,
+          tone: existingPnL >= 0 ? 'profit' : 'loss',
+        },
+        { label: '這次買入', value: `${qty.toLocaleString('zh-TW')} 股 / NT$ ${formatMoney(buyAmount)}` },
+        { label: '預估含手續費花費', value: `NT$ ${formatMoney(finalBuyCost)}`, tone: 'warning' },
+        { label: '買後總持股', value: `${newShares.toLocaleString('zh-TW')} 股` },
+        { label: '買後平均成本', value: `NT$ ${formatPrice(newAvgCost)}`, tone: price < existingAvgCost ? 'warning' : 'normal' },
+        { label: '買後總投入成本', value: `NT$ ${formatMoney(newPositionCost)}` },
+        { label: '買後部位市值', value: `NT$ ${formatMoney(newPositionValue)}（總資產 ${newPositionWeight.toFixed(1)}%）`, tone: newPositionWeight > 15 ? 'warning' : 'normal' },
+        { label: `跌到 -${stopLossPct}% 參考價`, value: `NT$ ${formatPrice(stopLossPrice)}` },
+        { label: '本次加碼可能損失', value: `NT$ ${formatMoney(addOnStopLossLoss)}`, tone: 'loss' },
+        {
+          label: '整檔到參考價損益',
+          value: `${wholePositionStopLossPnL >= 0 ? '+' : '-'}NT$ ${formatMoney(Math.abs(wholePositionStopLossPnL))}`,
+          tone: wholePositionStopLossPnL >= 0 ? 'profit' : 'loss',
+        },
+        ...(balanceAfter !== null ? [{ label: '買後可用餘額', value: `NT$ ${formatMoney(balanceAfter)}`, tone: balanceAfter < 0 ? 'loss' : 'normal' } as const] : []),
+      ] : undefined;
 
       // Risk 1: 買入後單一該股超過總資金 15%
-      const existingValue = holding ? holding.totalShares * holding.currentPrice : 0;
-      const newPositionValue = existingValue + buyAmount;
       if (totalAssets > 0 && newPositionValue / totalAssets > 0.15) {
-        const pct = (newPositionValue / totalAssets * 100).toFixed(0);
+        const pct = newPositionWeight.toFixed(1);
         warnings.push({
-          icon: '👸',
-          title: '雞蛋不能放在同一個箐子裡！',
+          icon: '📦',
+          title: '單一股票部位偏高',
           message: `買入後，「${stockData?.stkname || code}」將占你總資金的 ${pct}%，超過了建議的 15% 上限。`,
-          tip: '分散投資就像將雞蛋放入不同的箐子裡，僅一個筐子不小心打破，其他的蛋還是安全的。單一股票超過 15%，万一跨了就欲哭無淚！',
+          tip: '部位太集中時，單一股票下跌會明顯影響整體資產。下單前請確認這不是因為一時看好而把資金壓得太集中。',
+          level: 'danger',
+          details: [
+            { label: '買後部位市值', value: `NT$ ${formatMoney(newPositionValue)}` },
+            { label: '買後總資產占比', value: `${pct}%`, tone: 'warning' },
+            { label: '建議上限', value: '15%' },
+          ],
         });
       }
 
-      // Risk 2: 在號損時加碼
-      if (holding && price < holding.avgCost) {
-        const lossRate = ((holding.avgCost - price) / holding.avgCost * 100).toFixed(1);
-        warnings.push({
-          icon: '🚨',
-          title: '目前正在號損！越跌越買很危険！',
-          message: `你的成本是 NT$ ${formatPrice(holding.avgCost)}，目前價格是 NT$ ${formatPrice(price)}，已號損 ${lossRate}%。`,
-          tip: '越跌越買（扔平成本）是投資新手最常犯的錯誤。警告：如果镜子不轉，搁整只會讓你輸得更多！只允許在「走勢變強」時才加碼。',
-        });
+      // Risk 2: 已持股再買，依獲利/攤平狀態顯示加碼後果
+      if (holding) {
+        if (price > holding.avgCost) {
+          const profitRate = ((price - holding.avgCost) / holding.avgCost) * 100;
+          warnings.push({
+            icon: '📈',
+            title: '獲利中加碼提醒',
+            message: `目前這檔已有 ${profitRate.toFixed(1)}% 帳面獲利。獲利加碼可以是順勢，但買完後平均成本會提高，部位也會變大。`,
+            tip: '請確認這次加碼是因為新的理由仍然成立，而不是因為目前賺錢就追高。加碼後如果回跌，原本獲利可能會被吃掉。',
+            level: 'caution',
+            details: addOnDetails,
+          });
+        } else if (price < holding.avgCost) {
+          const lossRate = ((holding.avgCost - price) / holding.avgCost) * 100;
+          const halfStopLossPct = stopLossPct / 2;
+          const isOverStopLoss = lossRate >= stopLossPct;
+          const isNearStopLoss = !isOverStopLoss && lossRate >= halfStopLossPct;
+          warnings.push({
+            icon: isOverStopLoss ? '🛑' : isNearStopLoss ? '🚨' : '⚠️',
+            title: isOverStopLoss
+              ? '超過停損提醒仍想攤平'
+              : isNearStopLoss
+                ? '接近停損區攤平警告'
+                : '虧損中攤平警告',
+            message: isOverStopLoss
+              ? `目前已虧損 ${lossRate.toFixed(1)}%，超過你設定的 -${stopLossPct}% 停損提醒。這次買入會降低平均成本，但也會把更多資金放進正在虧損的股票。`
+              : isNearStopLoss
+                ? `目前已虧損 ${lossRate.toFixed(1)}%，接近你設定的 -${stopLossPct}% 停損提醒。攤平前要先確認走勢或理由是否真的改善。`
+                : `目前已虧損 ${lossRate.toFixed(1)}%。攤平會讓平均成本下降，但帳面虧損不會消失，總投入金額會變大。`,
+            tip: isOverStopLoss
+              ? '這是最高風險加碼情境。請確認不是因為不想認賠而加碼；如果投資理由已經改變，先停下來比繼續投入更重要。'
+              : '攤平不是降低風險，只是用更多資金換一個較低的平均成本。請把加碼後的總投入、總部位和可能損失一起看。',
+            level: isOverStopLoss || isNearStopLoss ? 'danger' : 'caution',
+            details: addOnDetails,
+          });
+        } else {
+          warnings.push({
+            icon: '⚖️',
+            title: '接近成本加碼提醒',
+            message: '目前價格接近你的平均成本。這次買入後部位會變大，後續上漲或下跌對帳戶的影響也會放大。',
+            tip: '加碼前請先確認這筆新增資金的目的，是提高長期部位，還是只是因為價格沒有明顯變動就順手買進。',
+            level: 'info',
+            details: addOnDetails,
+          });
+        }
       }
 
       // Risk 3: 一次買超過現有持股的 1/3
       if (holding && holding.totalShares > 0) {
         const oneThirdShares = holding.totalShares / 3;
         if (qty > oneThirdShares) {
+          const addOnPct = (qty / holding.totalShares) * 100;
           warnings.push({
             icon: '⚠️',
             title: '一次加碼太多了！',
-            message: `你已持有 ${holding.totalShares} 股，此次想再買 ${qty} 股，超過現持股的 1/3（1/${3} = ${Math.floor(oneThirdShares)} 股）。`,
-            tip: '穩健的加碼方式，是將資金分拆從小量進場。當走勢問題時，輸少了還有檢討空間；一次 All-in 的話，沒有第二次機會了！',
+            message: `你已持有 ${holding.totalShares.toLocaleString('zh-TW')} 股，這次想再買 ${qty.toLocaleString('zh-TW')} 股，等於現持股的 ${addOnPct.toFixed(1)}%，超過建議的 1/3。`,
+            tip: '穩健的加碼方式通常是分批，而不是一次把部位拉大。請確認這筆單就算判斷錯了，帳戶仍然承受得住。',
+            level: 'danger',
+            details: [
+              { label: '目前持股', value: `${holding.totalShares.toLocaleString('zh-TW')} 股` },
+              { label: '本次加碼', value: `${qty.toLocaleString('zh-TW')} 股` },
+              { label: '加碼比例', value: `${addOnPct.toFixed(1)}%`, tone: 'warning' },
+              { label: '建議上限', value: `${Math.floor(oneThirdShares).toLocaleString('zh-TW')} 股以內` },
+            ],
           });
         }
       }
@@ -437,7 +893,7 @@ export default function StockDetail() {
     if (isTrading) return;
     setIsTrading(true);
     setShowWarningModal(false);
-    const qty = parseInt(quantity);
+    const qty = tradeShares;
 
     try {
       let result;
@@ -450,6 +906,7 @@ export default function StockDetail() {
       setTradeResult(result);
       if (result.success) {
         setQuantity('');
+        setTradeUnit('share');
         setTradeReason('');
       }
     } catch (err) {
@@ -493,19 +950,276 @@ export default function StockDetail() {
               return `民國 ${d.slice(0, 3)} 年 ${d.slice(3, 5)} 月 ${d.slice(5, 7)} 日 (TPEx)`;
             }
             return d;
-          })()
-        : (latestPrice?.mdate || '');
+        })()
+      : (latestPrice?.mdate || '');
+  const marketBadge = twseQuote
+    ? 'listed' as const
+    : tpexQuote
+      ? 'otc' as const
+      : null;
+  const stockDisplayName = stockData?.stkname || twseQuote?.Name || tpexQuote?.CompanyName || '';
+  const finmindFlowItems = institutionCostData?.finmind?.items || [];
+  const formatFlowShares = (shares: number) => {
+    const lots = Math.round(shares / 1000);
+    return `${lots >= 0 ? '+' : ''}${lots.toLocaleString()}張`;
+  };
 
-  if (loading) {
+  const goodinfoCostMap = new Map(
+    (institutionCostData?.items || [])
+      .filter(item => item.estimatedCost !== null && item.estimatedCost > 0)
+      .map(item => [item.key, item.estimatedCost as number])
+  );
+  const parseCostValue = (value: string | number | null | undefined): number | null => {
+    const n = typeof value === 'number'
+      ? value
+      : parseFloat(String(value ?? '').replace(/,/g, '').trim());
+    return Number.isFinite(n) && n > 0 ? n : null;
+  };
+  const recommendationCostData: SimonsInstitutionCostData | null = recommendation && (
+    parseCostValue(recommendation.fcost) ||
+    parseCostValue(recommendation.tcost) ||
+    parseCostValue(recommendation.dcost) ||
+    parseCostValue(recommendation.wtcost)
+  ) ? {
+      coid: recommendation.coid,
+      stockName: recommendation.stkname,
+      date: recommendation.mdate,
+      source: 'simons-recommendation',
+      foreignCost: parseCostValue(recommendation.fcost),
+      trustCost: parseCostValue(recommendation.tcost),
+      dealerCost: parseCostValue(recommendation.dcost),
+      weightedAverage: parseCostValue(recommendation.wtcost),
+      close: parseCostValue(recommendation.close),
+    } : null;
+  const activeSimonsCostData = simonsInstitutionCostData || recommendationCostData;
+  const buildChipCostItem = (
+    key: 'foreign' | 'trust' | 'dealer',
+    label: string,
+    shortLabel: string,
+    simonsValue: number | null | undefined,
+    color: string
+  ) => {
+    const simonsCost = simonsValue || 0;
+    const goodinfoCost = goodinfoCostMap.get(key) || 0;
+    const value = simonsCost > 0 ? simonsCost : goodinfoCost;
+    if (value <= 0) return null;
+    return {
+      key,
+      label,
+      shortLabel,
+      value,
+      color,
+      source: simonsCost > 0 ? '⭐ Simons' : 'IFAlgo原資料',
+      sourceKind: simonsCost > 0 ? 'simons' as const : 'fallback' as const,
+      isEstimated: simonsCost <= 0,
+    };
+  };
+  const chipCostItems = [
+    buildChipCostItem('foreign', '外資成本', '外資', activeSimonsCostData?.foreignCost, '#10b981'),
+    buildChipCostItem('trust', '投信成本', '投信', activeSimonsCostData?.trustCost, '#3b82f6'),
+    buildChipCostItem('dealer', '自營商成本', '自營商', activeSimonsCostData?.dealerCost, '#8b5cf6'),
+  ].filter((item): item is NonNullable<typeof item> => item !== null);
+  const chipCostSources = Array.from(
+    new Map(chipCostItems.map(item => [item.source, { label: item.source, kind: item.sourceKind }])).values()
+  );
+  const hasGoodinfoEstimatedCost = chipCostItems.some(item => item.isEstimated);
+  const simonsWeightedAverageCost = activeSimonsCostData?.weightedAverage || 0;
+  const avgInstitutionCost = simonsWeightedAverageCost > 0
+    ? simonsWeightedAverageCost
+    : chipCostItems.length > 0
+      ? chipCostItems.reduce((sum, item) => sum + item.value, 0) / chipCostItems.length
+      : 0;
+  const avgInstitutionCostLabel = simonsWeightedAverageCost > 0
+    ? 'Simons 加權平均成本'
+    : '法人平均估算成本';
+  const latestChipCostSourceDate = activeSimonsCostData?.date || '';
+  const belowInstitutionCosts = chipCostItems.filter(item => price > 0 && price < item.value);
+  const nearestInstitutionCost = chipCostItems.length > 0
+    ? chipCostItems.reduce((prev, current) =>
+      Math.abs(current.value - price) < Math.abs(prev.value - price) ? current : prev
+    )
+    : null;
+  const costGapPct = avgInstitutionCost > 0 && price > 0
+    ? ((price - avgInstitutionCost) / avgInstitutionCost) * 100
+    : null;
+  const chipCostStatus = chipCostItems.length === 0 ? '尚無法人成本' :
+    belowInstitutionCosts.length >= 2 ? '低於多數法人估算成本' :
+    belowInstitutionCosts.length === 1 ? '接近法人估算成本區' : '高於主要法人估算成本';
+  const chipCostStatusClass = chipCostItems.length === 0 ? 'sm-badge-mute' :
+    belowInstitutionCosts.length >= 2 ? 'sm-badge-good' :
+    belowInstitutionCosts.length === 1 ? 'sm-badge-warn' : 'sm-badge-bad';
+  const chipCostSummary = chipCostItems.length === 0
+    ? '這檔目前沒有抓到外資、投信或自營商成本資料，可以先看技術線圖和即時整理。'
+    : belowInstitutionCosts.length >= 2
+      ? '現價仍低於多數法人平均布局區，單看籌碼成本不算追高。'
+      : belowInstitutionCosts.length === 1
+        ? '現價貼近部分法人成本，適合搭配技術線圖確認是否有續航力。'
+        : '現價已高於主要法人成本，代表市場先漲一段，追價前要更謹慎。';
+  const tvChartSubtitle = hasAiFeature
+    ? tradingSignalLoading
+      ? '日K · MA5 · MA20 · 成交量 · 進出場訊號讀取中'
+      : tradingSignalDate
+        ? `日K · MA5 · MA20 · 成交量 · IFAlgo訊號 ${tradingSignalDate}`
+        : '日K · MA5 · MA20 · 成交量 · 會員進出場訊號'
+    : '日K · MA5 · MA20 · 成交量';
+  const tvChartSignalNote = hasAiFeature
+    ? tradingSignalError
+      ? tradingSignalError
+      : tradingSignalDate
+        ? `IFAlgo 進出場訊號資料日期：${tradingSignalDate}${tradingSignalUpdatedAt ? `；訊號更新：${tradingSignalUpdatedAt.slice(0, 10)}` : ''}。綠箭頭代表前方未結束模型訊號出清或結束。`
+        : tradingSignalLoading
+          ? '正在讀取 IFAlgo 進出場訊號...'
+          : '目前沒有可顯示的 IFAlgo 進出場訊號'
+    : '';
+
+  const parsePercentValue = (value: string | null | undefined): number | null => {
+    const parsed = parseFloat(String(value ?? '').replace('%', '').replace(/,/g, '').trim());
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+  const activeEtfLabel = activeEtfRadar
+    ? activeEtfRadar.holdingEtfCount > 0
+      ? `ETF+${activeEtfRadar.holdingEtfCount}`
+      : 'ETF支撐 無'
+    : activeEtfLoading
+      ? 'ETF支撐 讀取中'
+      : 'ETF支撐 無紀錄';
+  const activeEtfTone = activeEtfRadar?.signal ?? 'neutral';
+  const currentAiSignal = hasAiFeature ? quantData?.currentSignal ?? 'neutral' : 'neutral';
+  const currentAiSignalLabel = currentAiSignal === 'buy' ? 'AI進場' : currentAiSignal === 'sell' ? 'AI出場' : 'AI中立';
+  const chipPtsValue = quantData?.chipStability ? parseFloat(quantData.chipStability.pts) : null;
+  const cumRetPct = parsePercentValue(quantData?.aiQuanBackDataComment?.cum_ret);
+  const tailwind = code ? getIndustryTailwind(code) : null;
+  const tailwindScore = code ? getIndustryTailwindScore(code) : null;
+  const addPriority = calculateAddPriority({
+    simonsScore: recommendation?.score ?? null,
+    aiSignal: currentAiSignal,
+    techTailwindScore: tailwindScore,
+    activeEtfScore: activeEtfRadar?.score ?? null,
+    activeEtfSignal: activeEtfRadar?.signal ?? null,
+    recommendationCount,
+    chipPts: chipPtsValue,
+    cumRetPct,
+  });
+  const addPriorityCaution = cumRetPct !== null && cumRetPct > 35
+    ? '累積報酬已偏高，代表模型歷史表現強，但也可能已有一段漲幅；加碼時要控制部位，不適合只因分數高就追價。'
+    : currentAiSignal === 'sell'
+      ? '目前 AI 訊號偏出場，若仍想加碼，應先確認股價、籌碼與原本投資理由是否仍成立。'
+      : addPriority.level === 'strong'
+        ? '目前條件較集中，可以優先研究加碼，但仍需搭配部位大小與停損設定。'
+        : addPriority.level === 'avoid'
+          ? '目前條件不夠集中，系統判斷偏向暫緩，先觀察比急著加碼更合理。'
+          : '目前條件有部分支持，但還不是全數集中，適合小心評估而不是一次把部位拉大。';
+  const addPriorityMetrics = [
+    {
+      key: 'simons',
+      label: '股票本質',
+      value: recommendation?.score ?? null,
+      display: recommendation ? `${recommendation.score}分` : '尚無資料',
+      note: 'Simons量化評分',
+    },
+    {
+      key: 'tailwind',
+      label: '科技順風',
+      value: tailwindScore !== null ? tailwindScore * 10 : null,
+      display: tailwindScore !== null ? `${tailwindScore}/10` : '未列入',
+      note: tailwind?.label || '產業受惠鏈',
+    },
+    {
+      key: 'activeEtf',
+      label: 'ETF支撐',
+      value: activeEtfRadar?.score ?? null,
+      display: activeEtfRadar ? `${activeEtfRadar.score}分` : activeEtfLoading ? '讀取中' : '無紀錄',
+      note: activeEtfRadar ? activeEtfLabel : '近5日資金流',
+    },
+    {
+      key: 'chip',
+      label: '籌碼穩定',
+      value: chipPtsValue !== null && Number.isFinite(chipPtsValue) ? chipPtsValue * 10 : null,
+      display: chipPtsValue !== null && Number.isFinite(chipPtsValue) ? `${chipPtsValue.toFixed(1)}/10` : '尚無資料',
+      note: '籌碼乾淨程度',
+    },
+    {
+      key: 'recCount',
+      label: '推薦次數',
+      value: Math.min(recommendationCount, 6) / 6 * 100,
+      display: `${recommendationCount}次`,
+      note: '近90日重複出現',
+    },
+    {
+      key: 'cumRet',
+      label: '累積報酬',
+      value: cumRetPct !== null ? Math.min(Math.abs(cumRetPct), 100) : null,
+      display: cumRetPct !== null ? `${cumRetPct >= 0 ? '+' : ''}${cumRetPct.toFixed(1)}%` : '尚無資料',
+      note: cumRetPct !== null && cumRetPct > 35 ? '偏高要防追價' : '回測參考',
+    },
+  ];
+  const getActiveEtfActionLabel = (action: ActiveEtfRadarItem['etfs'][number]['action']): string => {
+    switch (action) {
+      case 'added': return '新進';
+      case 'increased': return '加碼';
+      case 'decreased': return '減碼';
+      case 'removed': return '剔除';
+      case 'held': return '持有';
+      default: return '持有';
+    }
+  };
+  const formatEtfWeight = (value: number | null): string => (
+    value === null || !Number.isFinite(value) ? '--' : `${value.toFixed(2)}%`
+  );
+  const formatEtfShares = (value: number | null | undefined): string => {
+    if (value === null || value === undefined || !Number.isFinite(value)) return '--';
+    return Math.round(value).toLocaleString('zh-TW');
+  };
+  const formatEtfShareChange = (value: number | null | undefined, action: ActiveEtfRadarItem['etfs'][number]['action']): string => {
+    if (action === 'added') return '新上榜';
+    if (action === 'removed') return '移出';
+    if (value === null || value === undefined || !Number.isFinite(value)) return '--';
+    if (value === 0) return '持平';
+    return `${value > 0 ? '+' : ''}${Math.round(value).toLocaleString('zh-TW')}`;
+  };
+
+  const loadingSteps = [
+    { label: '股價與基本資料', done: !loading },
+    { label: '技術線與量化訊號', done: !loading && !quantLoading },
+    { label: '籌碼面成本資料', done: !loading && !institutionCostLoading },
+    { label: 'PPBear 公司介紹', done: !loading && !descLoading },
+    { label: 'AI 三面向整理', done: !loading && !analysisLoading },
+  ];
+  const loadingDoneCount = loadingSteps.filter(step => step.done).length;
+  const loadingProgress = Math.max(8, Math.round((loadingDoneCount / loadingSteps.length) * 100));
+  const currentLoadingStep = loadingSteps.find(step => !step.done)?.label || '準備公布完整個股頁';
+
+  if (!pageReleased) {
     return (
       <div className="stock-detail">
         <div className="page-header">
           <button className="page-header-back" onClick={() => navigate(-1)}>←</button>
-          <h1 className="page-title">載入中...</h1>
+          <h1 className="page-title">{code ? `${code} 資料整理中` : '載入中...'}</h1>
         </div>
-        <div className="loading-spinner">
-          <div className="spinner"></div>
-          <div className="loading-text">PPBear 正在查資料... 🐻📖</div>
+        <div className="stock-loading-panel">
+          <div className="stock-loading-orbit">
+            <img src="/ppbear.png" alt="PPBear" />
+            <span />
+          </div>
+          <div className="stock-loading-title">正在整理完整個股資料</div>
+          <div className="stock-loading-subtitle">
+            目前進度：{currentLoadingStep}
+          </div>
+          <div className="stock-loading-progress" aria-label={`載入進度 ${loadingProgress}%`}>
+            <div style={{ width: `${loadingProgress}%` }} />
+          </div>
+          <div className="stock-loading-percent">{loadingProgress}%</div>
+          <div className="stock-loading-steps">
+            {loadingSteps.map(step => (
+              <div
+                className={`stock-loading-step ${step.done ? 'done' : step.label === currentLoadingStep ? 'active' : 'pending'}`}
+                key={step.label}
+              >
+                <span>{step.done ? '✓' : ''}</span>
+                <strong>{step.label}</strong>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     );
@@ -513,6 +1227,26 @@ export default function StockDetail() {
 
   return (
     <div className="stock-detail">
+      <div className={`stock-context-bar ${isStockMiniBarVisible ? 'is-visible' : ''}`}>
+        <button
+          type="button"
+          className="stock-context-bar-inner"
+          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+          aria-label="回到個股頁上方"
+        >
+          <span className="stock-context-identity">
+            <span className="stock-context-code">{code}</span>
+            <span className="stock-context-name">{stockDisplayName || '個股資料'}</span>
+          </span>
+          <span className="stock-context-price">
+            <strong>NT$ {formatPrice(price)}</strong>
+            <span className={isUp ? 'text-profit' : 'text-loss'}>
+              {isUp ? '▲' : '▼'} {Math.abs(change).toFixed(2)}%
+            </span>
+          </span>
+        </button>
+      </div>
+
       {/* Header */}
       <div className="page-header" style={{ justifyContent: 'space-between', borderBottom: 'none', paddingBottom: 0 }}>
         <button className="page-header-back" onClick={() => navigate(-1)}>←</button>
@@ -521,8 +1255,10 @@ export default function StockDetail() {
 
       {/* 價格區 */}
       <div className="price-hero" style={{ textAlign: 'center', paddingTop: '12px' }}>
-        <div style={{ fontSize: '36px', fontWeight: 900, marginBottom: '16px', color: 'var(--text-primary)' }}>
-          {stockEmoji} {code} {stockData?.stkname || twseQuote?.Name || ''}
+        <div className="stock-title-line">
+          <MarketBadge market={marketBadge} />
+          <span className="stock-title-symbol">{stockEmoji}</span>
+          <span>{code} {stockDisplayName}</span>
         </div>
         <div className="price-main">NT$ {formatPrice(price)}</div>
         <div className={`price-change ${isUp ? 'text-profit' : 'text-loss'}`}>
@@ -590,16 +1326,248 @@ export default function StockDetail() {
       {code && stockData?.prices && stockData.prices.length > 0 && (
         <div className="card tv-chart-card">
           <div className="tv-chart-header">
-            <span className="tv-chart-title">📈 技術線圖</span>
-            <span className="tv-chart-subtitle">日K · MA5 · MA20 · 成交量</span>
+            <div className="tv-chart-heading">
+              <span className="tv-chart-title">📈 技術線圖</span>
+              <span className="tv-chart-subtitle">{tvChartSubtitle}</span>
+            </div>
+            <div className="tv-chart-controls" aria-label="均線顯示設定">
+              <button
+                type="button"
+                className={`tv-chart-toggle ${showMa5 ? 'active ma5' : ''}`}
+                aria-pressed={showMa5}
+                onClick={() => setShowMa5(value => !value)}
+              >
+                MA5
+              </button>
+              <button
+                type="button"
+                className={`tv-chart-toggle ${showMa20 ? 'active ma20' : ''}`}
+                aria-pressed={showMa20}
+                onClick={() => setShowMa20(value => !value)}
+              >
+                MA20
+              </button>
+            </div>
           </div>
+          {hasAiFeature && tvChartSignalNote && (
+            <div className={`tv-chart-signal-note ${tradingSignalError ? 'is-error' : ''}`}>
+              {!tradingSignalError && tradingSignals.length > 0 && (
+                <span className="tv-chart-signal-legend">
+                  <span><i className="tv-signal-arrow entry">↑</i>建立 / 加碼</span>
+                  <span><i className="tv-signal-arrow exit">↓</i>出清 / 結束</span>
+                </span>
+              )}
+              <span>{tvChartSignalNote}</span>
+            </div>
+          )}
           <div className="tv-chart-wrapper">
-            <StockChart prices={stockData.prices} stockName={stockData.stkname || code} />
+            <StockChart
+              prices={stockData.prices}
+              stockName={stockData.stkname || code}
+              tradingSignals={hasAiFeature ? tradingSignals : undefined}
+              showMa5={showMa5}
+              showMa20={showMa20}
+            />
           </div>
         </div>
       )}
 
-      {/* 用小朋友聽得懂的話介紹 */}
+      <section className={`card add-decision-card add-decision-card-${addPriority.level}`}>
+        <div className="add-decision-header">
+          <div>
+            <div className="add-decision-kicker">加碼決策雷達</div>
+            <div className="add-decision-title">
+              <span>加碼時機</span>
+              <strong>{addPriority.score}分</strong>
+              <em>{addPriority.label}</em>
+            </div>
+          </div>
+          <div className={`add-decision-etf-badge add-decision-etf-${activeEtfTone}`}>
+            {activeEtfLabel}
+          </div>
+        </div>
+
+        <div className="add-decision-summary">
+          <div>
+            <span>主要理由</span>
+            <strong>{addPriority.reason}</strong>
+          </div>
+          <div>
+            <span>AI狀態</span>
+            <strong>{currentAiSignalLabel}</strong>
+          </div>
+          <div>
+            <span>判讀提醒</span>
+            <p>{addPriorityCaution}</p>
+          </div>
+        </div>
+
+        <div className="add-decision-grid">
+          {addPriorityMetrics.map(metric => (
+            <div className="add-decision-metric" key={metric.key}>
+              <div className="add-decision-metric-top">
+                <span>{metric.label}</span>
+                <strong>{metric.display}</strong>
+              </div>
+              <div className="add-decision-meter" aria-hidden="true">
+                <div style={{ width: `${metric.value !== null ? Math.max(4, Math.min(metric.value, 100)) : 0}%` }} />
+              </div>
+              <small>{metric.note}</small>
+            </div>
+          ))}
+        </div>
+
+        <details className="add-decision-details">
+          <summary>查看 ETF 支撐明細與分數來源</summary>
+          <div className="add-decision-detail-body">
+            <div className="add-decision-detail-block">
+              <div className="add-decision-detail-title">ETF 支撐近5日資金流</div>
+              {activeEtfRadar ? (
+                <>
+                  <div className="add-decision-etf-stats">
+                    <span>新進 {activeEtfRadar.addedEtfCount}</span>
+                    <span>加碼 {activeEtfRadar.increasedEtfCount}</span>
+                    <span>減碼 {activeEtfRadar.decreasedEtfCount}</span>
+                    <span>剔除 {activeEtfRadar.removedEtfCount}</span>
+                    <span>淨權重 {activeEtfRadar.netWeightChangePct >= 0 ? '+' : ''}{activeEtfRadar.netWeightChangePct.toFixed(2)}%</span>
+                  </div>
+                  <div className="add-decision-etf-table" role="table" aria-label="ETF 支撐明細">
+                    <div className="add-decision-etf-table-head" role="row">
+                      <span>基金名稱</span>
+                      <span>持有比例</span>
+                      <span>持股增減</span>
+                    </div>
+                    {activeEtfRadar.etfs.map(etf => (
+                      <div className={`add-decision-etf-table-row add-decision-etf-row-${etf.action}`} key={`${etf.etfCode}-${etf.action}`} role="row">
+                        <div className="add-decision-etf-name">
+                          <strong>{etf.etfName || etf.etfCode}</strong>
+                          <span>{etf.etfCode} · {getActiveEtfActionLabel(etf.action)}</span>
+                        </div>
+                        <div>
+                          <strong>{formatEtfWeight(etf.weightPct)}</strong>
+                          <span>變動 {formatEtfWeight(etf.weightChangePct)}</span>
+                        </div>
+                        <div>
+                          <strong>{formatEtfShareChange(etf.shareChange, etf.action)}</strong>
+                          <span>持股 {formatEtfShares(etf.shares)}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="add-decision-footnote">資料日：{activeEtfRadar.latestDate || '待同步'}；來源：{activeEtfRadar.source}</p>
+                </>
+              ) : (
+                <p className="add-decision-empty">
+                  {activeEtfLoading ? '正在讀取 ETF 支撐資料...' : '近5日沒有看到追蹤 ETF 對這檔股票的新進、加碼、減碼或剔除紀錄。'}
+                </p>
+              )}
+            </div>
+
+            <div className="add-decision-detail-block">
+              <div className="add-decision-detail-title">加碼時機怎麼算</div>
+              <p>
+                分數會綜合股票本質、科技順風、ETF支撐、籌碼穩定、推薦次數與累積報酬，再依 AI 進出場與 ETF 多空訊號加減分。
+              </p>
+              <p>
+                這個分數用來回答「現在是否值得優先研究加碼」，不等於自動買進；真正下單前仍需看部位大小、平均成本與停損設定。
+              </p>
+            </div>
+          </div>
+        </details>
+      </section>
+
+      {/* 籌碼面摘要：讓大戶平均成本區回到個股頁主要視線內 */}
+      <div className="card chip-cost-summary-card">
+        <div className="chip-cost-summary-head">
+          <div>
+            <div className="chip-cost-summary-title">🧮 籌碼面</div>
+            <div className="chip-cost-summary-subtitle">
+              法人估算成本區與現在價格比較
+              {chipCostSources.length > 0 && (
+                <span className="chip-cost-source-row">
+                  來源：
+                  {chipCostSources.map(source => (
+                    <span
+                      className={`chip-cost-source ${source.kind === 'simons' ? 'chip-cost-source-simons' : ''}`}
+                      key={source.label}
+                    >
+                      {source.label}
+                      {source.kind === 'simons' && latestChipCostSourceDate ? ` ${latestChipCostSourceDate}` : ''}
+                    </span>
+                  ))}
+                </span>
+              )}
+            </div>
+          </div>
+          <span className={`sm-badge ${chipCostStatusClass}`}>{chipCostStatus}</span>
+        </div>
+
+        <div className="chip-cost-summary-main">
+          <div className="chip-cost-main-metric">
+            <span className="chip-cost-main-label">{avgInstitutionCostLabel}</span>
+            <strong>{avgInstitutionCost > 0 ? `NT$ ${avgInstitutionCost.toFixed(2)}` : '--'}</strong>
+            {costGapPct !== null && (
+              <small className={costGapPct <= 0 ? 'text-profit' : 'text-loss'}>
+                現價{costGapPct <= 0 ? '低於' : '高於'}均價 {Math.abs(costGapPct).toFixed(1)}%
+              </small>
+            )}
+          </div>
+
+          <div className="chip-cost-mini-metrics">
+            <div>
+              <span>現在價格</span>
+              <strong>NT$ {formatPrice(price)}</strong>
+            </div>
+            <div>
+              <span>低於幾個法人估算成本</span>
+              <strong>{belowInstitutionCosts.length} / {chipCostItems.length || 3}</strong>
+            </div>
+            <div>
+              <span>最近成本位置</span>
+              <strong>{nearestInstitutionCost?.shortLabel || '--'}</strong>
+            </div>
+          </div>
+        </div>
+
+        <div className="chip-cost-pill-row">
+          {chipCostItems.length > 0 ? chipCostItems.map(item => (
+            <div className="chip-cost-pill" key={item.key} style={{ '--chip-cost-color': item.color } as React.CSSProperties}>
+              <span>{item.label}</span>
+              <strong>
+                NT$ {item.value.toFixed(2)}
+                {item.isEstimated && <em>估</em>}
+              </strong>
+            </div>
+          )) : (
+            <div className="chip-cost-empty">暫時沒有外資、投信、自營商成本資料</div>
+          )}
+        </div>
+
+        <div className="chip-cost-summary-footer">
+          <p>{chipCostSummary}</p>
+          {finmindFlowItems.length > 0 && (
+            <div className="chip-cost-flow-row">
+              <span className="chip-cost-flow-label">FinMind近10日</span>
+              {finmindFlowItems.map(item => (
+                <span
+                  className={`chip-cost-flow-pill ${item.netShares >= 0 ? 'chip-cost-flow-buy' : 'chip-cost-flow-sell'}`}
+                  key={item.key}
+                >
+                  {item.label} {formatFlowShares(item.netShares)}
+                </span>
+              ))}
+            </div>
+          )}
+          {hasGoodinfoEstimatedCost && institutionCostData?.note && (
+            <p className="chip-cost-note">{institutionCostData.period} Goodinfo：{institutionCostData.note}</p>
+          )}
+          {institutionCostData?.finmind?.note && (
+            <p className="chip-cost-note">{institutionCostData.finmind.period} FinMind：{institutionCostData.finmind.note}</p>
+          )}
+        </div>
+      </div>
+
+      {/* 公司介紹 */}
       <div className="card kid-desc-card">
         <div className="kid-desc-header">
           <img src="/ppbear.png" alt="PPBear" className="kid-desc-bear" />
@@ -622,7 +1590,7 @@ export default function StockDetail() {
         <div className="stock-live-analysis-header">
           <div>
             <div className="stock-live-analysis-title">🧠 PPBear 即時整理</div>
-            <div className="stock-live-analysis-subtitle">每次點入個股頁都會重新整理技術面、籌碼面、消息面</div>
+            <div className="stock-live-analysis-subtitle">整合今日技術面、籌碼面與消息面重點，資料會使用每日快取</div>
           </div>
           {liveAnalysis && (
             <div className="stock-live-analysis-time">
@@ -687,7 +1655,7 @@ export default function StockDetail() {
             {recommendation.advice === 'hold' && '🟡 先觀望看看'}
             {recommendation.advice === 'sell' && '🔴 可以考慮賣出'}
             {/* 【NEW】Premium 會員且有量化資料時顯示 Simons 標籤 */}
-            {quantData?.aiQuanBackDataComment && hasFeature('ai_stock_picking') ? (
+            {quantData?.aiQuanBackDataComment && hasAiFeature ? (
               <span className="ai-score">
                 <button
                   className="simons-score-btn"
@@ -725,7 +1693,7 @@ export default function StockDetail() {
       )}
 
       {/* Simons 量化模型資料（限會員）— 統一卡片風格 */}
-      {quantData && hasFeature('ai_stock_picking') && (() => {
+      {quantData && hasAiFeature && (() => {
         // ── 籌碼穩定度（pts 分數越高越乾淨） ──
         const pts = quantData.chipStability ? parseFloat(quantData.chipStability.pts) : null;
         const chipLabel = pts === null ? '尚無資料' :
@@ -1052,14 +2020,14 @@ export default function StockDetail() {
                     🧲 籌碼穩定度
                     <span className="tooltip-icon">❓</span>
                   </div>
-                  <div className="sm-card-sub">綜合評分（GVI 推導）</div>
+                  <div className="sm-card-sub">股票本質（GVI 推導）</div>
                 </div>
                 <span className={`sm-badge ${chipClass}`}>{chipLabel}</span>
               </div>
               {activeTooltip === 'simonsChip' && (
                 <TooltipBox id="simonsChip">
                   <p><strong>籌碼穩定度</strong></p>
-                  <p>綜合評分，由 GVI 氣動指數推導而來。數值越高，代表籌碼越乾淨，主力掌控力越強。</p>
+                  <p>股票本質 = 地基，由 GVI 氣動指數推導而來。數值越高，代表籌碼越乾淨，主力掌控力越強；加碼時機 = 進場燈號，用來判斷現在是否適合加碼。</p>
                   <p className="tooltip-category">
                     🏆 <strong>9-10 分</strong> — 籌碼最乾淨，主力意圖明確，最優先買進<br/>
                     ✨ <strong>7-8 分</strong> — 籌碼非常穩定，散戶換手少，很適合中長期<br/>
@@ -1093,6 +2061,28 @@ export default function StockDetail() {
                 <span>10 最乾淨</span>
               </div>
               <div className="sm-tip">💡 {chipTip}</div>
+            </div>
+
+            <div className="chip-history-shell">
+              <div className="chip-history-toolbar" role="tablist" aria-label="籌碼穩定度天數">
+                {[30, 60].map(days => (
+                  <button
+                    key={days}
+                    type="button"
+                    className={`chip-history-range-btn ${quantHistoryDays === days ? 'active' : ''}`}
+                    onClick={() => setQuantHistoryDays(days as ChipHistoryDays)}
+                    role="tab"
+                    aria-selected={quantHistoryDays === days}
+                  >
+                    {days}天
+                  </button>
+                ))}
+              </div>
+              <ChipStabilityTrendChart
+                points={quantHistory}
+                days={quantHistoryDays}
+                loading={quantHistoryLoading}
+              />
             </div>
           </section>
         );
@@ -1155,193 +2145,6 @@ export default function StockDetail() {
           </div>
         </div>
       </section>
-
-      {/* 籌碼面分析 */}
-      {recommendation && (
-        <section>
-          {(() => {
-            const wtcost = parseFloat(recommendation.wtcost || '0') || 0;
-            const fcost = parseFloat(recommendation.fcost || '0') || 0;
-            const tcost = parseFloat(recommendation.tcost || '0') || 0;
-            const costItems = [
-              { key: 'wt', label: '🌍 外資成本', shortLabel: '外資', value: wtcost, color: '#10b981' },
-              { key: 'fc', label: '🏢 投信成本', shortLabel: '投信', value: fcost, color: '#3b82f6' },
-              { key: 'tc', label: '🏦 自營商成本', shortLabel: '自營商', value: tcost, color: '#8b5cf6' },
-            ].filter(item => item.value > 0);
-            const maxVal = Math.max(price, ...costItems.map(item => item.value)) * 1.05 || 1;
-            const belowCosts = costItems.filter(item => price < item.value);
-            const avgCost = costItems.length > 0
-              ? costItems.reduce((sum, item) => sum + item.value, 0) / costItems.length
-              : 0;
-            const nearestCost = costItems.length > 0
-              ? costItems.reduce((prev, current) =>
-                Math.abs(current.value - price) < Math.abs(prev.value - price) ? current : prev
-              )
-              : null;
-            const costBadgeClass = costItems.length === 0 ? 'sm-badge-mute' :
-              belowCosts.length >= 2 ? 'sm-badge-good' :
-              belowCosts.length === 1 ? 'sm-badge-warn' : 'sm-badge-bad';
-            const costBadgeLabel = costItems.length === 0 ? '尚無資料' :
-              belowCosts.length >= 2 ? '✅ 低於多數法人成本' :
-              belowCosts.length === 1 ? '⚖️ 接近法人區間' : '⚠️ 高於法人成本';
-            const costSummary = costItems.length === 0
-              ? '目前沒有足夠的法人成本資料可比較。'
-              : belowCosts.length >= 2
-                ? '現在價格還在多數法人成本之下，代表若單看成本區，位置相對不算追高。'
-                : belowCosts.length === 1
-                  ? '現在價格落在法人觀察區附近，屬於可持續追蹤、但不算特別便宜的位置。'
-                  : '現在價格已高於主要法人成本，代表市場已先走一段，操作上要更留意追價風險。';
-            const renderBar = (label: string, val: number, color: string, isCurrentPrice = false) => {
-              if (val <= 0) return null;
-              const width = `${(val / maxVal) * 100}%`;
-              let diffText = '';
-              let diffClass = '';
-              if (!isCurrentPrice) {
-                if (price < val) { diffText = '有空間'; diffClass = 'text-profit'; }
-                else if (price > val) { diffText = '已在上方'; diffClass = 'text-loss'; }
-                else { diffText = '貼近'; diffClass = 'text-muted'; }
-              }
-              return (
-                <div className="cost-bar-row" key={label}>
-                  <div className="cost-bar-header">
-                    <span className="cost-bar-label">{label}</span>
-                    <div className="cost-bar-value-wrap">
-                      <span className="cost-bar-value">NT$ {val.toFixed(2)}</span>
-                      {!isCurrentPrice && <span className={`cost-bar-diff ${diffClass}`}>{diffText}</span>}
-                    </div>
-                  </div>
-                  <div className="cost-bar-track">
-                    <div className={`cost-bar-fill ${isCurrentPrice ? 'pulse-bar' : ''}`} style={{ width, background: color }} />
-                  </div>
-                </div>
-              );
-            };
-
-            return (
-              <div className="chip-analysis-shell">
-                <div className="section-header">
-                  <h2 className="section-title">🧮 大人們買在哪裡？</h2>
-                  <span className={`sm-badge ${costBadgeClass}`}>{costBadgeLabel}</span>
-                </div>
-
-                <div className="chip-analysis-grid">
-                  <div className="sm-card chip-overview-card">
-                    <div className="sm-card-head">
-                      <div>
-                        <div className="sm-card-title">🏛️ 法人成本判讀</div>
-                        <div className="sm-card-sub">現在價格和主要法人布局區的相對位置</div>
-                      </div>
-                    </div>
-
-                    <div className="chip-hero-row">
-                      <div>
-                        <div className="chip-hero-label">現在價格</div>
-                        <div className="chip-hero-value">NT$ {price.toFixed(2)}</div>
-                      </div>
-                    </div>
-
-                    <div className="chip-mini-grid" style={{ position: 'relative' }}>
-                      <div className="chip-mini-card">
-                        <div 
-                          className="chip-mini-label tooltip-trigger"
-                          onClick={() => setActiveTooltip(activeTooltip === 'belowCosts' ? null : 'belowCosts')}
-                        >
-                          低於法人成本
-                          <span className="tooltip-icon">❓</span>
-                        </div>
-                        <div className="chip-mini-value">{belowCosts.length} / {costItems.length}</div>
-                        {activeTooltip === 'belowCosts' && (
-                          <TooltipBox id="belowCosts">
-                            <p><strong>低於法人成本</strong></p>
-                            <p>在 3 個主要法人中，現價低於多少個的成本價格。</p>
-                            <p className="tooltip-example">
-                              <strong>解釋：</strong><br/>
-                              「0 / 3」表示有 0 個法人的成本高於現價<br/>
-                              也就是全部 3 個法人成本都已 ≤ 現價
-                            </p>
-                            <p className="tooltip-tip">💡 <strong>數字越大越好</strong> — 表示現價越低於法人布局區（買進機會）</p>
-                          </TooltipBox>
-                        )}
-                      </div>
-                      <div className="chip-mini-card">
-                        <div 
-                          className="chip-mini-label tooltip-trigger"
-                          onClick={() => setActiveTooltip(activeTooltip === 'nearestCost' ? null : 'nearestCost')}
-                        >
-                          最近法人位置
-                          <span className="tooltip-icon">❓</span>
-                        </div>
-                        <div className="chip-mini-value">{nearestCost ? nearestCost.shortLabel : '--'}</div>
-                        {activeTooltip === 'nearestCost' && (
-                          <TooltipBox id="nearestCost">
-                            <p><strong>最近法人位置</strong></p>
-                            <p>在所有法人中，誰的成本價格最接近現在股價。</p>
-                            <p className="tooltip-example">
-                              <strong>例如：</strong><br/>
-                              顯示「投信」→ 投信成本最接近現價<br/>
-                              代表投信的持股成本區在目前價位附近
-                            </p>
-                            <p className="tooltip-category">
-                              🌍 <strong>外資</strong> — 國際大型基金、外資法人<br/>
-                              🏢 <strong>投信</strong> — 台灣投信基金、大型基金<br/>
-                              🏦 <strong>自營商</strong> — 證券自營部門
-                            </p>
-                            <p className="tooltip-tip">💡 「--」表示資料不足或無法計算</p>
-                          </TooltipBox>
-                        )}
-                      </div>
-                      <div className="chip-mini-card">
-                        <div 
-                          className="chip-mini-label tooltip-trigger"
-                          onClick={() => setActiveTooltip(activeTooltip === 'avgCost' ? null : 'avgCost')}
-                        >
-                          法人成本均價
-                          <span className="tooltip-icon">❓</span>
-                        </div>
-                        <div className="chip-mini-value">{avgCost > 0 ? `NT$ ${avgCost.toFixed(2)}` : '--'}</div>
-                        {activeTooltip === 'avgCost' && (
-                          <TooltipBox id="avgCost">
-                            <p><strong>法人成本均價</strong></p>
-                            <p>三個主要法人的持股成本平均值。用來判斷現價相對於所有法人的位置。</p>
-                            <p className="tooltip-example">
-                              <strong>計算方式：</strong><br/>
-                              (外資成本 + 投信成本 + 自營商成本) ÷ 3
-                            </p>
-                            <p className="tooltip-category">
-                              💚 <strong>現價 &lt; 均價</strong> → 買進機會（低於法人平均成本）<br/>
-                              ⚠️ <strong>現價 ≈ 均價</strong> → 接近法人布局區<br/>
-                              📈 <strong>現價 &gt; 均價</strong> → 已高於法人成本（法人有套利空間）
-                            </p>
-                            <p className="tooltip-tip">💡 對比成本分布圖可更清楚看出買賣時機</p>
-                          </TooltipBox>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="sm-tip">💡 {costSummary}</div>
-                  </div>
-
-                  <div className="sm-card chip-bars-card">
-                    <div className="sm-card-head">
-                      <div>
-                        <div className="sm-card-title">📍 成本分布</div>
-                        <div className="sm-card-sub">現在價格 vs 外資、投信、自營商的成本區間</div>
-                      </div>
-                    </div>
-
-                    <div className="cost-comparison cost-comparison-polished">
-                      {renderBar('📍 現在價格', price, 'var(--primary)', true)}
-                      {renderBar('🌍 外資成本', wtcost, '#10b981')}
-                      {renderBar('🏢 投信成本', fcost, '#3b82f6')}
-                      {renderBar('🏦 自營商成本', tcost, '#8b5cf6')}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            );
-          })()}
-        </section>
-      )}
 
       {/* 我的持股 */}
       {holding && (
@@ -1428,14 +2231,39 @@ export default function StockDetail() {
       )}
 
       {/* 交易按鈕 */}
+      {!dataReady && (
+        <div style={{
+          background: 'rgba(255, 160, 0, 0.1)',
+          border: '1px solid rgba(255, 160, 0, 0.35)',
+          borderRadius: 10,
+          padding: '10px 16px',
+          marginBottom: 10,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          fontSize: '0.85rem',
+          color: '#b07000',
+        }}>
+          <span style={{ width: 14, height: 14, border: '2px solid #FFA000', borderTopColor: 'transparent', borderRadius: '50%', display: 'inline-block', animation: 'spin 1s linear infinite', flexShrink: 0 }} />
+          帳號資料同步中，請稍候再下單以確保數據正確
+        </div>
+      )}
       <div className="trade-buttons">
-        <button className="btn btn-buy btn-lg" style={{ flex: 1 }} onClick={() => { setTradeMode('buy'); setTradeResult(null); }}>
-          🛒 買入
-        </button>
-        <button className="btn btn-sell btn-lg" style={{ flex: 1 }} onClick={() => { setTradeMode('sell'); setTradeResult(null); }}
-          disabled={!holding}
+        <button
+          className="btn btn-buy btn-lg"
+          style={{ flex: 1, opacity: dataReady ? 1 : 0.45, cursor: dataReady ? 'pointer' : 'not-allowed' }}
+          disabled={!dataReady}
+          onClick={() => { setTradeMode('buy'); setTradeResult(null); }}
         >
-          💰 賣出
+          {dataReady ? '🛒 買入' : '⏳ 同步中...'}
+        </button>
+        <button
+          className="btn btn-sell btn-lg"
+          style={{ flex: 1, opacity: dataReady ? 1 : 0.45, cursor: (!holding || !dataReady) ? 'not-allowed' : 'pointer' }}
+          disabled={!holding || !dataReady}
+          onClick={() => { setTradeMode('sell'); setTradeResult(null); }}
+        >
+          {dataReady ? '💰 賣出' : '⏳ 同步中...'}
         </button>
       </div>
 
@@ -1480,15 +2308,41 @@ export default function StockDetail() {
                 )}
 
                 <div className="input-group">
-                  <label className="input-label">股數</label>
+                  <div className="trade-unit-header">
+                    <label className="input-label">交易單位</label>
+                    <div className="trade-unit-toggle" role="group" aria-label="選擇交易單位">
+                      <button
+                        type="button"
+                        className={`trade-unit-btn${tradeUnit === 'share' ? ' active' : ''}`}
+                        onClick={() => setTradeUnit('share')}
+                      >
+                        股
+                      </button>
+                      <button
+                        type="button"
+                        className={`trade-unit-btn${tradeUnit === 'lot' ? ' active' : ''}`}
+                        onClick={() => setTradeUnit('lot')}
+                      >
+                        張
+                      </button>
+                    </div>
+                  </div>
                   <input
                     className="input-field"
                     type="number"
                     min="1"
-                    placeholder="輸入要交易的股數"
+                    step="1"
+                    placeholder={tradeUnit === 'lot' ? '輸入要交易的張數' : '輸入要交易的股數'}
                     value={quantity}
                     onChange={(e) => setQuantity(e.target.value)}
                   />
+                  <div className="trade-unit-hint">
+                    {quantity && tradeShares > 0
+                      ? `${quantity} ${tradeUnitLabel} = ${tradeShares.toLocaleString('zh-TW')} 股`
+                      : tradeUnit === 'lot'
+                        ? '1 張 = 1,000 股'
+                        : '以 1 股為單位交易'}
+                  </div>
                 </div>
 
                 <div className="input-group" style={{ marginTop: 16 }}>
@@ -1502,8 +2356,8 @@ export default function StockDetail() {
                   />
                 </div>
 
-                {quantity && parseInt(quantity) > 0 && (() => {
-                  const q = parseInt(quantity);
+                {quantity && tradeShares > 0 && (() => {
+                  const q = tradeShares;
                   const baseValue = q * price;
                   const feeRate = user?.brokerFeeRate ?? 0.001425;
                   const minFee = user?.brokerMinFee ?? 20;
@@ -1512,9 +2366,19 @@ export default function StockDetail() {
                   const estFee = Math.max(minFee, Math.round(baseValue * feeRate));
                   const estTax = tradeMode === 'sell' ? Math.round(baseValue * taxRate) : 0;
                   const finalTotal = tradeMode === 'buy' ? baseValue + estFee : baseValue - estFee - estTax;
+                  const stopLossPct = Math.min(80, Math.max(1, user?.stopLossAlertPct ?? 20));
+                  const stopLossPrice = price * (1 - stopLossPct / 100);
+                  const estimatedStopLossLoss = Math.round((price - stopLossPrice) * q);
+                  const affordableLossPct = user?.availableBalance
+                    ? (estimatedStopLossLoss / Math.max(user.availableBalance, 1)) * 100
+                    : 0;
 
                   return (
                     <div className="trade-preview" style={{ background: '#f8f9fa', padding: '12px', borderRadius: '8px', marginTop: '12px' }}>
+                      <div className="trade-preview-row" style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: '#666', marginBottom: '4px' }}>
+                        <span>交易股數</span>
+                        <span>{q.toLocaleString('zh-TW')} 股</span>
+                      </div>
                       <div className="trade-preview-row" style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: '#666', marginBottom: '4px' }}>
                         <span>股票市值</span>
                         <span>NT$ {formatMoney(baseValue)}</span>
@@ -1533,6 +2397,29 @@ export default function StockDetail() {
                         <span>預估{tradeMode === 'buy' ? '總花費' : '實收金額'}</span>
                         <span className={tradeMode === 'buy' ? '' : 'text-profit'}>NT$ {formatMoney(finalTotal)}</span>
                       </div>
+                      {tradeMode === 'buy' && (
+                        <div className="trade-risk-preview" style={{ marginTop: 12, padding: '12px', borderRadius: 12, background: 'rgba(255, 89, 94, 0.08)', border: '1.5px solid rgba(255, 89, 94, 0.22)' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                            <span style={{ fontWeight: 900, color: '#c62828', fontSize: 14 }}>🛡️ 停損風險預估</span>
+                            <span style={{ fontSize: 12, fontWeight: 900, color: '#c62828', background: '#fff', borderRadius: 999, padding: '3px 8px' }}>
+                              -{stopLossPct}%
+                            </span>
+                          </div>
+                          <div className="trade-preview-row" style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: '#666', marginBottom: '4px' }}>
+                            <span>停損參考價</span>
+                            <span>NT$ {formatPrice(stopLossPrice)}</span>
+                          </div>
+                          <div className="trade-preview-row" style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: '#666', marginBottom: '4px' }}>
+                            <span>跌到停損時預估損失</span>
+                            <span style={{ color: '#c62828', fontWeight: 900 }}>NT$ {formatMoney(estimatedStopLossLoss)}</span>
+                          </div>
+                          <div style={{ marginTop: 8, fontSize: 12.5, lineHeight: 1.5, color: '#7a3f00', fontWeight: 700 }}>
+                            如果股價跌到 NT$ {formatPrice(stopLossPrice)}，這筆單大約會虧 NT$ {formatMoney(estimatedStopLossLoss)}
+                            {user?.availableBalance ? `，約佔目前可用餘額 ${affordableLossPct.toFixed(1)}%。` : '。'}
+                            下單前先想想：這個損失你能接受嗎？
+                          </div>
+                        </div>
+                      )}
                     </div>
                   );
                 })()}
@@ -1545,10 +2432,14 @@ export default function StockDetail() {
 
                 <button
                   className={`btn ${tradeMode === 'buy' ? 'btn-buy' : 'btn-sell'} btn-lg btn-block`}
-                  disabled={isTrading}
+                  disabled={isTrading || !dataReady}
                   onClick={() => {
-                    if (!quantity || parseInt(quantity) <= 0) {
-                      alert('⚠️ 請輸入大於 0 的正確交易股數！');
+                    if (!dataReady) {
+                      alert('⚠️ 帳號資料尚未同步完成，請稍候幾秒後再下單！');
+                      return;
+                    }
+                    if (!quantity || tradeShares <= 0) {
+                      alert(`⚠️ 請輸入大於 0 的正確交易${tradeUnitLabel}數！`);
                       return;
                     }
                     if (!tradeReason.trim()) {
@@ -1557,9 +2448,22 @@ export default function StockDetail() {
                     }
                     handleTrade();
                   }}
-                  style={isTrading ? { opacity: 0.85, cursor: 'not-allowed' } : {}}
+                  style={(isTrading || !dataReady) ? { opacity: 0.85, cursor: 'not-allowed' } : {}}
                 >
-                  {isTrading ? (
+                  {!dataReady ? (
+                    <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+                      <span style={{
+                        width: 18, height: 18,
+                        border: '3px solid rgba(255,255,255,0.4)',
+                        borderTopColor: '#fff',
+                        borderRadius: '50%',
+                        display: 'inline-block',
+                        animation: 'spin 0.7s linear infinite',
+                        flexShrink: 0,
+                      }} />
+                      資料同步中...
+                    </span>
+                  ) : isTrading ? (
                     <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
                       <span style={{
                         width: 18, height: 18,
@@ -1594,11 +2498,56 @@ export default function StockDetail() {
 
             {pendingWarnings.map((w, idx) => (
               <div key={idx} style={{
-                background: '#fff8f8', border: '1.5px solid #ffcccc', borderRadius: 12,
+                background: w.level === 'danger' ? '#fff8f8' : w.level === 'caution' ? '#fffaf0' : '#f7fbff',
+                border: `1.5px solid ${w.level === 'danger' ? '#ffcccc' : w.level === 'caution' ? '#ffd98a' : '#b8d9ff'}`,
+                borderRadius: 12,
                 padding: '14px 16px', marginBottom: 12
               }}>
-                <div style={{ fontSize: 22, marginBottom: 6 }}>{w.icon} <span style={{ fontWeight: 800, fontSize: 15, color: '#cc0000' }}>{w.title}</span></div>
+                <div style={{ fontSize: 22, marginBottom: 6 }}>
+                  {w.icon} <span style={{
+                    fontWeight: 800,
+                    fontSize: 15,
+                    color: w.level === 'danger' ? '#cc0000' : w.level === 'caution' ? '#a85f00' : '#1d5f99',
+                  }}>{w.title}</span>
+                </div>
                 <p style={{ margin: '0 0 8px', fontSize: 14, color: '#333' }}>{w.message}</p>
+                {w.details && w.details.length > 0 && (
+                  <div style={{
+                    background: '#fff',
+                    border: '1px solid rgba(0,0,0,0.07)',
+                    borderRadius: 10,
+                    overflow: 'hidden',
+                    marginBottom: 10,
+                  }}>
+                    {w.details.map((detail, detailIdx) => (
+                      <div key={`${detail.label}-${detailIdx}`} style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        gap: 12,
+                        padding: '8px 10px',
+                        borderTop: detailIdx === 0 ? 'none' : '1px solid rgba(0,0,0,0.06)',
+                        fontSize: 13,
+                        lineHeight: 1.35,
+                      }}>
+                        <span style={{ color: '#666', flex: '0 0 42%' }}>{detail.label}</span>
+                        <span style={{
+                          color: detail.tone === 'profit'
+                            ? 'var(--profit-color)'
+                            : detail.tone === 'loss'
+                              ? 'var(--loss-color)'
+                              : detail.tone === 'warning'
+                                ? '#b06a00'
+                                : 'var(--text-primary)',
+                          fontWeight: 900,
+                          textAlign: 'right',
+                          wordBreak: 'break-word',
+                        }}>
+                          {detail.value}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 <div style={{ background: '#fff3cd', borderRadius: 8, padding: '8px 12px', fontSize: 12.5, color: '#7a5800', lineHeight: 1.5 }}>
                   💡 <strong>投資教室：</strong> {w.tip}
                 </div>
@@ -1633,7 +2582,9 @@ export default function StockDetail() {
                       }} />
                       交易中，請稍候...
                     </span>
-                  ) : '我瞭解風险，還是要買'}
+                  ) : pendingWarnings.some(w => w.level === 'danger')
+                    ? '我知道後果，仍要買'
+                    : '我已看過數據，仍要買'}
               </button>
             </div>
           </div>

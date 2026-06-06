@@ -15,10 +15,13 @@ import {
   buildHoldingsWithSignals,
   buildEmailHtml,
   userHasAiFeature,
+  userHasNewsletterFeature,
   STRATEGY_LABELS,
   resend,
   loadTodayCache,
-  getTodayTW,
+  getNewsletterCacheDateTW,
+  type FilteredStock,
+  type SimonsItem,
 } from './_newsletter-utils.js';
 
 export const config = {
@@ -66,12 +69,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(404).json({ error: '找不到此用戶' });
     }
 
-    // ── 優先使用 6AM 快取資料；無快取則即時抓取 ──────────────────────────────
-    const todayDate = getTodayTW();
+    const newsletterEnabled = await userHasNewsletterFeature(userId, userData.tier);
+    if (!newsletterEnabled) {
+      return res.status(200).json({ success: false, error: '此帳號的每日電子報已關閉' });
+    }
+
+    // ── 優先使用台灣時間 08:00 快取資料；無快取則即時抓取 ─────────────────────
+    const todayDate = getNewsletterCacheDateTW();
     const cache = await loadTodayCache(todayDate);
 
-    let allStocks;
-    let cachedAiFiltered;
+    let allStocks: SimonsItem[];
+    let cachedAiFiltered: FilteredStock[] | null;
 
     if (cache && cache.all_stocks.length > 0) {
       allStocks = cache.all_stocks;
@@ -84,14 +92,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       cachedAiFiltered = null;
     }
 
-    const nowTW = new Date(Date.now() + 8 * 60 * 60 * 1000);
-    // todayDate 已在上方由 getTodayTW() 取得，此處不重複宣告
-
     // ── 依用戶功能決定篩選方式 ────────────────────────────────────────────────
     const hasAi = await userHasAiFeature(userId, userData.tier);
     const strategy = userData.newsletter_strategy as string | undefined;
 
-    let stocks;
+    let stocks: FilteredStock[];
     let strategyLabel: string | undefined;
 
     if (hasAi || !strategy) {

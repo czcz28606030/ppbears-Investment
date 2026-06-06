@@ -1,4 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { createClient } from '@supabase/supabase-js';
 
 type PricePoint = {
   mdate: string;
@@ -37,6 +38,13 @@ type AnalysisResponse = {
   headlines: string[];
   generatedAt: string;
 };
+
+type CachedAnalysisRow = {
+  cache_date: string;
+  payload: AnalysisResponse;
+};
+
+const LIVE_ANALYSIS_CACHE_TYPE = 'live_analysis_v2';
 
 export const config = {
   maxDuration: 30,
@@ -86,6 +94,89 @@ async function fetchWithTimeout(url: string, init?: RequestInit, ms = 7000): Pro
     return await fetch(url, { ...init, signal: controller.signal });
   } finally {
     clearTimeout(timer);
+  }
+}
+
+function getTodayTaipei(): string {
+  const taipei = new Date(Date.now() + 8 * 60 * 60 * 1000);
+  return taipei.toISOString().slice(0, 10);
+}
+
+function getSupabaseAdmin() {
+  const url = process.env.VITE_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return null;
+  return createClient(url, key, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  });
+}
+
+function isValidAnalysisPayload(payload: unknown): payload is AnalysisResponse {
+  if (!payload || typeof payload !== 'object') return false;
+  const value = payload as Partial<AnalysisResponse>;
+  return typeof value.technical === 'string'
+    && typeof value.chips === 'string'
+    && typeof value.news === 'string'
+    && Array.isArray(value.headlines)
+    && typeof value.generatedAt === 'string';
+}
+
+async function loadCachedAnalysis(code: string, cacheDate: string): Promise<AnalysisResponse | null> {
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return null;
+
+    const { data, error } = await supabase
+      .from('stock_daily_cache')
+      .select('cache_date, payload')
+      .eq('stock_code', code)
+      .eq('cache_type', LIVE_ANALYSIS_CACHE_TYPE)
+      .maybeSingle<CachedAnalysisRow>();
+
+  if (error || !data || data.cache_date !== cacheDate || !isValidAnalysisPayload(data.payload)) return null;
+  return data.payload;
+}
+
+async function cleanupStaleStockCache(): Promise<void> {
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return;
+
+  const staleBefore = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+  const { error } = await supabase
+    .from('stock_daily_cache')
+    .delete()
+    .lt('updated_at', staleBefore);
+
+  if (error) {
+    console.error('stock-analysis cache cleanup error:', error.message);
+  }
+}
+
+async function saveCachedAnalysis(
+  code: string,
+  cacheDate: string,
+  payload: AnalysisResponse,
+  source: string
+): Promise<void> {
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return;
+
+  const { error } = await supabase
+    .from('stock_daily_cache')
+    .upsert({
+      stock_code: code,
+      cache_date: cacheDate,
+      cache_type: LIVE_ANALYSIS_CACHE_TYPE,
+      payload,
+      source,
+      generated_at: payload.generatedAt,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'stock_code,cache_type' });
+
+  if (error) {
+    console.error('stock-analysis cache save error:', error.message);
   }
 }
 
@@ -173,16 +264,16 @@ function buildFallbackAnalysis(
   const lowerThanCosts = validCosts.filter(cost => lastClose < cost).length;
 
   const technical = trendUp
-    ? `這支股票最近的股價表現還不錯喔！價格一直維持在比較高的位置，感覺買方力道還在。`
-    : `這支股票最近股價有點上上下下，還沒有穩穩站住，可以再觀察幾天看看。`;
+    ? `近期股價維持在相對高檔，收盤價高於短期平均，代表買盤仍有支撐。後續可觀察成交量是否同步放大，確認趨勢是否延續。`
+    : `近期股價波動較明顯，收盤價尚未穩定站上短期平均，技術面仍偏整理。建議先觀察是否出現量能回溫與價格轉強。`;
 
   const chips = strength >= 2 && lowerThanCosts >= 1
-    ? `大機構（法人）買的成本跟現在的股價差不多，表示他們應該還不會急著賣，籌碼比較穩。`
-    : `目前大機構的持股優勢不算明顯，需要觀察有沒有更多人願意持續買進這支股票。`;
+    ? `法人持股成本與目前股價接近，籌碼面仍有一定支撐。若 strength 維持在較高水準，代表資金承接力道相對穩定。`
+    : `目前法人籌碼優勢不算明顯，資金承接力道仍需觀察。若後續 strength 回升，才比較能確認籌碼面轉強。`;
 
   const news = headlines.length > 0
-    ? `最近市場上跟這支股票有關的新聞，主要是「${headlines[0]}」，大家都在關注公司最新的動態！`
-    : `目前奇摩股市沒有抓到這支股票的最新新聞，可以自己上新聞網站找找看最近有沒有重要消息。`;
+    ? `近期新聞重點為「${headlines[0]}」。消息面可作為輔助判斷，但仍需搭配營收、法人籌碼與股價反應一起評估。`
+    : `目前奇摩股市未抓到明確最新新聞。消息面暫無重大訊號時，可優先回到營收、產業趨勢與籌碼變化判斷。`;
 
   return {
     technical,
@@ -214,16 +305,17 @@ async function generateAiAnalysis(
     changePct: item.roia,
   }));
 
-  const prompt = `你是 PPBears App 的台股分析助手，讀者是國小到國中的學生。請只回傳 JSON，不要加任何 markdown。
+  const prompt = `你是 PPBears App 的台股分析助手。請用「專業但白話」的語氣，幫一般投資使用者快速掌握重點。請只回傳 JSON，不要加任何 markdown。
 
 請針對以下單一股票，整理三段繁體中文說明：技術面、籌碼面、消息面。
 
 規則：
-1. 每段 45 到 90 字，使用小朋友也能看懂的白話文，避免艱深術語，必要時加一句解釋。
-2. 技術面：根據價格趨勢、成交量、PE/PB、報酬率等已提供資料描述，不可亂編技術指標數值。將專業詞彙用簡單方式說明（例如：成交量代表有多少人在買賣這支股票）。
-3. 籌碼面：根據 strength、外資/投信/自營商成本與相關數據，解釋大機構（法人）投資的狀況，用「大機構」或「法人叔叔阿姨」這類稱呼。
+1. 每段 55 到 110 字，語氣要專業、直接、白話，不要使用小朋友口吻，不要出現「喔、叔叔阿姨、大家、很棒、快來」等童趣用語。
+2. 技術面：根據價格趨勢、成交量、PE/PB、報酬率等已提供資料描述，不可亂編技術指標數值。若提到 PE/PB，請用「估值」白話說明。
+3. 籌碼面：根據 strength、外資/投信/自營商成本與相關數據，解釋法人資金、成本區間與籌碼穩定度。只能稱為「法人」、「外資」、「投信」、「自營商」。
 4. 消息面：根據奇摩股市新聞標題說明最近發生什麼事；若沒有新聞，明確說明目前沒找到新聞，不能捏造。
 5. 全程不寫停損價、不給明確買賣操作指令。
+6. 不要保證漲跌，不要使用煽動語句；重點是讓使用者知道目前資料透露的風險與觀察方向。
 
 請輸出格式：
 {
@@ -310,27 +402,38 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
+    const normalizedCode = String(code).trim();
+    const cacheDate = getTodayTaipei();
+    const cached = await loadCachedAnalysis(normalizedCode, cacheDate);
+    if (cached) {
+      res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=3600');
+      return res.status(200).json(cached);
+    }
 
     const [ifalgoStock, simons, headlines] = await Promise.all([
-      fetchIfalgoStock(code),
-      fetchRecentSimonsItem(code),
-      fetchYahooHeadlines(code),
+      fetchIfalgoStock(normalizedCode),
+      fetchRecentSimonsItem(normalizedCode),
+      fetchYahooHeadlines(normalizedCode),
     ]);
 
-    const stockName = ifalgoStock?.name || simons?.stkname || name || code;
+    const stockName = ifalgoStock?.name || simons?.stkname || name || normalizedCode;
     const stockIndustry = ifalgoStock?.industry || simons?.subindustry || industry || '';
     const stockStatus = ifalgoStock?.status || simons?.status || status || '';
     const prices = ifalgoStock?.prices || [];
 
     const fallback = buildFallbackAnalysis(prices, simons, headlines);
-    const aiAnalysis = await generateAiAnalysis(code, stockName, stockIndustry, stockStatus, prices, simons, headlines);
+    const aiAnalysis = await generateAiAnalysis(normalizedCode, stockName, stockIndustry, stockStatus, prices, simons, headlines);
+    const result = aiAnalysis || fallback;
+    await cleanupStaleStockCache();
+    await saveCachedAnalysis(normalizedCode, cacheDate, result, aiAnalysis ? 'openai' : 'rule_fallback');
 
-    return res.status(200).json(aiAnalysis || fallback);
+    res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=3600');
+    return res.status(200).json(result);
   } catch (err) {
     console.error('stock-analysis error:', err);
     return res.status(200).json({
-      technical: '目前技術面資料整理時發生問題，先別急著下決定，等資料更新後再看一次比較安全。',
-      chips: '目前籌碼面資料暫時讀取不到，建議先觀察這支股票幾天，再和家人討論下一步。',
+      technical: '目前技術面資料整理時發生問題，暫時無法判斷近期價格與量能變化。建議稍後重新整理，再搭配 K 線與成交量確認。',
+      chips: '目前籌碼面資料暫時讀取不到，無法確認法人資金與成本區間。建議先觀察外資、投信與自營商後續動向。',
       news: '目前消息面暫時抓取失敗，請稍後重新整理頁面，或先查看公司公告與主流財經新聞。',
       headlines: [],
       generatedAt: new Date().toISOString(),

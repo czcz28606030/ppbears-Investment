@@ -21,6 +21,20 @@ export interface StockData {
   prices: StockPrice[];
 }
 
+export interface StockTradingSignal {
+  id: string;
+  coid: string;
+  stockName: string;
+  inDate: string;
+  buyClose: number | null;
+  outDate: string;
+  sellClose: number | null;
+  signal: string;
+  returnPct: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface SimonsItem {
   mdate: string;
   coid: string;
@@ -87,6 +101,7 @@ export interface UserAccount {
   brokerFeeRate: number;     // 交易手續費率 (e.g., 0.001425)
   brokerMinFee: number;      // 交易手續費低消 (e.g., 20)
   brokerTaxRate: number;     // 交易證交稅率 (e.g., 0.003)
+  stopLossAlertPct: number;  // 買入前風險提醒跌幅百分比 (e.g., 20)
   parentId?: string;
   newsletterStrategy?: string; // 電子報策略：'A'~'F' 或 null（使用 AI 選股）
 }
@@ -111,6 +126,23 @@ export interface WithdrawalRequest {
   reason?: string;
   status: WithdrawalStatus;
   reviewedAt?: string;
+  createdAt: string;
+}
+
+export interface DividendPayment {
+  id: string;
+  userId: string;
+  stockCode: string;
+  stockName: string;
+  exDate: string;
+  lastBuyDate: string;
+  payDate: string;
+  cashDividend: number;
+  eligibleShares: number;
+  amount: number;
+  status: 'scheduled' | 'paid' | 'skipped';
+  paidAt?: string;
+  source: string;
   createdAt: string;
 }
 
@@ -156,7 +188,7 @@ export interface SystemSettings {
   free_max_child_accounts: number;
   free_max_holdings: number;
   free_max_daily_trades: number;
-  newsletter_send_hour: number; // 電子報發送時段（台灣時間 0-23），預設 7
+  newsletter_send_hour: number; // 電子報資料更新時段（台灣時間 0-23），預設 8
 }
 
 // ── Learning Module ──────────────────────────────────────
@@ -169,6 +201,7 @@ export interface LessonQuestion {
   options?: string[];           // choice 題用
   correct_answer: number | boolean | string;
   explanation: string;
+  image_key?: string;
 }
 
 export interface LessonCard {
@@ -182,7 +215,7 @@ export interface LessonData {
   lesson_id: string;
   stage: number;
   level: number;
-  domain: 'basic' | 'technical' | 'chips' | 'psychology';
+  domain: 'basic' | 'technical' | 'chips' | 'psychology' | 'quant' | 'financials' | 'safety';
   title: string;
   summary: string;
   cards: LessonCard[];

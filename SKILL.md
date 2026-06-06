@@ -42,8 +42,8 @@
 ppbears-Investment/
 ├── api/                          # Vercel Serverless Functions
 │   ├── _newsletter-utils.ts      # 電子報共用邏輯（601 行）
-│   ├── cron-newsletter.ts        # 每日 07:00 (UTC+8) 發送電子報
-│   ├── cron-newsletter-prepare.ts# 每日 06:00 預先準備快取
+│   ├── cron-newsletter.ts        # 每日 08:30 (UTC+8) 發送電子報
+│   ├── cron-newsletter-prepare.ts# 每日 08:00 預先準備快取
 │   ├── send-newsletter-single.ts # 手動觸發單一用戶電子報
 │   └── stock-analysis.ts         # AI 個股分析（GPT-4o-mini）
 ├── src/
@@ -217,11 +217,11 @@ shopItems, redemptions
 - 失敗時 fallback 到規則式分析
 
 ### cron-newsletter-prepare.ts
-- **Cron** 每天 UTC 22:00（台灣 06:00）
+- **Cron** 每天 UTC 00:00（台灣 08:00）
 - 預先抓 Simons + AI 篩選 + OpenAI 分析，寫入 `newsletter_daily_cache`
 
 ### cron-newsletter.ts
-- **Cron** 每天 UTC 23:00（台灣 07:00），maxDuration=60s
+- **Cron** 每天 UTC 00:30（台灣 08:30），maxDuration=60s
 - 讀快取 → 取所有 Premium 用戶 → 逐一發信（600ms 間隔 rate limit）
 
 ### send-newsletter-single.ts
@@ -279,7 +279,7 @@ CRON_SECRET=...                  # Cron 驗證用
 ```
 
 ### Vercel 設定 (vercel.json)
-- **Cron**：`cron-newsletter-prepare`（UTC 22:00）、`cron-newsletter`（UTC 23:00）
+- **Cron**：`cron-newsletter-prepare`（UTC 00:00）、`cron-newsletter`（UTC 00:30）
 - **Rewrites**：5 組外部 API proxy + SPA fallback
 - **maxDuration**：stock-analysis=30s, newsletter=60s
 
@@ -308,8 +308,8 @@ npm run dev          # Vite dev server (port 5173)
 
 ### 12.2 電子報流程
 ```
-06:00 cron-newsletter-prepare → 抓 Simons → AI 篩選 Top 15 → OpenAI 分析 → 寫入 cache
-07:00 cron-newsletter → 讀 cache → 取 Premium 用戶 → 逐一：
+08:00 cron-newsletter-prepare → 抓 Simons → AI 篩選 Top 15 → OpenAI 分析 → 寫入 cache
+08:30 cron-newsletter → 讀 cache → 取 Premium 用戶 → 逐一：
   ├─ 有 AI 功能 → 用 AI 快取
   └─ 有策略設定 → 用策略篩選 + OpenAI 分析
   → buildHoldingsWithSignals → buildEmailHtml → Resend 發信

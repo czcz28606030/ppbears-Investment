@@ -60,6 +60,8 @@ export interface UserRow {
   newsletter_strategy?: string;
 }
 
+export const DAILY_NEWSLETTER_FEATURE_KEY = 'daily_newsletter';
+
 // ─── 策略名稱對照 ─────────────────────────────────────────────────────────────
 export const STRATEGY_LABELS: Record<string, string> = {
   A: '🏢 穩穩大公司',
@@ -213,7 +215,7 @@ export async function filterByAI(allStocks: SimonsItem[]): Promise<FilteredStock
     try {
       const res = await fetchWithTimeout(`https://api.ifalgo.com.tw/frontapi/stock?coid=${s.coid}`, {}, 8000);
       if (!res.ok) return null;
-      const json = await res.json();
+      const json = await res.json() as any;
       const comment = json.data?.stock?.aiQuanBackDataComment;
       if (comment) {
         const cumRetStr = comment.cum_ret || '';
@@ -328,7 +330,7 @@ export async function buildHoldingsWithSignals(
     try {
       const res = await fetchWithTimeout(`https://api.ifalgo.com.tw/frontapi/stock?coid=${coid}`, {}, 8000);
       if (!res.ok) { stockCache[coid] = { sell_sig: '' }; return stockCache[coid]; }
-      const json = await res.json();
+      const json = await res.json() as any;
       const list = json.data?.stock?.aiQuanBackDataTradingList || [];
       const last = list.length > 0 ? list[list.length - 1].sell_sig : '';
       stockCache[coid] = { sell_sig: last };
@@ -369,6 +371,7 @@ export function buildEmailHtml(
   todayDate: string,
   strategyLabel?: string
 ): string {
+  const dataLabel = getNewsletterDataLabelTW(todayDate);
 
   const stocksHtml = stocks.map((s) => {
     const badgeColor = s.remark.includes('超高') ? '#e11d48'
@@ -452,7 +455,7 @@ export function buildEmailHtml(
     <div style="background:linear-gradient(135deg,#FF924C,#FF595E);padding:36px 24px;text-align:center;">
       <div style="font-size:44px;margin-bottom:10px;">🐻📈</div>
       <h1 style="margin:0;color:#fff;font-size:24px;font-weight:900;">PPBears 每日投資電子報</h1>
-      <div style="color:rgba(255,255,255,0.85);font-size:14px;margin-top:6px;font-weight:600;">${todayDate} · Premium 版</div>
+      <div style="color:rgba(255,255,255,0.85);font-size:14px;margin-top:6px;font-weight:600;">資料時間：${dataLabel} · Premium 版</div>
     </div>
     <div style="padding:32px 24px;">
       <p style="color:#555;font-size:16px;margin:0 0 32px;line-height:1.6;">嗨 ${recipientName}！早安 ☕ 今天 PPBear 幫你找了 ${stocks.length} 檔值得關注的好股票，並搭配 AI 財經深度解析，一起來看看吧～</p>
@@ -496,6 +499,19 @@ export async function userHasAiFeature(userId: string, userTier: string): Promis
 
   if (data) return Boolean(data.enabled);
   return userTier === 'premium'; // 預設：premium 有 AI
+}
+
+// ─── 判斷用戶是否要收到每日電子報 ─────────────────────────────────────────────
+export async function userHasNewsletterFeature(userId: string, userTier: string): Promise<boolean> {
+  const { data } = await supabase
+    .from('feature_overrides')
+    .select('enabled')
+    .eq('user_id', userId)
+    .eq('feature_key', DAILY_NEWSLETTER_FEATURE_KEY)
+    .maybeSingle();
+
+  if (data) return Boolean(data.enabled);
+  return userTier === 'premium'; // 預設：Premium 收信、Free 不收，管理員可逐一覆蓋
 }
 
 // ─── 發送單一用戶電子報 ───────────────────────────────────────────────────────
@@ -568,11 +584,68 @@ export interface NewsletterCache {
   cache_date: string;           // YYYY-MM-DD
   all_stocks: SimonsItem[];     // 當日完整 Simons 資料
   ai_filtered: FilteredStock[]; // AI 篩選 + OpenAI 分析完成的結果
+  created_at?: string;
 }
 
 /** 取得今日台灣日期字串（YYYY-MM-DD）*/
 export function getTodayTW(): string {
   return new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
+export function getLatestCompletedTradingDateTW(now = Date.now()): string {
+  const tw = new Date(now + 8 * 60 * 60 * 1000);
+  tw.setUTCHours(0, 0, 0, 0);
+  // Morning sync reads the latest fully completed market day, not the same-day
+  // intraday session.
+  tw.setUTCDate(tw.getUTCDate() - 1);
+
+  while (tw.getUTCDay() === 0 || tw.getUTCDay() === 6) {
+    tw.setUTCDate(tw.getUTCDate() - 1);
+  }
+  return tw.toISOString().slice(0, 10);
+}
+
+export function normalizeSimonsDate(value: unknown): string {
+  const raw = String(value ?? '').trim();
+  if (!raw) return '';
+  if (/^\d{8}$/.test(raw)) return `${raw.slice(0, 4)}-${raw.slice(4, 6)}-${raw.slice(6, 8)}`;
+  return raw.slice(0, 10).replace(/\//g, '-');
+}
+
+export function getSimonsItemDataDate(items: SimonsItem[]): string {
+  return normalizeSimonsDate(items[0]?.mdate);
+}
+
+export function isSimonsDataReadyForDate(items: SimonsItem[], targetDate: string): boolean {
+  if (!Array.isArray(items) || items.length === 0) return false;
+  const dataDate = getSimonsItemDataDate(items);
+  return dataDate === targetDate;
+}
+
+export async function fetchSimonsDataForDate(dateStr: string): Promise<SimonsItem[]> {
+  try {
+    const res = await fetchWithTimeout(
+      `https://api.ifalgo.com.tw/frontapi/common/getSimonsData?searchDate=${dateStr}`,
+      { headers: { 'Accept': 'application/json' } },
+      8000
+    );
+    if (!res.ok) return [];
+    const json = await res.json() as { data?: { dataItems?: SimonsItem[] } };
+    return json.data?.dataItems || [];
+  } catch {
+    return [];
+  }
+}
+
+/** 台灣時間今天 08:00 的資料快取日期；08:00 前手動寄送仍使用前一個準備批次。 */
+export function getNewsletterCacheDateTW(now = Date.now()): string {
+  const tw = new Date(now + 8 * 60 * 60 * 1000);
+  if (tw.getUTCHours() < 8) tw.setUTCDate(tw.getUTCDate() - 1);
+  return tw.toISOString().slice(0, 10);
+}
+
+export function getNewsletterDataLabelTW(cacheDate: string): string {
+  return `${cacheDate} 08:00 台灣時間`;
 }
 
 /** 將準備好的資料寫入 newsletter_daily_cache */
@@ -589,10 +662,10 @@ export async function saveTodayCache(data: Omit<NewsletterCache, never>): Promis
 
 /** 讀取今日快取；無快取則回傳 null */
 export async function loadTodayCache(date?: string): Promise<NewsletterCache | null> {
-  const cacheDate = date ?? getTodayTW();
+  const cacheDate = date ?? getNewsletterCacheDateTW();
   const { data, error } = await supabase
     .from('newsletter_daily_cache')
-    .select('cache_date, all_stocks, ai_filtered')
+    .select('cache_date, all_stocks, ai_filtered, created_at')
     .eq('cache_date', cacheDate)
     .maybeSingle();
   if (error || !data) return null;

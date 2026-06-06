@@ -287,10 +287,20 @@
   background: linear-gradient(135deg, rgba(108,92,231,0.08) 0%, rgba(162,155,254,0.08) 100%) !important;
   border-color: rgba(108,92,231,0.2) !important;
 }
+.lesson-retry-card {
+  background: linear-gradient(135deg, rgba(255, 114, 95, 0.08) 0%, rgba(255, 202, 58, 0.08) 100%) !important;
+  border-color: rgba(255, 114, 95, 0.28) !important;
+}
 .lesson-levelup {
   font-size: var(--font-size-lg);
   font-weight: 900;
   color: var(--learn-coin);
+}
+.lesson-result-error {
+  font-size: var(--font-size-sm);
+  font-weight: 900;
+  color: var(--action-dark);
+  text-align: center;
 }
 .lesson-result-syncing {
   font-size: var(--font-size-sm);

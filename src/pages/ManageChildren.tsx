@@ -11,7 +11,7 @@ const AVATARS = ['🐻', '🐼', '🐨', '🦁', '🦊', '🐯', '🐸', '🦄']
 
 export default function ManageChildren() {
   const navigate = useNavigate();
-  const { children, createChildAccount, setChildBalance, updateChildProfile, deleteChildAccount } = useStore();
+  const { user, children, createChildAccount, setChildBalance, updateChildProfile, deleteChildAccount, updateBrokerSettings } = useStore();
 
   // 子帳號資產資料
   const [childrenHoldings, setChildrenHoldings] = useState<Record<string, Holding[]>>({});
@@ -77,6 +77,9 @@ export default function ManageChildren() {
   const [isCreating, setIsCreating] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [registeredChildEmail, setRegisteredChildEmail] = useState('');
+  const [stopLossAlertPct, setStopLossAlertPct] = useState(user?.stopLossAlertPct?.toString() || '20');
+  const [riskSettingMsg, setRiskSettingMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+  const [riskSettingSaving, setRiskSettingSaving] = useState(false);
 
   // 設定餘額面板
   const [editingChildId, setEditingChildId] = useState<string | null>(null);
@@ -177,6 +180,25 @@ export default function ManageChildren() {
     }
   };
 
+  const handleSaveRiskSetting = async () => {
+    if (!user || user.role !== 'parent') return;
+    const pct = Math.min(80, Math.max(1, Number(stopLossAlertPct) || 20));
+    setStopLossAlertPct(String(pct));
+    setRiskSettingMsg(null);
+    setRiskSettingSaving(true);
+    const result = await updateBrokerSettings(
+      user.brokerFeeRate ?? 0.001425,
+      user.brokerMinFee ?? 20,
+      user.brokerTaxRate ?? 0.003,
+      pct
+    );
+    setRiskSettingSaving(false);
+    setRiskSettingMsg(result.error
+      ? { text: result.error, type: 'error' }
+      : { text: `✅ 停損提醒已設定為 -${pct}%`, type: 'success' }
+    );
+  };
+
 
   return (
     <div className="manage-page">
@@ -202,6 +224,78 @@ export default function ManageChildren() {
           <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', marginTop: 2 }}>設定發幣規則，孩子學習自動領學習幣</div>
         </div>
         <span style={{ color: 'var(--text-light)', fontSize: 18 }}>▶</span>
+      </div>
+
+      {/* 下單風險設定 */}
+      <div
+        style={{
+          background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)',
+          padding: '16px 20px', marginBottom: 4,
+          border: '2px solid rgba(255,89,94,0.18)',
+          boxShadow: 'var(--shadow-sm)',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 10 }}>
+          <span style={{ fontSize: 32 }}>🛡️</span>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 900, fontSize: 'var(--font-size-base)', color: 'var(--text-primary)' }}>下單停損提醒設定</div>
+            <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', marginTop: 2 }}>買入時自動試算停損價與可能損失，套用到所有副帳號</div>
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <input
+            type="number"
+            min="1"
+            max="80"
+            step="1"
+            value={stopLossAlertPct}
+            onChange={(event) => setStopLossAlertPct(event.target.value)}
+            style={{
+              flex: 1,
+              border: '2px solid rgba(255,193,7,0.45)',
+              borderRadius: 14,
+              padding: '12px 14px',
+              fontSize: 16,
+              fontWeight: 900,
+              color: 'var(--text-primary)',
+              background: '#fffaf0',
+            }}
+          />
+          <span style={{ fontWeight: 900, color: 'var(--text-secondary)' }}>%</span>
+          <button
+            type="button"
+            onClick={handleSaveRiskSetting}
+            disabled={riskSettingSaving}
+            style={{
+              border: 0,
+              borderRadius: 14,
+              padding: '12px 16px',
+              background: 'linear-gradient(135deg, var(--primary), var(--primary-dark))',
+              color: '#fff',
+              fontWeight: 900,
+              cursor: riskSettingSaving ? 'not-allowed' : 'pointer',
+              opacity: riskSettingSaving ? 0.6 : 1,
+            }}
+          >
+            {riskSettingSaving ? '儲存中' : '儲存'}
+          </button>
+        </div>
+        <div style={{ fontSize: 12.5, color: '#7a5800', background: 'rgba(255,193,7,0.12)', borderRadius: 10, padding: '9px 10px', marginTop: 10, lineHeight: 1.5, fontWeight: 700 }}>
+          例如設定 20%，股價 NT$100 買入時會提醒停損參考價 NT$80，並試算這筆單可能虧多少。
+        </div>
+        {riskSettingMsg && (
+          <div style={{
+            marginTop: 10,
+            borderRadius: 10,
+            padding: '9px 10px',
+            fontSize: 13,
+            fontWeight: 800,
+            background: riskSettingMsg.type === 'success' ? 'rgba(76,175,80,0.12)' : 'rgba(255,80,80,0.1)',
+            color: riskSettingMsg.type === 'success' ? '#2e7d32' : 'var(--loss-color)',
+          }}>
+            {riskSettingMsg.text}
+          </div>
+        )}
       </div>
 
       {/* 副帳號清單 */}

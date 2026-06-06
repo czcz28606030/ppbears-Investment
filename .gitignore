@@ -24,3 +24,12 @@ dist-ssr
 *.sw?
 
 .vercel
+
+# Local agent / generated workspace files
+.codex-remote-attachments/
+
+# Local build caches
+*.tsbuildinfo
+
+# Supabase local CLI state
+supabase/.temp/

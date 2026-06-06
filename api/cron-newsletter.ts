@@ -6,7 +6,10 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import {
   supabase, fetchLatestSimonsData, filterByAI,
-  sendNewsletterToUser, loadTodayCache, getTodayTW,
+  sendNewsletterToUser, loadTodayCache, getNewsletterCacheDateTW,
+  userHasNewsletterFeature,
+  type FilteredStock,
+  type SimonsItem,
 } from './_newsletter-utils.js';
 
 export const config = {
@@ -20,28 +23,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    // ── 時段檢查 ────────────────────────────────────────────────────────────
-    const { data: settings } = await supabase.from('system_settings').select('setting_key, setting_value');
-    const settingsMap: Record<string, number> = {};
-    (settings || []).forEach((row: { setting_key: string; setting_value: number }) => {
-      settingsMap[row.setting_key] = Number(row.setting_value);
-    });
-
-    const newsletterHour = settingsMap['newsletter_send_hour'] ?? 7;
-    const nowUTC = new Date();
-    const nowTW = new Date(nowUTC.getTime() + 8 * 60 * 60 * 1000);
-    const twHour = nowTW.getUTCHours();
-    const isForce = req.query.force === 'true';
-
-    if (twHour !== newsletterHour && !isForce) {
-      return res.status(200).json({ skipped: true, reason: `目前台灣時間 ${twHour}:xx，未達發送時段` });
-    }
-
     // ── 抓取 Simons 資料 ─────────────────────────────────────────────────────
-    // 優先使用 6AM 準備 cron 寫入的快取；若快取不存在才即時計算
-    const todayDate = getTodayTW();
-    let allStocks;
-    let aiFiltered;
+    // 優先使用 08:00 準備 cron 寫入的快取；若快取不存在才即時計算
+    const todayDate = getNewsletterCacheDateTW();
+    let allStocks: SimonsItem[];
+    let aiFiltered: FilteredStock[] | null;
 
     const cache = await loadTodayCache(todayDate);
     if (cache && cache.all_stocks.length > 0) {
@@ -57,21 +43,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       aiFiltered = await filterByAI(allStocks);
     }
 
-    // ── 取得所有 Premium 用戶（含 newsletter_strategy）──────────────────────
-    const { data: premiumUsers } = await supabase
+    // ── 取得所有用戶，逐一套用「每日電子報」開關（預設 Premium 開、Free 關）──
+    const { data: users } = await supabase
       .from('users')
-      .select('id, email, display_name, tier, newsletter_strategy')
-      .eq('tier', 'premium');
+      .select('id, email, display_name, tier, newsletter_strategy');
 
-    if (!premiumUsers || premiumUsers.length === 0) {
-      return res.status(200).json({ message: '目前沒有 Premium 用戶，跳過發信' });
+    if (!users || users.length === 0) {
+      return res.status(200).json({ message: '目前沒有用戶，跳過發信' });
     }
 
     let sentCount = 0;
+    let skippedCount = 0;
     const errors: string[] = [];
 
     // ── 逐一發信 ─────────────────────────────────────────────────────────────
-    for (const u of premiumUsers) {
+    for (const u of users) {
+      const enabled = await userHasNewsletterFeature(u.id, u.tier);
+      if (!enabled) {
+        skippedCount++;
+        continue;
+      }
       await new Promise(resolve => setTimeout(resolve, 600)); // rate limit
       const result = await sendNewsletterToUser(u, allStocks, aiFiltered, todayDate);
       if (result.success) {
@@ -84,6 +75,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).json({
       success: true,
       sentCount,
+      skippedCount,
       errors: errors.length > 0 ? errors : undefined,
     });
 

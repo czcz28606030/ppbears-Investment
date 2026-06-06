@@ -1,63 +1,183 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useStore } from '../store';
 import { getLesson } from '../data/lessons';
-import type { LessonQuestion } from '../types';
+import LessonVisual from '../components/LessonVisual';
+import type { LessonData, LessonQuestion } from '../types';
 import './LessonView.css';
 
-// XP 計算
 const XP_PER_CORRECT = 10;
 const COMBO_MULTIPLIER = 1.5;
-const TRUE_FALSE_TIME_LIMIT = 5; // 秒
-const SAVE_WAIT_HINT_MS = 8000; // 儲存超過 8 秒顯示提示
+const TRUE_FALSE_TIME_LIMIT = 5;
+const SAVE_WAIT_HINT_MS = 8000;
 
 type Phase = 'cards' | 'quiz' | 'results';
 
 interface AnswerRecord {
   question: LessonQuestion;
-  userAnswer: number | boolean | null; // null = 超時
+  userAnswer: number | boolean | null;
   isCorrect: boolean;
   xpEarned: number;
 }
 
-// 從 preset_questions 隨機抽題（目標5題；choice 和 true_false_speed 盡量均衡分配）
-function pickQuestions(questions: LessonQuestion[]): LessonQuestion[] {
-  const TARGET = 5; // 每次測驗出題數
-  const shuffled = [...questions].sort(() => Math.random() - 0.5);
+function shuffleChoiceOptions(question: LessonQuestion): LessonQuestion {
+  if (question.question_type !== 'choice' || !question.options || typeof question.correct_answer !== 'number') {
+    return question;
+  }
+
+  const correctOption = question.options[question.correct_answer];
+  const shuffledOptions = [...question.options].sort(() => Math.random() - 0.5);
+
+  return {
+    ...question,
+    options: shuffledOptions,
+    correct_answer: shuffledOptions.indexOf(correctOption),
+  };
+}
+
+function makeChoiceQuestion(
+  questionText: string,
+  options: string[],
+  correctAnswer: number,
+  explanation: string,
+  imageKey?: string
+): LessonQuestion {
+  return {
+    question_type: 'choice',
+    question_text: questionText,
+    options,
+    correct_answer: correctAnswer,
+    explanation,
+    image_key: imageKey,
+  };
+}
+
+function buildDynamicQuestionPool(lesson: LessonData): LessonQuestion[] {
+  const lessonNumber = Number(lesson.lesson_id.slice(1));
+  const imageKey = `lesson_${String(lessonNumber).padStart(3, '0')}_quiz_dynamic`;
+  const core = lesson.cards[0]?.title ?? lesson.title;
+  const second = lesson.cards[1]?.title ?? lesson.title;
+  const pool: LessonQuestion[] = [
+    ...lesson.preset_questions,
+    makeChoiceQuestion(
+      `換個情境想一想：學完「${lesson.title}」後，遇到新的投資選擇時，第一步最應該做什麼？`,
+      ['先看懂內容、成本和風險', '看到上漲就立刻買', '只聽朋友說哪一檔熱門', '把所有錢一次投入'],
+      0,
+      '真正理解觀念，比記住某一題答案更重要。投資前要先看懂內容、成本和風險。',
+      imageKey
+    ),
+    makeChoiceQuestion(
+      `「${core}」這個觀念最適合怎麼使用？`,
+      ['當成檢查表的一部分，搭配其他線索判斷', '當成保證賺錢的魔法', '只在朋友推薦時才看', '完全不用考慮風險'],
+      0,
+      '單一觀念只能提供一部分線索，最好搭配其他資料和風險控管一起使用。',
+      imageKey
+    ),
+  ];
+
+  if (lesson.domain === 'technical' || lessonNumber >= 56) {
+    pool.push(
+      makeChoiceQuestion(
+        '看圖判斷：技術分析圖上有 K 線、均線或成交量時，哪一種做法最可靠？',
+        ['同時看型態、位置、趨勢和量能', '只看到紅 K 就買', '只要有黃金交叉就保證賺錢', '完全不用設定停損'],
+        0,
+        '技術分析要把多個線索合在一起看；單一訊號可能是假訊號。',
+        imageKey
+      ),
+      makeChoiceQuestion(
+        `如果圖上的訊號和「${second}」看起來很像，下一步應該是什麼？`,
+        ['等待確認並設定風險界線', '立刻把所有資金買進', '忽略成交量和大趨勢', '只看一天就下結論'],
+        0,
+        '圖形訊號需要確認，也要先設定如果看錯時怎麼保護本金。',
+        imageKey
+      )
+    );
+  }
+
+  if (lessonNumber >= 61 && lessonNumber <= 66) {
+    pool.push(makeChoiceQuestion(
+      '看圖判斷：ETF 線圖比較像在表達什麼？',
+      ['一籃股票或指數的整體表現', '單一公司一定會上漲', '保證每年固定獲利', '不用付任何成本'],
+      0,
+      'ETF 通常追蹤一籃股票或指數，但仍有費用與市場波動風險。',
+      imageKey
+    ));
+  }
+
+  if (lessonNumber >= 67 && lessonNumber <= 72) {
+    pool.push(makeChoiceQuestion(
+      '看圖判斷：資產配置圓餅圖最主要是在提醒什麼？',
+      ['錢要分在不同隊伍，比例要定期檢查', '全部買同一檔最安全', '每天都要改比例', '現金完全沒有用'],
+      0,
+      '資產配置強調分散和比例管理，不是每天猜漲跌。',
+      imageKey
+    ));
+  }
+
+  if (lessonNumber >= 79 && lessonNumber <= 86) {
+    pool.push(makeChoiceQuestion(
+      '看圖判斷：財報長條圖最適合幫我們觀察什麼？',
+      ['收入、利潤或現金流的趨勢', '明天股價一定漲跌', '哪個網紅最準', '股票代號好不好記'],
+      0,
+      '財報圖表重點是看趨勢和品質，不是預測明天股價。',
+      imageKey
+    ));
+  }
+
+  if (lessonNumber >= 97) {
+    pool.push(makeChoiceQuestion(
+      '情境題：有人說「保證獲利、今天不加入就沒機會」，你應該怎麼做？',
+      ['提高警覺，查證來源並請家長協助', '馬上匯款', '把帳號密碼傳給對方', '不用看風險說明'],
+      0,
+      '保證獲利和限時壓迫都是常見警訊。投資前要查證，也要保護帳號和個資。',
+      imageKey
+    ));
+  }
+
+  return pool;
+}
+
+function pickQuestions(lesson: LessonData): LessonQuestion[] {
+  const target = 5;
+  const shuffled = [...buildDynamicQuestionPool(lesson)].sort(() => Math.random() - 0.5);
   const choices = shuffled.filter(q => q.question_type === 'choice');
   const tfs = shuffled.filter(q => q.question_type === 'true_false_speed');
 
   const picked: LessonQuestion[] = [];
-
-  // 盡量各取一半，各至少 2 題
-  const wantChoice = Math.max(2, Math.ceil(TARGET / 2));
-  const wantTf = TARGET - wantChoice;
+  const wantChoice = Math.max(2, Math.ceil(target / 2));
+  const wantTf = target - wantChoice;
 
   picked.push(...choices.slice(0, wantChoice));
   picked.push(...tfs.slice(0, wantTf));
 
-  // 若不足 TARGET 題，從剩餘補滿
-  if (picked.length < TARGET) {
+  if (picked.length < target) {
     const used = new Set(picked);
     const rest = shuffled.filter(q => !used.has(q));
-    picked.push(...rest.slice(0, TARGET - picked.length));
+    picked.push(...rest.slice(0, target - picked.length));
   }
 
-  // 再次隨機排序（避免固定 choice 在前 tf 在後）
-  return picked.slice(0, TARGET).sort(() => Math.random() - 0.5);
+  return picked
+    .slice(0, target)
+    .sort(() => Math.random() - 0.5)
+    .map(shuffleChoiceOptions);
 }
 
 export default function LessonView() {
   const { lessonId } = useParams<{ lessonId: string }>();
   const navigate = useNavigate();
-  const { completeLesson, fetchLearningProfile } = useStore();
+  const {
+    user,
+    completedLessonIds,
+    completeLesson,
+    fetchCompletedLessonIds,
+    fetchLearningProfile,
+  } = useStore();
 
   const lesson = lessonId ? getLesson(lessonId) : null;
-
   const [phase, setPhase] = useState<Phase>('cards');
   const [cardIndex, setCardIndex] = useState(0);
-  const [questions] = useState<LessonQuestion[]>(() =>
-    lesson ? pickQuestions(lesson.preset_questions) : []
+  const [questions, setQuestions] = useState<LessonQuestion[]>(() =>
+    lesson ? pickQuestions(lesson) : []
   );
   const [questionIndex, setQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<AnswerRecord[]>([]);
@@ -67,28 +187,23 @@ export default function LessonView() {
   const [tfTimeLeft, setTfTimeLeft] = useState(TRUE_FALSE_TIME_LIMIT);
   const [saving, setSaving] = useState(false);
   const [saveSlowHint, setSaveSlowHint] = useState(false);
-  const [resultData, setResultData] = useState<{ xpEarned: number; coinsEarned: number; levelUp: boolean; newStreak: number } | null>(null);
+  const [resultData, setResultData] = useState<{
+    xpEarned: number;
+    coinsEarned: number;
+    levelUp: boolean;
+    newStreak: number;
+    error?: string | null;
+  } | null>(null);
+
   const startTimeRef = useRef(Date.now());
   const tfTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const saveHintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // 用 ref 追蹤最新 answers，避免 stale closure 導致最後一题 XP 遯失
   const answersRef = useRef<AnswerRecord[]>([]);
+  const answerLockedRef = useRef(false);
 
-  // 404
-  if (!lesson) {
-    return (
-      <div className="lesson-error">
-        <div className="lesson-error-emoji">😕</div>
-        <div className="lesson-error-msg">找不到課程 {lessonId}</div>
-        <button className="btn-primary" onClick={() => navigate('/learn')}>回學習首頁</button>
-      </div>
-    );
-  }
+  const alreadyCompleted = Boolean(lessonId && completedLessonIds.includes(lessonId));
+  const shouldShowAlreadyCompleted = alreadyCompleted && phase === 'cards' && answers.length === 0 && !resultData;
 
-  const currentQuestion = questions[questionIndex];
-  const isTrueFalse = currentQuestion?.question_type === 'true_false_speed';
-
-  // TF 倒數計時
   const clearTfTimer = useCallback(() => {
     if (tfTimerRef.current) {
       clearInterval(tfTimerRef.current);
@@ -96,15 +211,42 @@ export default function LessonView() {
     }
   }, []);
 
+  const resetAttempt = useCallback(() => {
+    clearTfTimer();
+    if (lesson) {
+      setQuestions(pickQuestions(lesson));
+    }
+    answersRef.current = [];
+    answerLockedRef.current = false;
+    startTimeRef.current = Date.now();
+    setAnswers([]);
+    setCardIndex(0);
+    setQuestionIndex(0);
+    setSelectedChoice(null);
+    setRevealed(false);
+    setCombo(0);
+    setTfTimeLeft(TRUE_FALSE_TIME_LIMIT);
+    setSaving(false);
+    setSaveSlowHint(false);
+    setResultData(null);
+    setPhase('cards');
+  }, [clearTfTimer, lesson]);
+
   useEffect(() => {
-    if (phase !== 'quiz' || !isTrueFalse || revealed) return;
+    if (user) {
+      void fetchCompletedLessonIds();
+    }
+  }, [user, fetchCompletedLessonIds]);
+
+  useEffect(() => {
+    if (phase !== 'quiz' || !questions[questionIndex] || questions[questionIndex].question_type !== 'true_false_speed' || revealed) return;
     setTfTimeLeft(TRUE_FALSE_TIME_LIMIT);
 
     tfTimerRef.current = setInterval(() => {
       setTfTimeLeft(prev => {
         if (prev <= 1) {
           clearTfTimer();
-          handleTfAnswer(null); // 超時
+          handleTfAnswer(null);
           return 0;
         }
         return prev - 1;
@@ -112,19 +254,46 @@ export default function LessonView() {
     }, 1000);
 
     return clearTfTimer;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, questionIndex, revealed]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, questionIndex, revealed, questions]);
 
   useEffect(() => {
     return () => {
+      clearTfTimer();
       if (saveHintTimerRef.current) {
         clearTimeout(saveHintTimerRef.current);
         saveHintTimerRef.current = null;
       }
     };
-  }, []);
+  }, [clearTfTimer]);
 
-  // ── 答題邏輯 ──────────────────────────────
+  if (!lesson) {
+    return (
+      <div className="lesson-error">
+        <div className="lesson-error-emoji">?</div>
+        <div className="lesson-error-msg">找不到課程 {lessonId}</div>
+        <button className="btn-primary" onClick={() => navigate('/learn')}>回到學習地圖</button>
+      </div>
+    );
+  }
+
+  if (shouldShowAlreadyCompleted) {
+    return (
+      <div className="lesson-view lesson-results">
+        <div className="lesson-results-hero">
+          <div className="lesson-results-emoji">?</div>
+          <h2 className="lesson-results-title">這堂課已經完成了</h2>
+          <div className="lesson-results-score">已領過這關的學習幣，完成過的課程不能重複刷題。</div>
+        </div>
+        <button className="btn-primary lesson-done-btn" onClick={() => navigate('/learn')}>
+          回到學習地圖
+        </button>
+      </div>
+    );
+  }
+
+  const currentQuestion = questions[questionIndex];
+  const isTrueFalse = currentQuestion?.question_type === 'true_false_speed';
 
   function calcXp(isCorrect: boolean, currentCombo: number): number {
     if (!isCorrect) return 0;
@@ -138,29 +307,35 @@ export default function LessonView() {
     setSelectedChoice(idx);
   }
 
+  function recordAnswer(record: AnswerRecord) {
+    if (answerLockedRef.current || answersRef.current.length > questionIndex) return false;
+    answerLockedRef.current = true;
+    answersRef.current = [...answersRef.current, record].slice(0, questions.length);
+    setAnswers(answersRef.current);
+    return true;
+  }
+
   function handleChoiceConfirm() {
-    if (selectedChoice === null || revealed) return;
+    if (!currentQuestion || selectedChoice === null || revealed) return;
     const isCorrect = selectedChoice === (currentQuestion.correct_answer as number);
     const newCombo = isCorrect ? combo + 1 : 0;
     const xp = calcXp(isCorrect, combo);
+    const newRecord: AnswerRecord = { question: currentQuestion, userAnswer: selectedChoice, isCorrect, xpEarned: xp };
+    if (!recordAnswer(newRecord)) return;
     setCombo(newCombo);
     setRevealed(true);
-    const newRecord: AnswerRecord = { question: currentQuestion, userAnswer: selectedChoice, isCorrect, xpEarned: xp };
-    answersRef.current = [...answersRef.current, newRecord];
-    setAnswers(answersRef.current);
   }
 
   function handleTfAnswer(answer: boolean | null) {
-    if (revealed) return;
+    if (!currentQuestion || revealed) return;
     clearTfTimer();
     const isCorrect = answer !== null && answer === (currentQuestion.correct_answer as boolean);
     const newCombo = isCorrect ? combo + 1 : 0;
     const xp = calcXp(isCorrect, combo);
+    const newRecord: AnswerRecord = { question: currentQuestion, userAnswer: answer, isCorrect, xpEarned: xp };
+    if (!recordAnswer(newRecord)) return;
     setCombo(newCombo);
     setRevealed(true);
-    const newRecord: AnswerRecord = { question: currentQuestion, userAnswer: answer, isCorrect, xpEarned: xp };
-    answersRef.current = [...answersRef.current, newRecord];
-    setAnswers(answersRef.current);
   }
 
   async function handleNextQuestion() {
@@ -170,61 +345,73 @@ export default function LessonView() {
     setSelectedChoice(null);
 
     if (questionIndex + 1 < questions.length) {
+      answerLockedRef.current = false;
       setQuestionIndex(q => q + 1);
-    } else {
-      // 全部答完 → 儲存結果
-      // 使用 ref 取得最新答案（避免 stale closure）
-      const allAnswers = answersRef.current;
-      const correct = allAnswers.filter(a => a.isCorrect).length;
-      const totalXpFromQ = allAnswers.reduce((s, a) => s + a.xpEarned, 0);
-      const elapsed = Math.round((Date.now() - startTimeRef.current) / 1000);
-      const score = Math.round((correct / questions.length) * 100);
+      return;
+    }
 
-      setSaving(true);
-      setSaveSlowHint(false);
-      setResultData({ xpEarned: totalXpFromQ, coinsEarned: 0, levelUp: false, newStreak: 0 });
-      saveHintTimerRef.current = setTimeout(() => {
-        setSaveSlowHint(true);
-      }, SAVE_WAIT_HINT_MS);
+    const allAnswers = answersRef.current.slice(0, questions.length);
+    const correct = allAnswers.filter(a => a.isCorrect).length;
+    const perfect = correct === questions.length;
+    const totalXpFromQ = allAnswers.reduce((s, a) => s + a.xpEarned, 0);
+    const elapsed = Math.round((Date.now() - startTimeRef.current) / 1000);
+    const score = Math.round((correct / questions.length) * 100);
 
-      try {
-        const res = await completeLesson(lesson!.lesson_id, {
-          questionsCorrect: correct,
-          questionsTotal: questions.length,
-          xpFromQuestions: totalXpFromQ,
-          timeSpentSeconds: elapsed,
-          score,
-        });
-        // 不阻塞結果頁：背景刷新學習檔案
-        void fetchLearningProfile().catch(err => {
-          console.error('fetchLearningProfile failed after completeLesson:', err);
-        });
-        setResultData({ xpEarned: res.xpEarned, coinsEarned: res.coinsEarned, levelUp: res.levelUp, newStreak: res.newStreak });
-      } catch (err) {
-        console.error('completeLesson failed:', err);
-        setResultData({ xpEarned: totalXpFromQ, coinsEarned: 0, levelUp: false, newStreak: 0 });
-      } finally {
-        if (saveHintTimerRef.current) {
-          clearTimeout(saveHintTimerRef.current);
-          saveHintTimerRef.current = null;
-        }
-        setSaving(false);
-        setSaveSlowHint(false);
-        setPhase('results');
+    if (!perfect) {
+      setResultData({ xpEarned: 0, coinsEarned: 0, levelUp: false, newStreak: 0 });
+      setPhase('results');
+      return;
+    }
+
+    setSaving(true);
+    setSaveSlowHint(false);
+    setResultData({ xpEarned: totalXpFromQ, coinsEarned: 0, levelUp: false, newStreak: 0 });
+    saveHintTimerRef.current = setTimeout(() => {
+      setSaveSlowHint(true);
+    }, SAVE_WAIT_HINT_MS);
+
+    try {
+      const res = await completeLesson(lesson!.lesson_id, {
+        questionsCorrect: correct,
+        questionsTotal: questions.length,
+        xpFromQuestions: totalXpFromQ,
+        timeSpentSeconds: elapsed,
+        score,
+      });
+      void fetchLearningProfile().catch(err => {
+        console.error('fetchLearningProfile failed after completeLesson:', err);
+      });
+      void fetchCompletedLessonIds().catch(err => {
+        console.error('fetchCompletedLessonIds failed after completeLesson:', err);
+      });
+      setResultData({
+        xpEarned: res.xpEarned,
+        coinsEarned: res.coinsEarned,
+        levelUp: res.levelUp,
+        newStreak: res.newStreak,
+        error: res.error,
+      });
+    } catch (err) {
+      console.error('completeLesson failed:', err);
+      setResultData({ xpEarned: 0, coinsEarned: 0, levelUp: false, newStreak: 0, error: '儲存失敗，請再試一次。' });
+    } finally {
+      if (saveHintTimerRef.current) {
+        clearTimeout(saveHintTimerRef.current);
+        saveHintTimerRef.current = null;
       }
+      setSaving(false);
+      setSaveSlowHint(false);
+      setPhase('results');
     }
   }
-
-  // ── 渲染 ──────────────────────────────────
 
   if (phase === 'cards') {
     const card = lesson.cards[cardIndex];
     const isLast = cardIndex === lesson.cards.length - 1;
     return (
       <div className="lesson-view">
-        {/* 進度列 */}
         <div className="lesson-progress-bar-wrap">
-          <button className="lesson-back" onClick={() => navigate('/learn')}>✕</button>
+          <button className="lesson-back" onClick={() => navigate('/learn')}>←</button>
           <div className="lesson-progress-bar">
             {lesson.cards.map((_, i) => (
               <div key={i} className={`lesson-progress-dot ${i <= cardIndex ? 'active' : ''}`} />
@@ -232,20 +419,19 @@ export default function LessonView() {
           </div>
         </div>
 
-        {/* 卡片 */}
         <div className="lesson-card-area">
           <div className="card lesson-card" key={cardIndex}>
-            <div className="lesson-card-num">第 {cardIndex + 1} / {lesson.cards.length} 張</div>
+            <div className="lesson-card-num">第 {cardIndex + 1} / {lesson.cards.length} 張卡</div>
+            {card.image_key && <LessonVisual imageKey={card.image_key} title={card.title} />}
             <h2 className="lesson-card-title">{card.title}</h2>
             <p className="lesson-card-body">{card.body}</p>
           </div>
         </div>
 
-        {/* 導覽 */}
         <div className="lesson-nav">
           {cardIndex > 0 && (
             <button className="btn-ghost lesson-nav-prev" onClick={() => setCardIndex(i => i - 1)}>
-              ← 上一張
+              上一張
             </button>
           )}
           <button
@@ -255,7 +441,7 @@ export default function LessonView() {
               else setCardIndex(i => i + 1);
             }}
           >
-            {isLast ? '開始答題 🎯' : '下一張 →'}
+            {isLast ? '開始答題' : '下一張'}
           </button>
         </div>
       </div>
@@ -268,22 +454,20 @@ export default function LessonView() {
 
     return (
       <div className="lesson-view">
-        {/* 進度列 */}
         <div className="lesson-progress-bar-wrap">
-          <button className="lesson-back" onClick={() => navigate('/learn')}>✕</button>
+          <button className="lesson-back" onClick={() => navigate('/learn')}>←</button>
           <div className="lesson-quiz-label">第 {questionIndex + 1} / {questions.length} 題</div>
-          {combo >= 2 && <div className="lesson-combo">🔥 {combo} 連勝！</div>}
+          {combo >= 2 && <div className="lesson-combo">連對 {combo}</div>}
         </div>
 
-        {/* 題目 */}
         <div className="lesson-question-box card">
           <div className="lesson-q-type-badge">
-            {isTrueFalse ? '⚡ 是非急速題' : '📝 選擇題'}
+            {isTrueFalse ? '限時是非題' : '選擇題'}
           </div>
+          {q.image_key && <LessonVisual imageKey={q.image_key} title={q.question_text} />}
           <p className="lesson-q-text">{q.question_text}</p>
         </div>
 
-        {/* 選擇題選項 */}
         {!isTrueFalse && q.options && (
           <div className="lesson-choices">
             {q.options.map((opt, i) => {
@@ -304,7 +488,6 @@ export default function LessonView() {
           </div>
         )}
 
-        {/* 選擇題確認按鈕 */}
         {!isTrueFalse && !revealed && (
           <button
             className="btn-primary"
@@ -315,7 +498,6 @@ export default function LessonView() {
           </button>
         )}
 
-        {/* 是非急速題 */}
         {isTrueFalse && !revealed && (
           <div className="lesson-tf-area">
             <div className="lesson-tf-timer">
@@ -323,22 +505,21 @@ export default function LessonView() {
               <span>{tfTimeLeft}</span>
             </div>
             <div className="lesson-tf-btns">
-              <button className="lesson-tf-btn true" onClick={() => handleTfAnswer(true)}>⭕ 對</button>
-              <button className="lesson-tf-btn false" onClick={() => handleTfAnswer(false)}>✕ 錯</button>
+              <button className="lesson-tf-btn true" onClick={() => handleTfAnswer(true)}>對</button>
+              <button className="lesson-tf-btn false" onClick={() => handleTfAnswer(false)}>錯</button>
             </div>
           </div>
         )}
 
-        {/* 答題回饋 */}
         {revealed && lastAnswer && (
           <div className={`lesson-feedback card ${lastAnswer.isCorrect ? 'correct' : 'wrong'}`}>
             <div className="lesson-feedback-icon">
-              {lastAnswer.isCorrect ? '🎉' : lastAnswer.userAnswer === null ? '⏰' : '😅'}
+              {lastAnswer.isCorrect ? '✓' : lastAnswer.userAnswer === null ? '⏱' : '✕'}
             </div>
             <div className="lesson-feedback-main">
               {lastAnswer.isCorrect
-                ? `答對了！+${lastAnswer.xpEarned} XP${lastAnswer.xpEarned > XP_PER_CORRECT ? ' 🔥連勝加成' : ''}`
-                : lastAnswer.userAnswer === null ? '時間到！' : '答錯了～'}
+                ? `答對了，+${lastAnswer.xpEarned} XP`
+                : lastAnswer.userAnswer === null ? '時間到，再練一次' : '答錯了，再練一次'}
             </div>
             <div className="lesson-feedback-explain">{q.explanation}</div>
             <button
@@ -353,14 +534,14 @@ export default function LessonView() {
               disabled={saving && !saveSlowHint}
             >
               {saving
-                ? (saveSlowHint ? '網路較慢，先看結果 →' : '儲存中...')
+                ? (saveSlowHint ? '先看結果' : '儲存中...')
                 : questionIndex + 1 < questions.length
-                  ? '下一題 →'
-                  : '查看結果 🏆'}
+                  ? '下一題'
+                  : '看結果'}
             </button>
             {saving && saveSlowHint && (
               <div className="lesson-saving-hint">
-                仍在背景同步學習進度，稍後會自動更新首頁等級與連續天數。
+                儲存比較久，畫面會先顯示結果；進度同步完成後會更新。
               </div>
             )}
           </div>
@@ -369,41 +550,51 @@ export default function LessonView() {
     );
   }
 
-  // results
-  const totalCorrect = answers.filter(a => a.isCorrect).length;
+  const resultAnswers = answers.slice(0, questions.length);
+  const totalCorrect = Math.min(
+    questions.length,
+    resultAnswers.filter(a => a.isCorrect).length
+  );
   const perfect = totalCorrect === questions.length;
+  const canGoBack = perfect && Boolean(resultData?.xpEarned);
+
   return (
     <div className="lesson-view lesson-results">
       <div className="lesson-results-hero">
-        <div className="lesson-results-emoji">{perfect ? '🏆' : totalCorrect > 0 ? '⭐' : '💪'}</div>
+        <div className="lesson-results-emoji">{perfect ? '✓' : '↻'}</div>
         <h2 className="lesson-results-title">
-          {perfect ? '完美通關！' : totalCorrect > 0 ? '做得不錯！' : '繼續加油！'}
+          {perfect ? '全部答對，課程完成' : '還差一點，再挑戰一次'}
         </h2>
-        <div className="lesson-results-score">{totalCorrect} / {questions.length} 答對</div>
+        <div className="lesson-results-score">{totalCorrect} / {questions.length} 題答對</div>
       </div>
 
       {resultData && (
-        <div className="card lesson-xp-card">
+        <div className={`card lesson-xp-card ${perfect ? '' : 'lesson-retry-card'}`}>
           {saving && (
-            <div className="lesson-result-syncing">⏳ 正在背景同步資料中...</div>
+            <div className="lesson-result-syncing">正在儲存學習進度...</div>
           )}
-          {resultData.levelUp && (
-            <div className="lesson-levelup">🎊 升級了！</div>
+          {resultData.error && (
+            <div className="lesson-result-error">{resultData.error}</div>
+          )}
+          {perfect && resultData.levelUp && (
+            <div className="lesson-levelup">升級了</div>
           )}
           <div className="lesson-xp-earned">+{resultData.xpEarned} XP</div>
-          {resultData.coinsEarned > 0 && (
-            <div className="lesson-coins-earned">🪙 +{resultData.coinsEarned} 學習幣</div>
+          {perfect && (
+            <div className="lesson-coins-earned">
+              本次獲得 +{resultData.coinsEarned} 學習幣
+            </div>
           )}
           <div className="lesson-xp-sub">
-            含每日首學 +20 XP
-            {resultData.newStreak > 1 ? `・連續 ${resultData.newStreak} 天 🔥` : ''}
+            {perfect
+              ? '課程已完成，學習幣會依照家長設定的規則發放。'
+              : '答錯不會完成課程，也不會發放學習幣。請重新挑戰到全對。'}
           </div>
         </div>
       )}
 
-      {/* 答題回顧 */}
       <div className="lesson-review">
-        {answers.map((a, i) => (
+        {resultAnswers.map((a, i) => (
           <div key={i} className={`card lesson-review-item ${a.isCorrect ? 'correct' : 'wrong'}`}>
             <div className="lesson-review-q">{a.question.question_text}</div>
             <div className="lesson-review-explain">{a.question.explanation}</div>
@@ -411,9 +602,15 @@ export default function LessonView() {
         ))}
       </div>
 
-      <button className="btn-primary lesson-done-btn" onClick={() => navigate('/learn')}>
-        回學習首頁 🏠
-      </button>
+      {canGoBack ? (
+        <button className="btn-primary lesson-done-btn" onClick={() => navigate('/learn')}>
+          回到學習地圖
+        </button>
+      ) : (
+        <button className="btn-primary lesson-done-btn" onClick={resetAttempt}>
+          重新挑戰
+        </button>
+      )}
     </div>
   );
 }

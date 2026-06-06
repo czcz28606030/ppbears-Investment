@@ -29,6 +29,7 @@ CREATE TABLE public.users (
   broker_fee_rate numeric DEFAULT 0.001425,       -- 買賣手續費率（預設 0.1425%）
   broker_min_fee numeric DEFAULT 20,              -- 買賣最低手續費（預設 20 元）
   broker_tax_rate numeric DEFAULT 0.003,          -- 賣出證交稅率（預設 0.3%）
+  stop_loss_alert_pct numeric DEFAULT 20,         -- 買入前停損提醒跌幅（預設 20%）
   created_at timestamptz DEFAULT now() NOT NULL
 );
 
@@ -57,7 +58,8 @@ CREATE TABLE public.system_settings (
 INSERT INTO public.system_settings (setting_key, setting_value) VALUES
 ('free_max_child_accounts', 2),
 ('free_max_holdings', 5),
-('free_max_daily_trades', 10)
+('free_max_daily_trades', 10),
+('newsletter_send_hour', 8)
 ON CONFLICT (setting_key) DO NOTHING;
 
 -- ==========================================================
@@ -222,6 +224,7 @@ CREATE POLICY "Users can view own feature overrides"
 -- ALTER TABLE public.users ADD COLUMN broker_fee_rate numeric DEFAULT 0.001425;
 -- ALTER TABLE public.users ADD COLUMN broker_min_fee numeric DEFAULT 20;
 -- ALTER TABLE public.users ADD COLUMN broker_tax_rate numeric DEFAULT 0.003;
+-- ALTER TABLE public.users ADD COLUMN stop_loss_alert_pct numeric DEFAULT 20;
 --
 -- 升級 (加入入金出金支援): 
 -- ALTER TABLE public.trades DROP CONSTRAINT IF EXISTS trades_trade_type_check;
@@ -248,8 +251,8 @@ CREATE POLICY "Allow authenticated users to insert stock profiles"
 
 -- ==========================================================
 -- 升級 v2.3 (電子報每日資料快取表)
--- 供 cron-newsletter-prepare（06:00）寫入，
--- 供 cron-newsletter（07:00）與 send-newsletter-single 讀取
+-- 供 cron-newsletter-prepare（08:00）寫入，
+-- 供 cron-newsletter（08:30）與 send-newsletter-single 讀取
 -- ==========================================================
 CREATE TABLE IF NOT EXISTS public.newsletter_daily_cache (
   cache_date date PRIMARY KEY,
@@ -262,3 +265,38 @@ CREATE TABLE IF NOT EXISTS public.newsletter_daily_cache (
 ALTER TABLE public.newsletter_daily_cache ENABLE ROW LEVEL SECURITY;
 
 -- service_role 繞過 RLS，前端無法直接存取，無需額外 policy
+
+-- ==========================================================
+-- 升級 v2.4 (每日電子報逐帳號開關)
+-- ==========================================================
+-- 使用既有 feature_overrides 表，不新增欄位：
+-- feature_key = 'daily_newsletter'
+-- 預設規則：Premium 開啟、Free 關閉；管理員可針對任一帳號新增 override。
+INSERT INTO public.system_settings (setting_key, setting_value) VALUES
+('newsletter_send_hour', 8)
+ON CONFLICT (setting_key) DO UPDATE SET setting_value = EXCLUDED.setting_value;
+
+-- ==========================================================
+-- 升級 v2.5 (個股共用快取表)
+-- 用於 stock-analysis 等伺服器端流程；同一支股票同一快取類型只保留最新一筆，
+-- 隔天重新查詢時覆蓋舊資料，並由服務端清理超過 30 天未更新的快取。
+-- ==========================================================
+CREATE TABLE IF NOT EXISTS public.stock_daily_cache (
+  stock_code text NOT NULL,
+  cache_date date NOT NULL,
+  cache_type text NOT NULL,
+  payload jsonb NOT NULL DEFAULT '{}'::jsonb,
+  source text,
+  generated_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now(),
+  PRIMARY KEY (stock_code, cache_type)
+);
+
+CREATE INDEX IF NOT EXISTS stock_daily_cache_date_type_idx
+  ON public.stock_daily_cache (cache_date, cache_type);
+
+CREATE INDEX IF NOT EXISTS stock_daily_cache_updated_at_idx
+  ON public.stock_daily_cache (updated_at);
+
+-- 僅服務端（service_role）讀寫；前端透過 /api/stock-analysis 取得結果。
+ALTER TABLE public.stock_daily_cache ENABLE ROW LEVEL SECURITY;

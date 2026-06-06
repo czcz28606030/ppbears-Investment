@@ -1,0 +1,119 @@
+{
+  "lesson_id": "L085",
+  "stage": 6,
+  "level": 5,
+  "domain": "financials",
+  "title": "存貨與應收帳款",
+  "summary": "學會觀察貨賣不賣得掉、錢收不收得回來。",
+  "cards": [
+    {
+      "type": "text_image",
+      "title": "先認識：存貨與應收帳款",
+      "body": "學會觀察貨賣不賣得掉、錢收不收得回來。\n\n可以把它想成「公司的健康檢查」：不是只看表面，而是要看裡面有哪些東西、比例怎麼安排、風險在哪裡。",
+      "image_key": "lesson_085_card_01"
+    },
+    {
+      "type": "text_image",
+      "title": "孩子也能懂的重點",
+      "body": "這堂課要記住：營收看生意規模、利潤看賺錢能力。投資不是猜答案，而是一步一步檢查。",
+      "image_key": "lesson_085_card_02"
+    },
+    {
+      "type": "text_image",
+      "title": "看圖學：財報長條圖",
+      "body": "看到 財報長條圖 時，先問自己：圖在比較什麼？時間有多長？變化是一次性的，還是長期趨勢？",
+      "image_key": "lesson_085_card_03"
+    },
+    {
+      "type": "text_image",
+      "title": "自己的小檢查表",
+      "body": "做決定前，可以問三件事：我懂這個工具嗎？我知道可能賠多少嗎？我有沒有照計畫，而不是照情緒？",
+      "image_key": "lesson_085_card_04"
+    }
+  ],
+  "preset_questions": [
+    {
+      "question_type": "choice",
+      "question_text": "財報最適合幫我們了解什麼？",
+      "options": [
+        "公司的經營狀況和財務體質",
+        "明天股價一定漲跌",
+        "哪個同學最會投資",
+        "股票代號好不好記"
+      ],
+      "correct_answer": 0,
+      "explanation": "正確。存貨與應收帳款 的核心不是背名詞，而是理解它能幫我們做什麼，以及風險在哪裡。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "學完「存貨與應收帳款」後，遇到新的投資選擇，第一步最適合做什麼？",
+      "options": [
+        "把多個財報數字放在一起看",
+        "只看一個漂亮數字就判斷公司很好",
+        "只看朋友有沒有買",
+        "把所有零用錢一次投入"
+      ],
+      "correct_answer": 0,
+      "explanation": "投資前先檢查內容、成本、風險與自己的目標，比衝動買進更重要。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "只要學會「存貨與應收帳款」，就能保證每次投資都賺錢。",
+      "correct_answer": false,
+      "explanation": "任何投資都不保證獲利。學習的目的，是讓判斷更穩、風險更清楚。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "哪一個行為最符合這堂課的精神？",
+      "options": [
+        "現金流看是否真的有錢進來",
+        "只看一天漲跌",
+        "聽到熱門就立刻買",
+        "完全不用記錄原因"
+      ],
+      "correct_answer": 0,
+      "explanation": "這堂課要練習的是：現金流看是否真的有錢進來。"
+    },
+    {
+      "question_type": "true_false_speed",
+      "question_text": "答題時只背選項位置就好，因為答案永遠固定。",
+      "correct_answer": false,
+      "explanation": "選項順序會被打亂，也會加入情境題。真正重要的是看懂題目。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "看圖表時，最可靠的做法是哪一個？",
+      "options": [
+        "先看圖表代表什麼，再搭配課程觀念判斷",
+        "看到線往上就一定買",
+        "看到線往下就永遠不能買",
+        "圖表漂亮就代表沒有風險"
+      ],
+      "correct_answer": 0,
+      "explanation": "圖表是輔助工具，要搭配「存貨與應收帳款」的概念和風險一起看。"
+    },
+    {
+      "question_type": "choice",
+      "question_text": "如果同學對「存貨與應收帳款」只記得一件事，最應該記得什麼？",
+      "options": [
+        "負債要看比例和用途",
+        "投資靠運氣就好",
+        "越快下單越厲害",
+        "只要有獎勵就不用理解"
+      ],
+      "correct_answer": 0,
+      "explanation": "很棒。負債要看比例和用途 是這堂課的重要提醒。"
+    }
+  ],
+  "ai_prompt_context": {
+    "topic": "存貨與應收帳款",
+    "age_hint": "11-15歲",
+    "vocabulary_level": "intermediate",
+    "metaphor_suggestions": [
+      "公司的健康檢查",
+      "財報長條圖",
+      "檢查表",
+      "安全帶"
+    ]
+  }
+}

@@ -1,12 +1,12 @@
 /**
- * PPBears Investment - 電子報資料預備 Cron（每天 06:00 台灣時間）
- * UTC schedule: 0 22 * * *（前一天 22:00 UTC = 當天 06:00 台灣）
+ * PPBears Investment - 電子報資料預備 Cron（每天 08:00 台灣時間）
+ * UTC schedule: 0 0 * * *（當天 00:00 UTC = 當天 08:00 台灣）
  *
  * 負責耗時的部分：
  *   1. 抓取 Simons 當日選股資料
  *   2. AI 篩選（呼叫 ifalgo 逐支評分）
  *   3. OpenAI 多面向分析
- * 完成後寫入 newsletter_daily_cache，供 07:00 的發信 cron 直接讀取。
+ * 完成後寫入 newsletter_daily_cache，供 08:30 的發信 cron 直接讀取。
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
@@ -15,7 +15,7 @@ import {
   filterByAI,
   generateStocksAnalysis,
   saveTodayCache,
-  getTodayTW,
+  getNewsletterCacheDateTW,
 } from './_newsletter-utils.js';
 
 export const config = {
@@ -29,7 +29,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
-  const todayDate = getTodayTW();
+  const todayDate = getNewsletterCacheDateTW();
 
   try {
     // ── 1. 取得 Simons 資料 ───────────────────────────────────────────────
