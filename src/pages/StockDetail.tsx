@@ -181,6 +181,7 @@ export default function StockDetail() {
   const [tradingSignalError, setTradingSignalError] = useState<string | null>(null);
   const [showMa5, setShowMa5] = useState(true);
   const [showMa20, setShowMa20] = useState(true);
+  const [chartRetrying, setChartRetrying] = useState(false);
 
   useLayoutEffect(() => {
     if (!code) return;
@@ -589,6 +590,23 @@ export default function StockDetail() {
       .finally(() => setInstitutionCostLoading(false));
   }
 
+  async function retryStockChart() {
+    if (!code || chartRetrying) return;
+    setChartRetrying(true);
+    try {
+      const stockRes = await fetchStockData(code);
+      if (stockRes) {
+        setStockData(stockRes);
+        const prices = stockRes.prices;
+        if (prices?.length > 0) {
+          setLatestPrice(prices[prices.length - 1]);
+        }
+      }
+    } finally {
+      setChartRetrying(false);
+    }
+  }
+
   // 【NEW】當量化數據加載完成時，如果是 Premium 會員且有 AI 推薦等級，重新用 Simons 評分計算
   useEffect(() => {
     if (!quantData?.aiQuanBackDataComment || !simonsMeta || !hasAiFeature) return;
@@ -958,6 +976,8 @@ export default function StockDetail() {
       ? 'otc' as const
       : null;
   const stockDisplayName = stockData?.stkname || twseQuote?.Name || tpexQuote?.CompanyName || '';
+  const chartPrices = Array.isArray(stockData?.prices) ? stockData.prices : [];
+  const hasChartPrices = chartPrices.length > 0;
   const finmindFlowItems = institutionCostData?.finmind?.items || [];
   const formatFlowShares = (shares: number) => {
     const lots = Math.round(shares / 1000);
@@ -1323,7 +1343,7 @@ export default function StockDetail() {
       </div>
 
       {/* 📈 技術線圖（使用 ifalgo K 線資料） */}
-      {code && stockData?.prices && stockData.prices.length > 0 && (
+      {code && (
         <div className="card tv-chart-card">
           <div className="tv-chart-header">
             <div className="tv-chart-heading">
@@ -1361,13 +1381,30 @@ export default function StockDetail() {
             </div>
           )}
           <div className="tv-chart-wrapper">
-            <StockChart
-              prices={stockData.prices}
-              stockName={stockData.stkname || code}
-              tradingSignals={hasAiFeature ? tradingSignals : undefined}
-              showMa5={showMa5}
-              showMa20={showMa20}
-            />
+            {hasChartPrices ? (
+              <StockChart
+                prices={chartPrices}
+                stockName={stockData?.stkname || stockDisplayName || code}
+                tradingSignals={hasAiFeature ? tradingSignals : undefined}
+                showMa5={showMa5}
+                showMa20={showMa20}
+              />
+            ) : (
+              <div className="tv-chart-fallback">
+                <div className="tv-chart-fallback-icon">📈</div>
+                <div className="tv-chart-fallback-text">
+                  技術線圖資料暫時沒有載入成功，股價資訊仍會先用官方收盤資料顯示。
+                </div>
+                <button
+                  type="button"
+                  className="tv-chart-fallback-btn"
+                  onClick={retryStockChart}
+                  disabled={chartRetrying}
+                >
+                  {chartRetrying ? '重新讀取中...' : '重新讀取線圖'}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

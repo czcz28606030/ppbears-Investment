@@ -1,9 +1,14 @@
 # 📦 PPBears Investment — 更新日誌
 
-> **目前版本：v1.24.77**（2026-06-07）
-> 最新更新：重整學習題庫，移除重複與模板化題目，並限制每日最多完成 3 個學習單元。
+> **目前版本：v1.24.78**（2026-06-08）
+> 最新更新：個股技術線圖資料短暫載入失敗時保留卡片，並提供重新讀取線圖入口。
 
 ---
+
+## [v1.24.78] - 2026-06-08
+### Fixed
+- Kept the Stock Detail technical chart card visible when IFAlgo K-line data is temporarily unavailable instead of hiding the entire section.
+- Added a `重新讀取線圖` retry action so users can reload the chart data without leaving the stock detail page.
 
 ## [v1.24.77] - 2026-06-07
 ### Added
