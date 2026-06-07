@@ -225,6 +225,8 @@ SET search_path = public
 AS $$
 DECLARE
   v_req public.redemption_requests%ROWTYPE;
+  v_item public.reward_shop_items%ROWTYPE;
+  v_cash_value int;
 BEGIN
   SELECT * INTO v_req
   FROM public.redemption_requests
@@ -238,6 +240,10 @@ BEGIN
   IF v_req.status <> 'pending' THEN
     RAISE EXCEPTION 'request is not pending';
   END IF;
+
+  SELECT * INTO v_item
+  FROM public.reward_shop_items
+  WHERE id = v_req.shop_item_id;
 
   -- 扣除凍結幣
   UPDATE public.learning_wallet
@@ -259,6 +265,29 @@ BEGIN
   VALUES
     (v_req.child_id, -v_req.cost_coins, 'redeem',
      p_request_id::text, '兌換：' || v_req.item_name, p_parent_note);
+
+  -- 現金 / 模擬投資加碼商品核可後，自動轉入副帳號可用現金
+  v_cash_value := COALESCE(v_item.cash_value, 0);
+  IF v_item.item_type IN ('cash', 'invest_bonus') AND v_cash_value > 0 THEN
+    UPDATE public.users
+    SET available_balance = available_balance + v_cash_value
+    WHERE id = v_req.child_id;
+
+    INSERT INTO public.trades
+      (user_id, stock_code, stock_name, trade_type, quantity, price, total_amount, reason, timestamp)
+    VALUES
+      (
+        v_req.child_id,
+        'CASH',
+        CASE WHEN v_item.item_type = 'invest_bonus' THEN '學習獎勵投資加碼' ELSE '學習獎勵現金' END,
+        'deposit',
+        1,
+        v_cash_value,
+        v_cash_value,
+        '學習商城兌換入帳：' || v_req.item_name || ' (' || p_request_id::text || ')',
+        floor(extract(epoch from now()) * 1000)::bigint
+      );
+  END IF;
 END;
 $$;
 

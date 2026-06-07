@@ -1042,36 +1042,55 @@ export const useStore = create<InvestmentStore>((set, get) => ({
 
   approveRedemption: async (requestId, note) => {
     if (!supabase) return { error: '資料庫未連線' };
-    const { error } = await supabase.rpc('approve_redemption', {
-      p_request_id: requestId,
-      p_parent_note: note || null,
-    });
-    if (error) return { error: error.message };
-    set(s => ({
-      redemptions: s.redemptions.map(r =>
-        r.id === requestId
-          ? { ...r, status: 'approved' as const, parentNote: note || null, resolvedAt: new Date().toISOString() }
-          : r
-      ),
-    }));
-    return { error: null };
+    try {
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) return { error: sessionError.message };
+      const token = sessionData.session?.access_token;
+      if (!token) return { error: '登入狀態已失效，請重新登入' };
+
+      const response = await fetch('/api/withdrawal-request', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ type: 'redemption', requestId, action: 'approve', note }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) return { error: result.error || '核可兌換失敗' };
+      await get().fetchRedemptions();
+      await get().loadChildren();
+      await get().fetchLearningWallet();
+      return { error: null };
+    } catch (e) {
+      return { error: e instanceof Error ? e.message : '核可兌換失敗' };
+    }
   },
 
   rejectRedemption: async (requestId, note) => {
     if (!supabase) return { error: '資料庫未連線' };
-    const { error } = await supabase.rpc('reject_redemption', {
-      p_request_id: requestId,
-      p_parent_note: note || null,
-    });
-    if (error) return { error: error.message };
-    set(s => ({
-      redemptions: s.redemptions.map(r =>
-        r.id === requestId
-          ? { ...r, status: 'rejected' as const, parentNote: note || null, resolvedAt: new Date().toISOString() }
-          : r
-      ),
-    }));
-    return { error: null };
+    try {
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) return { error: sessionError.message };
+      const token = sessionData.session?.access_token;
+      if (!token) return { error: '登入狀態已失效，請重新登入' };
+
+      const response = await fetch('/api/withdrawal-request', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ type: 'redemption', requestId, action: 'reject', note }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) return { error: result.error || '駁回兌換失敗' };
+      await get().fetchRedemptions();
+      await get().fetchLearningWallet();
+      return { error: null };
+    } catch (e) {
+      return { error: e instanceof Error ? e.message : '駁回兌換失敗' };
+    }
   },
 
   // ─── Auth ─────────────────────────────────

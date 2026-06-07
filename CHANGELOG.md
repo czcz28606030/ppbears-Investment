@@ -1,9 +1,15 @@
 # 📦 PPBears Investment — 更新日誌
 
-> **目前版本：v1.24.75**（2026-06-05）
-> 最新更新：觀察清單加入 AI 出場與低度推薦的一鍵移除提醒，ETF 小卡改為 ETF+N 支撐數。
+> **目前版本：v1.24.76**（2026-06-07）
+> 最新更新：修正學習商城現金類兌換核可後未自動入帳，並補回既有漏帳紀錄。
 
 ---
+
+## [v1.24.76] - 2026-06-07
+### Fixed
+- Fixed reward redemption approval so cash and investment-bonus shop items automatically credit the child account cash balance after parent approval.
+- Added a server-side reward redemption approval API that verifies the parent session before updating redemption status, learning coins, cash balance, and deposit trade records.
+- Backfilled the two approved `零用錢` redemptions from 2026-06-07 for child account `娃娃魚`, adding NT$100 each and leaving matching `學習獎勵現金` deposit records.
 
 ## [v1.24.75] - 2026-06-05
 ### Added
