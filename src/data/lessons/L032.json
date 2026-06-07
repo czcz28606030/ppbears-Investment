@@ -52,7 +52,7 @@
     },
     {
       "question_type": "choice",
-      "question_text": "巴菲特說「別人貪婪時你要？」",
+      "question_text": "巴菲特說「別人貪婪時你要？」（提示：了解股票上漲的各種原因和投資人的心理）",
       "options": [
         "更貪婪",
         "恐懼（冷靜思考）",

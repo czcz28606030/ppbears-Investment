@@ -10,6 +10,7 @@ const XP_PER_CORRECT = 10;
 const COMBO_MULTIPLIER = 1.5;
 const TRUE_FALSE_TIME_LIMIT = 5;
 const SAVE_WAIT_HINT_MS = 8000;
+const DAILY_LESSON_LIMIT = 3;
 
 type Phase = 'cards' | 'quiz' | 'results';
 
@@ -35,106 +36,8 @@ function shuffleChoiceOptions(question: LessonQuestion): LessonQuestion {
   };
 }
 
-function makeChoiceQuestion(
-  questionText: string,
-  options: string[],
-  correctAnswer: number,
-  explanation: string,
-  imageKey?: string
-): LessonQuestion {
-  return {
-    question_type: 'choice',
-    question_text: questionText,
-    options,
-    correct_answer: correctAnswer,
-    explanation,
-    image_key: imageKey,
-  };
-}
-
 function buildDynamicQuestionPool(lesson: LessonData): LessonQuestion[] {
-  const lessonNumber = Number(lesson.lesson_id.slice(1));
-  const imageKey = `lesson_${String(lessonNumber).padStart(3, '0')}_quiz_dynamic`;
-  const core = lesson.cards[0]?.title ?? lesson.title;
-  const second = lesson.cards[1]?.title ?? lesson.title;
-  const pool: LessonQuestion[] = [
-    ...lesson.preset_questions,
-    makeChoiceQuestion(
-      `換個情境想一想：學完「${lesson.title}」後，遇到新的投資選擇時，第一步最應該做什麼？`,
-      ['先看懂內容、成本和風險', '看到上漲就立刻買', '只聽朋友說哪一檔熱門', '把所有錢一次投入'],
-      0,
-      '真正理解觀念，比記住某一題答案更重要。投資前要先看懂內容、成本和風險。',
-      imageKey
-    ),
-    makeChoiceQuestion(
-      `「${core}」這個觀念最適合怎麼使用？`,
-      ['當成檢查表的一部分，搭配其他線索判斷', '當成保證賺錢的魔法', '只在朋友推薦時才看', '完全不用考慮風險'],
-      0,
-      '單一觀念只能提供一部分線索，最好搭配其他資料和風險控管一起使用。',
-      imageKey
-    ),
-  ];
-
-  if (lesson.domain === 'technical' || lessonNumber >= 56) {
-    pool.push(
-      makeChoiceQuestion(
-        '看圖判斷：技術分析圖上有 K 線、均線或成交量時，哪一種做法最可靠？',
-        ['同時看型態、位置、趨勢和量能', '只看到紅 K 就買', '只要有黃金交叉就保證賺錢', '完全不用設定停損'],
-        0,
-        '技術分析要把多個線索合在一起看；單一訊號可能是假訊號。',
-        imageKey
-      ),
-      makeChoiceQuestion(
-        `如果圖上的訊號和「${second}」看起來很像，下一步應該是什麼？`,
-        ['等待確認並設定風險界線', '立刻把所有資金買進', '忽略成交量和大趨勢', '只看一天就下結論'],
-        0,
-        '圖形訊號需要確認，也要先設定如果看錯時怎麼保護本金。',
-        imageKey
-      )
-    );
-  }
-
-  if (lessonNumber >= 61 && lessonNumber <= 66) {
-    pool.push(makeChoiceQuestion(
-      '看圖判斷：ETF 線圖比較像在表達什麼？',
-      ['一籃股票或指數的整體表現', '單一公司一定會上漲', '保證每年固定獲利', '不用付任何成本'],
-      0,
-      'ETF 通常追蹤一籃股票或指數，但仍有費用與市場波動風險。',
-      imageKey
-    ));
-  }
-
-  if (lessonNumber >= 67 && lessonNumber <= 72) {
-    pool.push(makeChoiceQuestion(
-      '看圖判斷：資產配置圓餅圖最主要是在提醒什麼？',
-      ['錢要分在不同隊伍，比例要定期檢查', '全部買同一檔最安全', '每天都要改比例', '現金完全沒有用'],
-      0,
-      '資產配置強調分散和比例管理，不是每天猜漲跌。',
-      imageKey
-    ));
-  }
-
-  if (lessonNumber >= 79 && lessonNumber <= 86) {
-    pool.push(makeChoiceQuestion(
-      '看圖判斷：財報長條圖最適合幫我們觀察什麼？',
-      ['收入、利潤或現金流的趨勢', '明天股價一定漲跌', '哪個網紅最準', '股票代號好不好記'],
-      0,
-      '財報圖表重點是看趨勢和品質，不是預測明天股價。',
-      imageKey
-    ));
-  }
-
-  if (lessonNumber >= 97) {
-    pool.push(makeChoiceQuestion(
-      '情境題：有人說「保證獲利、今天不加入就沒機會」，你應該怎麼做？',
-      ['提高警覺，查證來源並請家長協助', '馬上匯款', '把帳號密碼傳給對方', '不用看風險說明'],
-      0,
-      '保證獲利和限時壓迫都是常見警訊。投資前要查證，也要保護帳號和個資。',
-      imageKey
-    ));
-  }
-
-  return pool;
+  return lesson.preset_questions;
 }
 
 function pickQuestions(lesson: LessonData): LessonQuestion[] {
@@ -168,8 +71,10 @@ export default function LessonView() {
   const {
     user,
     completedLessonIds,
+    todayCompletedLessonCount,
     completeLesson,
     fetchCompletedLessonIds,
+    fetchTodayCompletedLessonCount,
     fetchLearningProfile,
   } = useStore();
 
@@ -203,6 +108,7 @@ export default function LessonView() {
 
   const alreadyCompleted = Boolean(lessonId && completedLessonIds.includes(lessonId));
   const shouldShowAlreadyCompleted = alreadyCompleted && phase === 'cards' && answers.length === 0 && !resultData;
+  const dailyLimitReached = !alreadyCompleted && todayCompletedLessonCount >= DAILY_LESSON_LIMIT;
 
   const clearTfTimer = useCallback(() => {
     if (tfTimerRef.current) {
@@ -235,8 +141,9 @@ export default function LessonView() {
   useEffect(() => {
     if (user) {
       void fetchCompletedLessonIds();
+      void fetchTodayCompletedLessonCount();
     }
-  }, [user, fetchCompletedLessonIds]);
+  }, [user, fetchCompletedLessonIds, fetchTodayCompletedLessonCount]);
 
   useEffect(() => {
     if (phase !== 'quiz' || !questions[questionIndex] || questions[questionIndex].question_type !== 'true_false_speed' || revealed) return;
@@ -284,6 +191,21 @@ export default function LessonView() {
           <div className="lesson-results-emoji">?</div>
           <h2 className="lesson-results-title">這堂課已經完成了</h2>
           <div className="lesson-results-score">已領過這關的學習幣，完成過的課程不能重複刷題。</div>
+        </div>
+        <button className="btn-primary lesson-done-btn" onClick={() => navigate('/learn')}>
+          回到學習地圖
+        </button>
+      </div>
+    );
+  }
+
+  if (dailyLimitReached) {
+    return (
+      <div className="lesson-view lesson-results">
+        <div className="lesson-results-hero">
+          <div className="lesson-results-emoji">⏳</div>
+          <h2 className="lesson-results-title">今天先休息一下</h2>
+          <div className="lesson-results-score">每日最多完成 {DAILY_LESSON_LIMIT} 個學習單元，避免一次刷題。明天再繼續下一關。</div>
         </div>
         <button className="btn-primary lesson-done-btn" onClick={() => navigate('/learn')}>
           回到學習地圖
@@ -383,6 +305,9 @@ export default function LessonView() {
       });
       void fetchCompletedLessonIds().catch(err => {
         console.error('fetchCompletedLessonIds failed after completeLesson:', err);
+      });
+      void fetchTodayCompletedLessonCount().catch(err => {
+        console.error('fetchTodayCompletedLessonCount failed after completeLesson:', err);
       });
       setResultData({
         xpEarned: res.xpEarned,

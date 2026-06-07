@@ -34,75 +34,82 @@
   "preset_questions": [
     {
       "question_type": "choice",
-      "question_text": "安全邊際是在提醒我們什麼？",
+      "question_text": "股價是市場報價，價值是公司能力和市場情緒分開看，有什麼好處？",
       "options": [
-        "用較合理的價格買，替錯誤留下空間",
-        "越貴越安全",
-        "不用看公司品質",
-        "只看今天漲跌"
+        "股價是市場報價，價值是公司能力",
+        "記住哪個選項排第一",
+        "只找會立刻上漲的答案",
+        "跳過風險直接下單"
       ],
       "correct_answer": 0,
-      "explanation": "正確。股價與價值 的核心不是背名詞，而是理解它能幫我們做什麼，以及風險在哪裡。"
+      "explanation": "這堂課的核心是：價格會波動，價值要看長期賺錢能力。",
+      "image_key": "lesson_088_quiz_unique"
     },
     {
       "question_type": "choice",
-      "question_text": "學完「股價與價值」後，遇到新的投資選擇，第一步最適合做什麼？",
+      "question_text": "情境：好公司股價短期大跌，你下一步最適合怎麼做？",
       "options": [
-        "比較價值、成長和風險後再決定",
-        "只因股價變便宜就一定買",
-        "只看朋友有沒有買",
-        "把所有零用錢一次投入"
+        "價格會波動，價值要看長期賺錢能力",
+        "不用查資料，先跟著買",
+        "只看朋友或網紅怎麼說",
+        "把全部資金一次投入"
       ],
       "correct_answer": 0,
-      "explanation": "投資前先檢查內容、成本、風險與自己的目標，比衝動買進更重要。"
+      "explanation": "遇到真實情境時，要把課堂觀念變成檢查動作：價格會波動，價值要看長期賺錢能力。",
+      "image_key": "lesson_088_quiz_unique"
     },
     {
       "question_type": "true_false_speed",
-      "question_text": "只要學會「股價與價值」，就能保證每次投資都賺錢。",
+      "question_text": "股價下跌就代表公司價值一定消失。",
       "correct_answer": false,
-      "explanation": "任何投資都不保證獲利。學習的目的，是讓判斷更穩、風險更清楚。"
+      "explanation": "這是常見誤解。比較穩的做法是：價格會波動，價值要看長期賺錢能力。",
+      "image_key": "lesson_088_quiz_unique"
     },
     {
       "question_type": "choice",
-      "question_text": "哪一個行為最符合這堂課的精神？",
+      "question_text": "價格波動時，哪句話最能說明 股價與價值？",
       "options": [
-        "保留安全邊際",
-        "只看一天漲跌",
-        "聽到熱門就立刻買",
-        "完全不用記錄原因"
+        "分清楚市場情緒和公司真實能力",
+        "只要題目答對，投資就一定成功",
+        "看到短線熱門就不用再檢查",
+        "把風險留到買進後再想"
       ],
       "correct_answer": 0,
-      "explanation": "這堂課要練習的是：保留安全邊際。"
+      "explanation": "檢查表要能提醒自己做出具體行動：分清楚市場情緒和公司真實能力。",
+      "image_key": "lesson_088_quiz_unique"
     },
     {
       "question_type": "true_false_speed",
-      "question_text": "答題時只背選項位置就好，因為答案永遠固定。",
-      "correct_answer": false,
-      "explanation": "選項順序會被打亂，也會加入情境題。真正重要的是看懂題目。"
+      "question_text": "價格會波動，價值要看長期賺錢能力。",
+      "correct_answer": true,
+      "explanation": "正確。這句話比背答案位置更重要，因為它能用在新的投資情境。",
+      "image_key": "lesson_088_quiz_unique"
     },
     {
       "question_type": "choice",
-      "question_text": "看圖表時，最可靠的做法是哪一個？",
+      "question_text": "價格圖出現價格線上下跳動但基本面變化小，該分辨哪兩件事？",
       "options": [
-        "先看圖表代表什麼，再搭配課程觀念判斷",
-        "看到線往上就一定買",
-        "看到線往下就永遠不能買",
-        "圖表漂亮就代表沒有風險"
+        "先確認它代表什麼，再和其他資料交叉檢查",
+        "只要圖形好看就代表安全",
+        "忽略時間範圍和資料來源",
+        "直接用單一數字決定買賣"
       ],
       "correct_answer": 0,
-      "explanation": "圖表是輔助工具，要搭配「股價與價值」的概念和風險一起看。"
+      "explanation": "圖表是線索，不是保證；要看懂意思並搭配其他資料。",
+      "image_key": "lesson_088_quiz_unique"
     },
     {
       "question_type": "choice",
-      "question_text": "如果同學對「股價與價值」只記得一件事，最應該記得什麼？",
+      "question_text": "股價大跌時，哪句話能提醒你查價值？",
       "options": [
-        "成長和風險都要一起看",
-        "投資靠運氣就好",
-        "越快下單越厲害",
-        "只要有獎勵就不用理解"
+        "分清楚市場情緒和公司真實能力",
+        "答案選項會固定，所以背位置即可",
+        "只要和上次題目像就不用重想",
+        "先追求速度，不需要慢慢查證"
       ],
       "correct_answer": 0,
-      "explanation": "很棒。成長和風險都要一起看 是這堂課的重要提醒。"
+      "explanation": "這題刻意要求把觀念轉成自己的提醒，避免把學習變成刷題。",
+      "image_key": "lesson_088_quiz_unique"
     }
   ],
   "ai_prompt_context": {

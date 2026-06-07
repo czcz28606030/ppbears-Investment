@@ -34,7 +34,7 @@
   "preset_questions": [
     {
       "question_type": "choice",
-      "question_text": "「通貨膨脹」是什麼意思？",
+      "question_text": "「通貨膨脹」是什麼意思？（提示：了解買股票的目的和好處：讓錢為你工作，對抗通膨）",
       "options": [
         "錢變得越來越多",
         "東西越來越便宜",

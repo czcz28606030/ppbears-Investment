@@ -34,7 +34,7 @@
   "preset_questions": [
     {
       "question_type": "choice",
-      "question_text": "什麼是「從眾心理」？",
+      "question_text": "什麼是「從眾心理」？（提示：認識投資中的「從眾心理」，了解為什麼跟著大家做不一定是對的）",
       "options": [
         "自己做功課後做決定",
         "大家都這樣做，所以我也跟著做",

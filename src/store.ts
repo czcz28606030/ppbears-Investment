@@ -51,6 +51,26 @@ function isMarketOpen(): boolean {
   return minutes >= 9 * 60 && minutes < 13 * 60 + 30;
 }
 
+const DAILY_LESSON_LIMIT = 3;
+
+function getTaipeiDateString(date = new Date()): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Taipei',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date);
+}
+
+function getTaipeiDayRangeIso(date = new Date()): { startIso: string; endIso: string } {
+  const taipeiDate = getTaipeiDateString(date);
+  const startUtcMs = Date.parse(`${taipeiDate}T00:00:00+08:00`);
+  return {
+    startIso: new Date(startUtcMs).toISOString(),
+    endIso: new Date(startUtcMs + 24 * 60 * 60 * 1000).toISOString(),
+  };
+}
+
 // ==========================================
 // 輔助函式
 // ==========================================
@@ -117,9 +137,11 @@ interface InvestmentStore {
   childrenTxLog: WalletTransaction[];
   rewardRules: RewardRule[];
   completedLessonIds: string[];
+  todayCompletedLessonCount: number;
   fetchLearningProfile: () => Promise<void>;
   fetchLearningWallet: () => Promise<void>;
   fetchCompletedLessonIds: () => Promise<void>;
+  fetchTodayCompletedLessonCount: () => Promise<number>;
   fetchWalletTransactions: () => Promise<void>;
   fetchChildrenTransactions: () => Promise<void>;
   completeLesson: (lessonId: string, result: LessonResult) => Promise<{ error: string | null; xpEarned: number; coinsEarned: number; levelUp: boolean; newStreak: number }>;
@@ -360,6 +382,7 @@ export const useStore = create<InvestmentStore>((set, get) => ({
   learningWalletTxs: [],
   childrenTxLog: [],
   completedLessonIds: [],
+  todayCompletedLessonCount: 0,
   rewardRules: [],
   shopItems: [],
   redemptions: [],
@@ -514,7 +537,12 @@ export const useStore = create<InvestmentStore>((set, get) => ({
       return { error: 'lesson already completed', xpEarned: 0, coinsEarned: 0, levelUp: false, newStreak: learningProfile.streakDays };
     }
 
-    const today = new Date().toISOString().split('T')[0];
+    const todayCount = await get().fetchTodayCompletedLessonCount();
+    if (todayCount >= DAILY_LESSON_LIMIT) {
+      return { error: 'daily lesson limit reached', xpEarned: 0, coinsEarned: 0, levelUp: false, newStreak: learningProfile.streakDays };
+    }
+
+    const today = getTaipeiDateString();
     const isFirstTodayLesson = learningProfile.lastLearnDate !== today;
 
     // XP：答題得分 + 首次每日 +20
@@ -619,6 +647,7 @@ export const useStore = create<InvestmentStore>((set, get) => ({
 
     set({
       completedLessonIds: newCompletedIds,
+      todayCompletedLessonCount: Math.min(DAILY_LESSON_LIMIT, get().todayCompletedLessonCount + 1),
       learningProfile: {
         ...learningProfile,
         totalXp: newTotalXp,
@@ -717,6 +746,26 @@ export const useStore = create<InvestmentStore>((set, get) => ({
     }
 
     return { error: coinGrantError, xpEarned, coinsEarned, levelUp, newStreak };
+  },
+
+  fetchTodayCompletedLessonCount: async () => {
+    if (!supabase) return 0;
+    const { user } = get();
+    if (!user) return 0;
+    const { startIso, endIso } = getTaipeiDayRangeIso();
+    const res = await withTimeout(
+      supabase
+        .from('lesson_progress')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .gte('completed_at', startIso)
+        .lt('completed_at', endIso),
+      10000,
+      { count: get().todayCompletedLessonCount, error: null } as any
+    );
+    const count = Number(res.count ?? 0);
+    set({ todayCompletedLessonCount: count });
+    return count;
   },
 
 
@@ -1218,7 +1267,7 @@ export const useStore = create<InvestmentStore>((set, get) => ({
 
   logout: async () => {
     // 先立即清除本地狀態（UI 立即回應），signOut 網路請求在背景執行不阻塞
-    set({ user: null, session: null, children: [], holdings: [], trades: [], dividendPayments: [], withdrawalRequests: [], featureOverrides: [], allUsers: [], learningProfile: null, learningWallet: null, learningWalletTxs: [], childrenTxLog: [], completedLessonIds: [], rewardRules: [], shopItems: [], redemptions: [], watchlist: [], watchlistSignals: [], watchlistWarnings: [] });
+    set({ user: null, session: null, children: [], holdings: [], trades: [], dividendPayments: [], withdrawalRequests: [], featureOverrides: [], allUsers: [], learningProfile: null, learningWallet: null, learningWalletTxs: [], childrenTxLog: [], completedLessonIds: [], todayCompletedLessonCount: 0, rewardRules: [], shopItems: [], redemptions: [], watchlist: [], watchlistSignals: [], watchlistWarnings: [] });
     if (supabase) supabase.auth.signOut().catch(() => {}); // 背景執行，失敗不影響 UI
     if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; }
   },

@@ -34,7 +34,7 @@
   "preset_questions": [
     {
       "question_type": "choice",
-      "question_text": "「損失趨避」是什麼意思？",
+      "question_text": "「損失趨避」是什麼意思？（提示：認識損失趨避效應，了解為什麼人們害怕虧損的感覺比賺錢的快樂更強烈）",
       "options": [
         "人們喜歡冒險",
         "人們害怕虧損的感覺比賺錢的快樂更強烈",

@@ -34,75 +34,82 @@
   "preset_questions": [
     {
       "question_type": "choice",
-      "question_text": "交易規則最重要的目的？",
+      "question_text": "下單前分清市價單快、限價單能控價，可以避免哪種成交誤會？",
       "options": [
-        "避免情緒亂買亂賣",
-        "保證每次交易都賺錢",
-        "讓自己每天都必須下單",
-        "不用管風險"
+        "市價單快、限價單能控價",
+        "記住哪個選項排第一",
+        "只找會立刻上漲的答案",
+        "跳過風險直接下單"
       ],
       "correct_answer": 0,
-      "explanation": "正確。市價單與限價單 的核心不是背名詞，而是理解它能幫我們做什麼，以及風險在哪裡。"
+      "explanation": "這堂課的核心是：市價單重速度，限價單重價格界線。",
+      "image_key": "lesson_073_quiz_unique"
     },
     {
       "question_type": "choice",
-      "question_text": "學完「市價單與限價單」後，遇到新的投資選擇，第一步最適合做什麼？",
+      "question_text": "情境：想買進但價格跳動很快，你下一步最適合怎麼做？",
       "options": [
-        "依照規則小心下單並控制風險",
-        "看到價格跳動就衝動買賣",
-        "只看朋友有沒有買",
-        "把所有零用錢一次投入"
+        "市價單重速度，限價單重價格界線",
+        "不用查資料，先跟著買",
+        "只看朋友或網紅怎麼說",
+        "把全部資金一次投入"
       ],
       "correct_answer": 0,
-      "explanation": "投資前先檢查內容、成本、風險與自己的目標，比衝動買進更重要。"
+      "explanation": "遇到真實情境時，要把課堂觀念變成檢查動作：市價單重速度，限價單重價格界線。",
+      "image_key": "lesson_073_quiz_unique"
     },
     {
       "question_type": "true_false_speed",
-      "question_text": "只要學會「市價單與限價單」，就能保證每次投資都賺錢。",
+      "question_text": "以為市價單一定成交在自己想要的價格。",
       "correct_answer": false,
-      "explanation": "任何投資都不保證獲利。學習的目的，是讓判斷更穩、風險更清楚。"
+      "explanation": "這是常見誤解。比較穩的做法是：市價單重速度，限價單重價格界線。",
+      "image_key": "lesson_073_quiz_unique"
     },
     {
       "question_type": "choice",
-      "question_text": "哪一個行為最符合這堂課的精神？",
+      "question_text": "填下單檢查表時，哪句話能避免誤用 市價單與限價單？",
       "options": [
-        "看價格也要看成交量",
-        "只看一天漲跌",
-        "聽到熱門就立刻買",
-        "完全不用記錄原因"
+        "下單前先選速度優先或價格優先",
+        "只要題目答對，投資就一定成功",
+        "看到短線熱門就不用再檢查",
+        "把風險留到買進後再想"
       ],
       "correct_answer": 0,
-      "explanation": "這堂課要練習的是：看價格也要看成交量。"
+      "explanation": "檢查表要能提醒自己做出具體行動：下單前先選速度優先或價格優先。",
+      "image_key": "lesson_073_quiz_unique"
     },
     {
       "question_type": "true_false_speed",
-      "question_text": "答題時只背選項位置就好，因為答案永遠固定。",
-      "correct_answer": false,
-      "explanation": "選項順序會被打亂，也會加入情境題。真正重要的是看懂題目。"
+      "question_text": "市價單重速度，限價單重價格界線。",
+      "correct_answer": true,
+      "explanation": "正確。這句話比背答案位置更重要，因為它能用在新的投資情境。",
+      "image_key": "lesson_073_quiz_unique"
     },
     {
       "question_type": "choice",
-      "question_text": "看圖表時，最可靠的做法是哪一個？",
+      "question_text": "委託紀錄出現委託價格和成交價格不同，代表哪種下單差異？",
       "options": [
-        "先看圖表代表什麼，再搭配課程觀念判斷",
-        "看到線往上就一定買",
-        "看到線往下就永遠不能買",
-        "圖表漂亮就代表沒有風險"
+        "先確認它代表什麼，再和其他資料交叉檢查",
+        "只要圖形好看就代表安全",
+        "忽略時間範圍和資料來源",
+        "直接用單一數字決定買賣"
       ],
       "correct_answer": 0,
-      "explanation": "圖表是輔助工具，要搭配「市價單與限價單」的概念和風險一起看。"
+      "explanation": "圖表是線索，不是保證；要看懂意思並搭配其他資料。",
+      "image_key": "lesson_073_quiz_unique"
     },
     {
       "question_type": "choice",
-      "question_text": "如果同學對「市價單與限價單」只記得一件事，最應該記得什麼？",
+      "question_text": "按下買進鍵前，哪句話可以避免成交誤會？",
       "options": [
-        "用紀錄修正自己的判斷",
-        "投資靠運氣就好",
-        "越快下單越厲害",
-        "只要有獎勵就不用理解"
+        "下單前先選速度優先或價格優先",
+        "答案選項會固定，所以背位置即可",
+        "只要和上次題目像就不用重想",
+        "先追求速度，不需要慢慢查證"
       ],
       "correct_answer": 0,
-      "explanation": "很棒。用紀錄修正自己的判斷 是這堂課的重要提醒。"
+      "explanation": "這題刻意要求把觀念轉成自己的提醒，避免把學習變成刷題。",
+      "image_key": "lesson_073_quiz_unique"
     }
   ],
   "ai_prompt_context": {

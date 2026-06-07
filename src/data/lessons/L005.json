@@ -64,7 +64,7 @@
     },
     {
       "question_type": "choice",
-      "question_text": "「消費」是指什麼？",
+      "question_text": "「消費」是指什麼？（提示：認識錢的三個用途：消費、儲蓄、投資，為後續學習打地基）",
       "options": [
         "把錢存到銀行",
         "用錢買東西或服務",

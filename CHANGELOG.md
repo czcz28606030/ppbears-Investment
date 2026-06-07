@@ -1,9 +1,22 @@
 # 📦 PPBears Investment — 更新日誌
 
-> **目前版本：v1.24.76**（2026-06-07）
-> 最新更新：修正學習商城現金類兌換核可後未自動入帳，並補回既有漏帳紀錄。
+> **目前版本：v1.24.77**（2026-06-07）
+> 最新更新：重整學習題庫，移除重複與模板化題目，並限制每日最多完成 3 個學習單元。
 
 ---
+
+## [v1.24.77] - 2026-06-07
+### Added
+- Added a `LEARNING_QUESTIONS_AUDIT.md` review file listing all 100 learning lessons and 721 questions with answer keys for manual inspection.
+- Added a Taiwan-time daily learning limit so users can complete at most 3 new learning units per day.
+- Added Learning map and Lesson View lock states that show when the daily 3-unit limit has been reached, including direct lesson URL protection.
+
+### Changed
+- Reworked Learning quiz selection so lessons use their own lesson-specific preset question pool instead of shared dynamic template questions.
+- Rewrote duplicated and highly similar Learning questions across the lesson catalog, especially lessons L061-L100, and cleaned older template-style definition questions.
+
+### Fixed
+- Removed exact duplicate Learning quiz prompts and template-equivalent prompts; the full 100-lesson audit now reports 0 exact duplicate groups and 0 normalized template duplicate groups.
 
 ## [v1.24.76] - 2026-06-07
 ### Fixed

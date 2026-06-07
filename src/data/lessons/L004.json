@@ -34,7 +34,7 @@
   "preset_questions": [
     {
       "question_type": "choice",
-      "question_text": "「記帳」是什麼意思？",
+      "question_text": "把飲料、文具花費寫下來，這個動作叫做什麼？",
       "options": [
         "把錢藏起來",
         "把花了多少錢記下來",
@@ -52,7 +52,7 @@
     },
     {
       "question_type": "choice",
-      "question_text": "什麼是「預算」？",
+      "question_text": "什麼是「預算」？（提示：學會管理零用錢，認識記帳和預算的基本觀念）",
       "options": [
         "把錢全部花光",
         "提前計畫好錢要怎麼花",
@@ -82,7 +82,7 @@
     },
     {
       "question_type": "choice",
-      "question_text": "「預算」是什麼意思？",
+      "question_text": "每週 100 元先分成存錢、花用、備用，這種事先安排叫做什麼？",
       "options": [
         "預測天氣",
         "計畫錢要怎麼花",

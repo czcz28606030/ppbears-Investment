@@ -531,6 +531,13 @@ button.learn-top-chip {
   opacity: 0.82;
 }
 
+.learn-lesson-daily_locked {
+  background:
+    radial-gradient(circle at 28% 24%, rgba(255, 255, 255, 0.7) 0 6px, transparent 7px),
+    linear-gradient(180deg, #e9f3f8 0%, #bad1dc 54%, #8aa8b6 100%);
+  opacity: 0.9;
+}
+
 .learn-node-number {
   position: relative;
   z-index: 1;
@@ -600,7 +607,8 @@ button.learn-top-chip {
 .learn-scene-section .learn-lesson-node,
 .learn-scene-section .learn-lesson-done,
 .learn-scene-section .learn-lesson-current,
-.learn-scene-section .learn-lesson-locked {
+.learn-scene-section .learn-lesson-locked,
+.learn-scene-section .learn-lesson-daily_locked {
   width: 168px;
   height: 126px;
   border: 0;
@@ -723,6 +731,14 @@ button.learn-top-chip {
   text-shadow: 0 1px 0 rgba(28, 112, 52, 0.28);
 }
 
+.learn-scene-section .learn-lesson-daily_locked .learn-node-number {
+  background: #f4f8fb;
+  box-shadow:
+    inset 0 -8px 0 rgba(60, 86, 104, 0.1),
+    0 8px 18px rgba(54, 73, 82, 0.2);
+  opacity: 0.92;
+}
+
 @keyframes learnNodePulse {
   0%,
   100% {
@@ -811,6 +827,11 @@ button.learn-top-chip {
 .learn-modal-badge-locked {
   color: #59636c;
   background: #eef1f3;
+}
+
+.learn-modal-badge-daily_locked {
+  color: #31536c;
+  background: #e1f0f8;
 }
 
 .learn-modal-kicker {

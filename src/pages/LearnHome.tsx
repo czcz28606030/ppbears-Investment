@@ -5,6 +5,7 @@ import { getAllLessonIds, getLesson } from '../data/lessons';
 import './LearnHome.css';
 
 const XP_PER_LEVEL = 100;
+const DAILY_LESSON_LIMIT = 3;
 const CALIBRATION_STORAGE_KEY = 'ppbears.learn.mapPositions.v2';
 
 const STAGES = [
@@ -177,7 +178,7 @@ function defaultPositionsForScene(sceneId: string): NodePosition[] {
   return SCENE_NODE_POSITIONS[sceneId] ? ZIGZAG_NODE_POSITIONS : ZIGZAG_NODE_POSITIONS;
 }
 
-type LessonNodeStatus = 'done' | 'current' | 'locked';
+type LessonNodeStatus = 'done' | 'current' | 'locked' | 'daily_locked';
 
 interface LessonNode {
   id: string;
@@ -202,6 +203,7 @@ function compactText(value: string | undefined, fallback: string) {
 function statusLabel(status: LessonNodeStatus) {
   if (status === 'done') return '已完成';
   if (status === 'current') return '下一關';
+  if (status === 'daily_locked') return '今日上限';
   return '尚未解鎖';
 }
 
@@ -235,9 +237,11 @@ export default function LearnHome() {
     learningProfile,
     learningWallet,
     completedLessonIds,
+    todayCompletedLessonCount,
     fetchLearningProfile,
     fetchLearningWallet,
     fetchCompletedLessonIds,
+    fetchTodayCompletedLessonCount,
   } = useStore();
 
   useEffect(() => {
@@ -245,7 +249,8 @@ export default function LearnHome() {
     if (!learningProfile) fetchLearningProfile();
     if (!learningWallet) fetchLearningWallet();
     fetchCompletedLessonIds();
-  }, [user, learningProfile, learningWallet, fetchLearningProfile, fetchLearningWallet, fetchCompletedLessonIds]);
+    fetchTodayCompletedLessonCount();
+  }, [user, learningProfile, learningWallet, fetchLearningProfile, fetchLearningWallet, fetchCompletedLessonIds, fetchTodayCompletedLessonCount]);
 
   useEffect(() => {
     try {
@@ -261,6 +266,7 @@ export default function LearnHome() {
   const lessonNodes = useMemo<LessonNode[]>(() => {
     const lessonIds = getAllLessonIds();
     const nextIndex = lessonIds.findIndex(id => !completedLessonIds.includes(id));
+    const dailyLimitReached = todayCompletedLessonCount >= DAILY_LESSON_LIMIT;
 
     return lessonIds.map((id, index) => {
       const lesson = getLesson(id);
@@ -268,7 +274,9 @@ export default function LearnHome() {
       const status: LessonNodeStatus = completedLessonIds.includes(id)
         ? 'done'
         : index === (nextIndex === -1 ? lessonIds.length - 1 : nextIndex)
-          ? 'current'
+          ? dailyLimitReached
+            ? 'daily_locked'
+            : 'current'
           : 'locked';
 
       return {
@@ -282,7 +290,7 @@ export default function LearnHome() {
         side: index % 2 === 0 ? 'left' : 'right',
       };
     });
-  }, [completedLessonIds]);
+  }, [completedLessonIds, todayCompletedLessonCount]);
 
   const allLessonsCompleted = lessonNodes.length > 0 && completedLessonIds.length >= lessonNodes.length;
   const currentNode = lessonNodes.find(node => node.status === 'current') ?? lessonNodes[lessonNodes.length - 1];
@@ -291,6 +299,7 @@ export default function LearnHome() {
   const totalLessons = lessonNodes.length;
   const xpInLevel = (learningProfile?.totalXp ?? 0) % XP_PER_LEVEL;
   const xpPct = Math.min(100, (xpInLevel / XP_PER_LEVEL) * 100);
+  const lessonsLeftToday = Math.max(0, DAILY_LESSON_LIMIT - todayCompletedLessonCount);
 
   const sceneSections = useMemo(() => {
     return SCENES.map(scene => ({
@@ -394,6 +403,10 @@ export default function LearnHome() {
           <span>答對</span>
           <b>{learningProfile?.totalQuestionsCorrect ?? 0} 題</b>
         </button>
+        <button className="learn-top-chip" type="button" onClick={() => navigate('/learn')}>
+          <span>今日</span>
+          <b>{Math.min(todayCompletedLessonCount, DAILY_LESSON_LIMIT)} / {DAILY_LESSON_LIMIT} 關</b>
+        </button>
         <span className="learn-top-chip learn-role-chip">
           <span>身分</span>
           <b>{user?.role === 'parent' ? '家長' : '孩子'}</b>
@@ -404,7 +417,7 @@ export default function LearnHome() {
         <div className="learn-hero-copy">
           <div className="learn-kicker">Stage {currentStage.id} / {currentStage.ageHint}</div>
           <h1>{allLessonsCompleted ? '100 關全部完成' : currentStage.name}</h1>
-          <p>{allLessonsCompleted ? '你已經完成全部課程，可以複習文章或兌換獎勵。' : currentStage.theme}</p>
+          <p>{allLessonsCompleted ? '你已經完成全部課程，可以複習文章或兌換獎勵。' : lessonsLeftToday > 0 ? currentStage.theme : '今天 3 個學習單元已完成，明天再解鎖下一關。'}</p>
         </div>
         <div className="learn-hero-actions">
           {!allLessonsCompleted && currentNode && (
@@ -545,6 +558,9 @@ export default function LearnHome() {
             <p>{selectedNode.summary}</p>
             {selectedNode.status === 'locked' && (
               <div className="learn-modal-hint">請先完成前面的關卡，才能解鎖這一關。</div>
+            )}
+            {selectedNode.status === 'daily_locked' && (
+              <div className="learn-modal-hint">今天已完成 {DAILY_LESSON_LIMIT} 個單元，為了避免一次刷題，請明天再繼續。</div>
             )}
             {selectedNode.status === 'done' && (
               <div className="learn-modal-hint">這關已完成，不能重複刷題領學習幣。</div>
