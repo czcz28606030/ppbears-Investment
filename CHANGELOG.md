@@ -1,9 +1,14 @@
 # 📦 PPBears Investment — 更新日誌
 
-> **目前版本：v1.24.78**（2026-06-08）
-> 最新更新：個股技術線圖資料短暫載入失敗時保留卡片，並提供重新讀取線圖入口。
+> **目前版本：v1.24.79**（2026-06-08）
+> 最新更新：庫存卡片股數超過 1,000 股改用張數顯示，並重排手機版持股卡片避免名稱被覆蓋。
 
 ---
+
+## [v1.24.79] - 2026-06-08
+### Fixed
+- Changed Portfolio holding quantities of 1,000 shares or more to display in lots (`張`) so large positions stay readable.
+- Reworked Portfolio holding card layout on mobile so quantity and cost move below the stock identity area instead of overlapping stock names.
 
 ## [v1.24.78] - 2026-06-08
 ### Fixed

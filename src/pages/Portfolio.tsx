@@ -148,6 +148,19 @@ function formatTodayDate(): string {
   return getTodayString().replace(/-/g, '/');
 }
 
+function formatHoldingShares(shares: number): string {
+  if (!Number.isFinite(shares)) return '-- 股';
+  if (Math.abs(shares) >= 1000) {
+    const lots = shares / 1000;
+    const formattedLots = lots.toLocaleString('zh-TW', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: lots >= 100 ? 0 : 2,
+    });
+    return `${formattedLots} 張`;
+  }
+  return `${shares.toLocaleString('zh-TW')} 股`;
+}
+
 function getFixedUpdateLabel(): string {
   return '08:00 自動檢查；可手動重新抓取';
 }
@@ -920,7 +933,7 @@ export default function Portfolio() {
                       </div>
                     </div>
                     <div className="holding-center">
-                      <div className="holding-shares">{h.totalShares} 股</div>
+                      <div className="holding-shares">{formatHoldingShares(h.totalShares)}</div>
                       <div className="holding-avg">成本 {formatPrice(h.avgCost)}</div>
                     </div>
                     <div className="holding-right">

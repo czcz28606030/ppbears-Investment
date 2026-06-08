@@ -443,7 +443,8 @@
 }
 
 .holding-main-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 12px;
 }
@@ -626,6 +627,8 @@
   font-size: 19px;
   line-height: 1.18;
   color: #111111;
+  min-width: 0;
+  max-width: 100%;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -932,7 +935,33 @@ button.holding-quant-chip:hover {
   }
 
   .holding-main-row {
-    gap: 10px;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "identity value"
+      "shares shares";
+    align-items: start;
+    column-gap: 10px;
+    row-gap: 8px;
+  }
+
+  .holding-left {
+    grid-area: identity;
+  }
+
+  .holding-center {
+    grid-area: shares;
+    display: flex;
+    align-items: baseline;
+    justify-content: flex-start;
+    gap: 8px;
+    min-width: 0;
+    padding-left: 92px;
+    text-align: left;
+  }
+
+  .holding-right {
+    grid-area: value;
+    min-width: 88px;
   }
 
   .signal-badge {
@@ -983,15 +1012,51 @@ button.holding-quant-chip:hover {
 
 }
 
+@media (max-width: 420px) {
+  .holding-main-row {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "identity"
+      "value"
+      "shares";
+  }
+
+  .holding-right {
+    justify-self: stretch;
+    display: flex;
+    align-items: baseline;
+    justify-content: flex-start;
+    gap: 8px;
+    min-width: 0;
+    padding-left: 92px;
+    text-align: left;
+  }
+
+  .holding-center {
+    padding-left: 92px;
+  }
+
+  .holding-current {
+    font-size: 16px;
+  }
+
+  .holding-pl,
+  .holding-pl-pct {
+    font-size: 12px;
+  }
+}
+
 .holding-center {
-  flex-shrink: 0;
   text-align: center;
+  min-width: 72px;
 }
 
 .holding-shares {
   font-size: 18px;
   font-weight: 900;
   line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .holding-avg {
@@ -1001,9 +1066,8 @@ button.holding-quant-chip:hover {
 }
 
 .holding-right {
-  flex-shrink: 0;
   text-align: right;
-  margin-left: auto;
+  min-width: 96px;
 }
 
 .holding-current {
@@ -1020,6 +1084,32 @@ button.holding-quant-chip:hover {
 .holding-pl-pct {
   font-size: 13px;
   font-weight: 800;
+}
+
+@media (max-width: 640px) {
+  .holding-center {
+    min-width: 0;
+    text-align: left;
+  }
+
+  .holding-right {
+    min-width: 88px;
+  }
+}
+
+@media (max-width: 420px) {
+  .holding-right {
+    min-width: 0;
+  }
+
+  .holding-current {
+    font-size: 16px;
+  }
+
+  .holding-pl,
+  .holding-pl-pct {
+    font-size: 12px;
+  }
 }
 
 /* Trade History */
