@@ -16,6 +16,7 @@ type PortfolioAiSignal = {
   primaryType: 'buy' | 'sell' | 'neutral';
   primaryIcon: string;
   streakCount?: number;
+  aiRemark?: string;
   cumRet?: string;
   chipPts?: number;
 };
@@ -56,6 +57,15 @@ function getCumRetClass(cumRet?: string): string {
   return value >= 0 ? 'holding-quant-chip-ret-pos' : 'holding-quant-chip-ret-neg';
 }
 
+function getAiRemarkClass(remark?: string): string {
+  if (!remark) return '';
+  if (remark.includes('超高度')) return 'holding-quant-chip-ai-ultra';
+  if (remark.includes('高度')) return 'holding-quant-chip-ai-high';
+  if (remark.includes('中度')) return 'holding-quant-chip-ai-mid';
+  if (remark.includes('低度')) return 'holding-quant-chip-ai-low';
+  return '';
+}
+
 function formatCumRet(cumRet?: string): string {
   if (!cumRet) return '--';
   return cumRet.startsWith('-') ? cumRet : `+${cumRet}`;
@@ -81,7 +91,7 @@ type FinMindPriceRow = {
 };
 
 const PORTFOLIO_SIGNAL_TTL_MS = 18 * 60 * 60 * 1000;
-const PORTFOLIO_PERSISTENT_CACHE_KEY = 'ppbears_portfolio_signals_v6';
+const PORTFOLIO_PERSISTENT_CACHE_KEY = 'ppbears_portfolio_signals_v7';
 const DAILY_AI_CACHE_POLL_MS = 90 * 1000;
 const DATA_REFRESH_SCHEDULE = [
   { label: '08:00', minutes: 8 * 60 },
@@ -383,15 +393,26 @@ export default function Portfolio() {
 
   function renderMemberQuantChips(signal?: PortfolioAiSignal) {
     if (!signal) return null;
+    const hasAiRemark = Boolean(signal.aiRemark);
     const hasCumRet = Boolean(signal.cumRet);
     const hasChipPts = signal.chipPts !== undefined && Number.isFinite(signal.chipPts);
-    if (!hasCumRet && !hasChipPts) return null;
+    if (!hasAiRemark && !hasCumRet && !hasChipPts) return null;
 
     return (
       <>
-        <span className={`holding-quant-chip holding-quant-chip-ret ${getCumRetClass(signal.cumRet)}`}>
-          📊 累積報酬 {formatCumRet(signal.cumRet)}
-        </span>
+        {hasAiRemark && (
+          <span
+            className={`holding-quant-chip holding-quant-chip-ai ${getAiRemarkClass(signal.aiRemark)}`}
+            title="目前 Simons 量化模型的 AI 推薦等級，用來輔助判斷是否值得研究加碼"
+          >
+            🤖 AI推薦 {signal.aiRemark}
+          </span>
+        )}
+        {hasCumRet && (
+          <span className={`holding-quant-chip holding-quant-chip-ret ${getCumRetClass(signal.cumRet)}`}>
+            📊 累積報酬 {formatCumRet(signal.cumRet)}
+          </span>
+        )}
         {hasChipPts && (
           <span className={`holding-quant-chip holding-quant-chip-pts ${getChipClass(signal.chipPts)}`}>
             🔒 籌碼 {signal.chipPts!.toFixed(0)}分 {getChipLabel(signal.chipPts)}
@@ -610,6 +631,7 @@ export default function Portfolio() {
               primaryType,
               primaryIcon,
               streakCount,
+              aiRemark: displayQuantData?.aiQuanBackDataComment?.remark,
               cumRet: displayQuantData?.aiQuanBackDataComment?.cum_ret || fallbackCumRet,
               chipPts: Number.isFinite(chipPts) ? chipPts : undefined,
             };

@@ -105,5 +105,5 @@ export const CACHE_KEYS = {
   QUANT_DATA:      (code: string) => `quant_${code}`,
   WATCHLIST_QUOTES:'watchlist_quotes',
   WATCHLIST_FULL:  'watchlist_full',      // quotes + quant + simons
-  PORTFOLIO_SIGNALS: 'portfolio_signals_v6',
+  PORTFOLIO_SIGNALS: 'portfolio_signals_v7',
 } as const;

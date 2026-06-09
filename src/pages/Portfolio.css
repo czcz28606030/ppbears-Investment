@@ -689,6 +689,34 @@ button.holding-quant-chip:hover {
   color: #be123c;
 }
 
+.holding-quant-chip-ai {
+  min-width: 118px;
+}
+
+.holding-quant-chip-ai-ultra {
+  background: #fdf2f8;
+  border-color: rgba(219, 39, 119, 0.22);
+  color: #be185d;
+}
+
+.holding-quant-chip-ai-high {
+  background: #fff7ed;
+  border-color: rgba(249, 115, 22, 0.24);
+  color: #c2410c;
+}
+
+.holding-quant-chip-ai-mid {
+  background: #ecfeff;
+  border-color: rgba(6, 182, 212, 0.24);
+  color: #0e7490;
+}
+
+.holding-quant-chip-ai-low {
+  background: #f8fafc;
+  border-color: rgba(100, 116, 139, 0.22);
+  color: #475569;
+}
+
 .holding-quant-chip-pts-high {
   background: #eff6ff;
   border-color: rgba(59, 130, 246, 0.22);

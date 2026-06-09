@@ -1,9 +1,14 @@
 # 📦 PPBears Investment — 更新日誌
 
-> **目前版本：v1.24.79**（2026-06-08）
-> 最新更新：庫存卡片股數超過 1,000 股改用張數顯示，並重排手機版持股卡片避免名稱被覆蓋。
+> **目前版本：v1.24.80**（2026-06-09）
+> 最新更新：庫存中的持股小卡新增 AI推薦等級指標，輔助判斷是否值得研究加碼。
 
 ---
+
+## [v1.24.80] - 2026-06-09
+### Added
+- Added the current AI recommendation level to Portfolio holding cards so users can compare add-timing, ETF support, cumulative return, chip stability, and AI recommendation strength in the same compact card row.
+- Styled Portfolio AI recommendation chips by level (`超高度`, `高度`, `中度`, `低度`) and bumped the portfolio signal cache key so old cached cards refresh with the new indicator.
 
 ## [v1.24.79] - 2026-06-08
 ### Fixed
