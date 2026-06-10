@@ -1,9 +1,14 @@
 # 📦 PPBears Investment — 更新日誌
 
-> **目前版本：v1.24.80**（2026-06-09）
-> 最新更新：庫存中的持股小卡新增 AI推薦等級指標，輔助判斷是否值得研究加碼。
+> **目前版本：v1.24.81**（2026-06-10）
+> 最新更新：全部賣出持股後會自動回到觀察名單，等待下一波 AI 訊號。
 
 ---
+
+## [v1.24.81] - 2026-06-10
+### Added
+- Added automatic Watchlist return after a holding is fully sold, treating the completed position as the end of one swing while keeping the stock on radar for the next AI entry signal.
+- Added the Watchlist note `已結束持倉，等待下一波訊號` for auto-returned stocks so the source remains visible without changing the AI recommendation state.
 
 ## [v1.24.80] - 2026-06-09
 ### Added

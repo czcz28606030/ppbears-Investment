@@ -1851,10 +1851,22 @@ export const useStore = create<InvestmentStore>((set, get) => ({
         holdings: newHoldings,
       });
 
+      let watchlistReturnMessage = '';
+      if (remaining <= 0) {
+        const autoWatchNote = '已結束持倉，等待下一波訊號';
+        const result = await get().addToWatchlist(stockCode, holding.stockName, price, autoWatchNote);
+        if (!result.error || result.error.includes('已在觀察名單')) {
+          watchlistReturnMessage = '\n已自動放回觀察名單，等待下一波 AI 訊號。';
+        } else {
+          console.warn('auto add watchlist after full sell failed:', result.error);
+          watchlistReturnMessage = '\n賣出已完成，但自動放回觀察名單失敗，稍後可手動加入。';
+        }
+      }
+
       const emoji = profit >= 0 ? '📈' : '📉';
       return {
         success: true,
-        message: `成功賣出 ${holding.stockName} ${quantity} 股 ${emoji}\n${profit >= 0 ? '賺了' : '虧了'} NT$${Math.abs(profit).toFixed(0)}`,
+        message: `成功賣出 ${holding.stockName} ${quantity} 股 ${emoji}\n${profit >= 0 ? '賺了' : '虧了'} NT$${Math.abs(profit).toFixed(0)}${watchlistReturnMessage}`,
       };
     } catch (err) {
       console.error('executeSell error:', err);
