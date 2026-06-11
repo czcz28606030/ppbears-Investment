@@ -1,9 +1,15 @@
 # 📦 PPBears Investment — 更新日誌
 
-> **目前版本：v1.24.81**（2026-06-10）
-> 最新更新：全部賣出持股後會自動回到觀察名單，等待下一波 AI 訊號。
+> **目前版本：v1.24.82**（2026-06-11）
+> 最新更新：找股票、觀察、庫存卡片加入小型產業類別圖示，讓不同產業用顏色與符號快速辨識。
 
 ---
+
+## [v1.24.82] - 2026-06-11
+### Added
+- Added compact industry category icons to Explore recommendation cards, Watchlist cards, and Portfolio holding cards.
+- Added a shared `IndustryIcon` component with distinct colors and glyphs for common industry groups such as semiconductor, electronics, finance, shipping, machinery, steel, construction, food, medical, biotech, tourism, retail, energy, telecom, and auto.
+- Moved API helper modules and the one-off backtest init script out of the Vercel function scan path so production deploys stay within the Hobby plan's 12-function limit.
 
 ## [v1.24.81] - 2026-06-10
 ### Added

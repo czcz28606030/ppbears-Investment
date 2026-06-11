@@ -8,8 +8,8 @@ import {
   isSimonsDataReadyForDate,
   loadTodayCache,
   saveTodayCache,
-} from './_newsletter-utils.js';
-import handleInstitutionCost from './_institution-cost.js';
+} from '../src/server/newsletter-utils.js';
+import handleInstitutionCost from '../src/server/institution-cost.js';
 
 const IFALGO_BASE = 'https://api.ifalgo.com.tw/frontapi';
 const TAIPEI_OFFSET_MS = 8 * 60 * 60 * 1000;

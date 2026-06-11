@@ -8,10 +8,10 @@
  *  4. 將所有數據寫入 Supabase
  *
  * 使用方式：
- *  node api/backtest-init.mjs
- *  node api/backtest-init.mjs --signals-only
- *  node api/backtest-init.mjs --prices-only
- *  node api/backtest-init.mjs --simons-only
+ *  node scripts/backtest-init.mjs
+ *  node scripts/backtest-init.mjs --signals-only
+ *  node scripts/backtest-init.mjs --prices-only
+ *  node scripts/backtest-init.mjs --simons-only
  *
  * 注意：首次執行約需 30~60 分鐘（需對每支股票呼叫 API）
  */

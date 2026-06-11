@@ -6,6 +6,7 @@ import { fetchOfficialPriceMap, fetchStockQuantData, fetchStockTradingSignals, f
 import type { ActiveEtfRadarItem, OfficialPriceMapEntry, StockQuantData, StockQuantMeta } from '../api';
 import { getCache, setCache, clearCache, getPersistentCache, setPersistentCache, clearPersistentCache, CACHE_KEYS } from '../cache';
 import MarketBadge from '../components/MarketBadge';
+import IndustryIcon from '../components/IndustryIcon';
 import { canAutoRefreshPrices, PRICE_AUTO_REFRESH_MS } from '../utils/priceAutoRefresh';
 import { getIndustryTailwind, getIndustryTailwindScore } from '../utils/industryTailwinds';
 import { calculateAddPriority } from '../utils/addPriority';
@@ -938,6 +939,7 @@ export default function Portfolio() {
                       )}
                       <div className="holding-info">
                         <div className="holding-name-line">
+                          <IndustryIcon industry={h.industry} compact />
                           <span className="holding-name">{h.stockName}</span>
                           <MarketBadge market={marketMap[h.stockCode]?.market} compact />
                         </div>

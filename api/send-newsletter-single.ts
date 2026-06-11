@@ -22,7 +22,7 @@ import {
   getNewsletterCacheDateTW,
   type FilteredStock,
   type SimonsItem,
-} from './_newsletter-utils.js';
+} from '../src/server/newsletter-utils.js';
 
 export const config = {
   maxDuration: 60,

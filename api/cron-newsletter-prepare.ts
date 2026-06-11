@@ -16,7 +16,7 @@ import {
   generateStocksAnalysis,
   saveTodayCache,
   getNewsletterCacheDateTW,
-} from './_newsletter-utils.js';
+} from '../src/server/newsletter-utils.js';
 
 export const config = {
   maxDuration: 60,

@@ -7,6 +7,7 @@ import { useStore } from '../store';
 import { getCache, setCache, clearCache, CACHE_KEYS } from '../cache';
 import AdBanner from '../components/AdBanner';
 import MarketBadge from '../components/MarketBadge';
+import IndustryIcon from '../components/IndustryIcon';
 import { canAutoRefreshPrices, PRICE_AUTO_REFRESH_MS } from '../utils/priceAutoRefresh';
 import './Explore.css';
 
@@ -956,6 +957,7 @@ export default function Explore() {
               >
                 <div className="rec-left">
                   <div className="rec-header">
+                    <IndustryIcon industry={displayRec.category || displayRec.subindustry} compact />
                     <MarketBadge market={twsePriceMap[rec.coid]?.market} compact />
                     <span className="stock-name">{displayRec.stkname}</span>
                     <span className="stock-code">{displayRec.coid}</span>

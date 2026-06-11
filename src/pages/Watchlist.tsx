@@ -6,6 +6,7 @@ import type { ActiveEtfRadarItem, OfficialPriceMapEntry, StockQuantData, StockQu
 import type { SimonsItem, StockData, StockPrice, StockRecommendation, WatchlistSignal, WatchlistWarning } from '../types';
 import { getCache, setCache, clearCache, getPersistentCache, setPersistentCache, clearPersistentCache, CACHE_KEYS } from '../cache';
 import MarketBadge from '../components/MarketBadge';
+import IndustryIcon from '../components/IndustryIcon';
 import { canAutoRefreshPrices, PRICE_AUTO_REFRESH_MS } from '../utils/priceAutoRefresh';
 import { getIndustryTailwind } from '../utils/industryTailwinds';
 import './Watchlist.css';
@@ -1620,6 +1621,7 @@ export default function Watchlist() {
                 <div className="wl-card-header">
                   <div className="wl-stock-info">
                     <div className="wl-stock-name-row">
+                      <IndustryIcon industry={simonsRec?.category || industryMap[w.stockCode]} compact />
                       <span className="wl-stock-name">{w.stockName}</span>
                       {renderRecommendationCountBadge(w.stockCode)}
                     </div>
