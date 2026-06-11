@@ -1236,7 +1236,12 @@ export const useStore = create<InvestmentStore>((set, get) => ({
   login: async (email, password) => {
     if (!supabase) return { error: '資料庫未連線' };
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      const result = await withTimeout(
+        supabase.auth.signInWithPassword({ email, password }),
+        12000,
+        { data: { user: null, session: null }, error: { message: 'login timeout' } } as Awaited<ReturnType<typeof supabase.auth.signInWithPassword>>
+      );
+      const { error } = result;
       if (error) return { error: error.message };
       return { error: null };
     } catch (e) { return { error: String(e) }; }
@@ -1268,7 +1273,7 @@ export const useStore = create<InvestmentStore>((set, get) => ({
   logout: async () => {
     // 先立即清除本地狀態（UI 立即回應），signOut 網路請求在背景執行不阻塞
     set({ user: null, session: null, children: [], holdings: [], trades: [], dividendPayments: [], withdrawalRequests: [], featureOverrides: [], allUsers: [], learningProfile: null, learningWallet: null, learningWalletTxs: [], childrenTxLog: [], completedLessonIds: [], todayCompletedLessonCount: 0, rewardRules: [], shopItems: [], redemptions: [], watchlist: [], watchlistSignals: [], watchlistWarnings: [] });
-    if (supabase) supabase.auth.signOut().catch(() => {}); // 背景執行，失敗不影響 UI
+    if (supabase) supabase.auth.signOut({ scope: 'local' }).catch(() => {}); // 清除本機 session，失敗不影響 UI
     if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; }
   },
 
@@ -1283,7 +1288,7 @@ export const useStore = create<InvestmentStore>((set, get) => ({
       // maybeSingle() 避免找不到資料時回傳 406 錯誤；加 timeout 避免下單區永久卡在同步中。
       const userRes = await withTimeout(
         supabase.from('users').select('*').eq('id', userId).maybeSingle(),
-        isInitialLoad ? 15000 : 8000,
+        isInitialLoad ? 8000 : 8000,
         { data: null, error: { message: 'load user timeout' } } as any
       );
       if (userRes.error) console.warn('loadUserData user failed:', userRes.error.message);

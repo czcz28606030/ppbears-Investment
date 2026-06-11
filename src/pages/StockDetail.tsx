@@ -7,6 +7,7 @@ import { useStore, formatPrice, formatMoney } from '../store';
 import type { StockData, StockPrice, StockRecommendation, StockLiveAnalysis, SimonsItem, StockTradingSignal } from '../types';
 import StockChart from '../components/TradingViewChart';
 import MarketBadge from '../components/MarketBadge';
+import IndustryIcon from '../components/IndustryIcon';
 import { calculateAddPriority } from '../utils/addPriority';
 import { getIndustryTailwind, getIndustryTailwindScore } from '../utils/industryTailwinds';
 import './StockDetail.css';
@@ -1309,18 +1310,11 @@ export default function StockDetail() {
         <div className="price-date">
           收盤價 · {priceDate}
         </div>
-        <div style={{ marginTop: 16, display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
+        <div className="stock-detail-actions">
+          <IndustryIcon stockCode={code} industry={stockData?.subindustry} compact={false} className="stock-detail-industry-icon" />
           <button
-            className="btn"
+            className={`btn stock-watchlist-btn ${isInWatchlist(code!) ? 'is-watched' : ''}`}
             disabled={wlBusy}
-            style={{
-              background: isInWatchlist(code!) ? 'rgba(255, 202, 58, 0.15)' : 'transparent',
-              border: `1px solid ${isInWatchlist(code!) ? '#FFCA3A' : '#888'}`,
-              color: isInWatchlist(code!) ? '#D97706' : '#888',
-              padding: '6px 16px', borderRadius: '20px', fontSize: '14px', fontWeight: 800,
-              display: 'inline-flex', alignItems: 'center', gap: 6, cursor: wlBusy ? 'wait' : 'pointer',
-              opacity: wlBusy ? 0.6 : 1,
-            }}
             onClick={async () => {
               if (!code || wlBusy) return;
               setWlBusy(true);

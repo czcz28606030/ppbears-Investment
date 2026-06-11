@@ -939,7 +939,7 @@ export default function Portfolio() {
                       )}
                       <div className="holding-info">
                         <div className="holding-name-line">
-                          <IndustryIcon industry={h.industry} compact />
+                          <IndustryIcon stockCode={h.stockCode} industry={h.industry} compact />
                           <span className="holding-name">{h.stockName}</span>
                           <MarketBadge market={marketMap[h.stockCode]?.market} compact />
                         </div>

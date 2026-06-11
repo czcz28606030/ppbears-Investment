@@ -957,7 +957,7 @@ export default function Explore() {
               >
                 <div className="rec-left">
                   <div className="rec-header">
-                    <IndustryIcon industry={displayRec.category || displayRec.subindustry} compact />
+                    <IndustryIcon stockCode={displayRec.coid} industry={displayRec.category || displayRec.subindustry} compact />
                     <MarketBadge market={twsePriceMap[rec.coid]?.market} compact />
                     <span className="stock-name">{displayRec.stkname}</span>
                     <span className="stock-code">{displayRec.coid}</span>

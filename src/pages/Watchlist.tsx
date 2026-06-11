@@ -1621,7 +1621,7 @@ export default function Watchlist() {
                 <div className="wl-card-header">
                   <div className="wl-stock-info">
                     <div className="wl-stock-name-row">
-                      <IndustryIcon industry={simonsRec?.category || industryMap[w.stockCode]} compact />
+                      <IndustryIcon stockCode={w.stockCode} industry={simonsRec?.category || industryMap[w.stockCode]} compact />
                       <span className="wl-stock-name">{w.stockName}</span>
                       {renderRecommendationCountBadge(w.stockCode)}
                     </div>

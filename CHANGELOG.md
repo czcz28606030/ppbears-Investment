@@ -1,9 +1,23 @@
 # 📦 PPBears Investment — 更新日誌
 
-> **目前版本：v1.24.82**（2026-06-11）
-> 最新更新：找股票、觀察、庫存卡片加入小型產業類別圖示，讓不同產業用顏色與符號快速辨識。
+> **目前版本：v1.24.83**（2026-06-12）
+> 最新更新：產業標籤改為可點擊說明，股票詳細頁也加入產業資訊，並改善 Supabase 連線異常時的登入提示。
 
 ---
+
+## [v1.24.83] - 2026-06-12
+### Added
+- Added clickable industry explanation dialogs so stock cards can show what each industry category means and what signals to watch.
+- Added industry classification support on Stock Detail pages, including a compact industry badge beside the watchlist action.
+- Added source-backed stock industry classifications so common Taiwan market industry labels stay consistent across Explore, Watchlist, Portfolio, and Stock Detail.
+
+### Changed
+- Changed compact industry badges from symbol-only pills to readable short labels, improving scanability on mobile stock cards.
+- Improved local auth failure messaging so Supabase network/API timeouts are shown separately from incorrect email or password errors.
+
+### Fixed
+- Added a profile-load timeout gate for stale sessions so users are offered refresh/logout actions when Supabase account data does not return.
+- Changed logout to clear the local Supabase session without waiting on a failing network sign-out request.
 
 ## [v1.24.82] - 2026-06-11
 ### Added

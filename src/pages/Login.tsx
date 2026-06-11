@@ -3,13 +3,29 @@ import { Link } from 'react-router-dom';
 import { useStore } from '../store';
 import './Login.css';
 
+function getLoginErrorMessage(error: string): string {
+  const normalized = error.toLowerCase();
+  if (
+    normalized.includes('timeout') ||
+    normalized.includes('failed to fetch') ||
+    normalized.includes('network') ||
+    normalized.includes('fetcherror')
+  ) {
+    return '雲端連線逾時，請稍後再試。若一直發生，可能是 Supabase 資料服務暫時無法回應。';
+  }
+  if (normalized.includes('invalid login credentials')) {
+    return '電子信箱或密碼錯誤，請再試一次 🔑';
+  }
+  return error || '登入失敗，請稍後再試。';
+}
+
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const { login, loading: storeLoading } = useStore();
+  const { login } = useStore();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -21,7 +37,7 @@ export default function Login() {
     setIsLoading(false);
 
     if (result.error) {
-      setError('電子信箱或密碼錯誤，請再試一次 🔑');
+      setError(getLoginErrorMessage(result.error));
     }
     // 成功登入後 App.tsx 的 onAuthStateChange 會自動導向
   };
@@ -86,9 +102,9 @@ export default function Login() {
           <button
             type="submit"
             className="auth-submit-btn"
-            disabled={!email || !password || isLoading || storeLoading}
+            disabled={!email || !password || isLoading}
           >
-            {(isLoading || storeLoading) ? '登入中...' : '登入 🚀'}
+            {isLoading ? '登入中...' : '登入 🚀'}
           </button>
         </form>
 
