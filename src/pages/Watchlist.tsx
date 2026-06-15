@@ -7,7 +7,7 @@ import type { SimonsItem, StockData, StockPrice, StockRecommendation, WatchlistS
 import { getCache, setCache, clearCache, getPersistentCache, setPersistentCache, clearPersistentCache, CACHE_KEYS } from '../cache';
 import MarketBadge from '../components/MarketBadge';
 import IndustryIcon from '../components/IndustryIcon';
-import { canAutoRefreshPrices, PRICE_AUTO_REFRESH_MS } from '../utils/priceAutoRefresh';
+import { canAutoRefreshPrices, formatPriceUpdateLabel, PRICE_AUTO_REFRESH_MS } from '../utils/priceAutoRefresh';
 import { getIndustryTailwind } from '../utils/industryTailwinds';
 import './Watchlist.css';
 
@@ -199,6 +199,7 @@ export default function Watchlist() {
   const [smallChipDialog, setSmallChipDialog] = useState<SmallChipInfoDialog | null>(null);
   const [recommendationCounts, setRecommendationCounts] = useState<Record<string, number>>({});
   const [activeEtfMap, setActiveEtfMap] = useState<Record<string, ActiveEtfRadarItem>>({});
+  const [priceUpdatedLabel, setPriceUpdatedLabel] = useState('');
 
   // 進入頁面時抓取即時報價 + 訊號分析
   useEffect(() => {
@@ -312,6 +313,7 @@ export default function Watchlist() {
         setLastAnalyzedAt(null);
         setUsingWatchlistCache(false);
         setLiveQuotes({});
+        setPriceUpdatedLabel('');
         setKlineMap({});
         setQuantDataMap({});
         setSimonsRecMap({});
@@ -345,6 +347,7 @@ export default function Watchlist() {
       cacheVersion?: string;
       accessScope?: 'ai' | 'basic';
       refreshSlot?: string;
+      priceUpdatedLabel?: string;
     };
     const cacheKey = CACHE_KEYS.WATCHLIST_FULL;
     const watchlistCodes = watchlist.map(w => w.stockCode);
@@ -372,6 +375,7 @@ export default function Watchlist() {
       setSimonsRecMap(cached.simonsRecMap);
       setLatestKlineDate(cached.latestKlineDate);
       setLastAnalyzedAt(cached.analyzedAt);
+      setPriceUpdatedLabel(cached.priceUpdatedLabel || '');
       setUsingWatchlistCache(true);
       setCache(cacheKey, cached, refreshSlot.ttlMs);
       return;
@@ -431,6 +435,10 @@ export default function Watchlist() {
       setLiveQuotes(quotes);
       setKlineMap(nextKlineMap);
       setQuotesLoading(false);
+      const nextPriceUpdatedLabel = Object.keys(quotes).length > 0 && canAutoRefreshPrices()
+        ? formatPriceUpdateLabel()
+        : '';
+      if (nextPriceUpdatedLabel) setPriceUpdatedLabel(nextPriceUpdatedLabel);
 
       // 記錄最新 K 線日期
       let latestDate = '';
@@ -490,6 +498,7 @@ export default function Watchlist() {
           cacheVersion: WATCHLIST_CACHE_VERSION,
           accessScope: 'basic',
           refreshSlot: refreshSlot.key,
+          priceUpdatedLabel: nextPriceUpdatedLabel || undefined,
         };
         const ttlMs = Math.min(WATCHLIST_FULL_TTL_MS, refreshSlot.ttlMs);
         setCache<WatchlistCacheData>(cacheKey, cacheData, ttlMs);
@@ -571,6 +580,7 @@ export default function Watchlist() {
         cacheVersion: WATCHLIST_CACHE_VERSION,
         accessScope: 'ai',
         refreshSlot: refreshSlot.key,
+        priceUpdatedLabel: nextPriceUpdatedLabel || undefined,
       };
       const ttlMs = Math.min(WATCHLIST_FULL_TTL_MS, refreshSlot.ttlMs);
       setCache<WatchlistCacheData>(cacheKey, cacheData, ttlMs);
@@ -612,6 +622,8 @@ export default function Watchlist() {
         });
 
         if (Object.keys(nextQuotes).length > 0) {
+          const nextPriceUpdatedLabel = formatPriceUpdateLabel();
+          setPriceUpdatedLabel(nextPriceUpdatedLabel);
           setLiveQuotes(prev => {
             const merged = { ...prev, ...nextQuotes };
             const refreshSlot = getRefreshSlotInfo();
@@ -621,6 +633,7 @@ export default function Watchlist() {
               const updatedCache = {
                 ...cacheData,
                 quotes: { ...cacheData.quotes, ...nextQuotes },
+                priceUpdatedLabel: nextPriceUpdatedLabel,
               };
               setCache(CACHE_KEYS.WATCHLIST_FULL, updatedCache, refreshSlot.ttlMs);
               setPersistentCache(WATCHLIST_PERSISTENT_CACHE_KEY, updatedCache, refreshSlot.ttlMs, refreshSlot.key);
@@ -1337,6 +1350,7 @@ export default function Watchlist() {
               setLastAnalyzedAt(null);
               setUsingWatchlistCache(false);
               setLiveQuotes({});
+              setPriceUpdatedLabel('');
               setKlineMap({});
               setQuantDataMap({});
               setSimonsRecMap({});
@@ -1658,6 +1672,9 @@ export default function Watchlist() {
                     </div>
                   </div>
                   <div className="wl-price-info">
+                    {priceUpdatedLabel && (
+                      <div className="wl-price-updated">{priceUpdatedLabel}</div>
+                    )}
                     <div className={`wl-price ${todayIsUp ? 'text-profit' : 'text-loss'}`}>
                       NT$ {formatPrice(currentPrice)}
                     </div>

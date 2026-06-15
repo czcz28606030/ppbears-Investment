@@ -8,7 +8,7 @@ import { getCache, setCache, clearCache, CACHE_KEYS } from '../cache';
 import AdBanner from '../components/AdBanner';
 import MarketBadge from '../components/MarketBadge';
 import IndustryIcon from '../components/IndustryIcon';
-import { canAutoRefreshPrices, PRICE_AUTO_REFRESH_MS } from '../utils/priceAutoRefresh';
+import { canAutoRefreshPrices, formatPriceUpdateLabel, PRICE_AUTO_REFRESH_MS } from '../utils/priceAutoRefresh';
 import './Explore.css';
 
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null> {
@@ -62,6 +62,7 @@ export default function Explore() {
   const [aiFilterQualified, setAiFilterQualified] = useState(true); // 預設勾選篩選
   const [simonsMeta, setSimonsMeta] = useState<Record<string, any>>({}); // 保存原始 SimonsItem 供重新評分用
   const [quantMeta, setQuantMeta] = useState<StockQuantMeta | null>(null);
+  const [priceUpdatedLabel, setPriceUpdatedLabel] = useState('');
   const resultRef = useRef<HTMLDivElement>(null);
   const forceFreshQuantRef = useRef(false);
   const pendingScrollY = useRef(restored.current?.scrollY ?? 0);
@@ -96,6 +97,7 @@ export default function Explore() {
         if (Object.keys(map).length > 0) {
           setTwsePriceMap(map);
           setCache(CACHE_KEYS.TWSE_PRICE_MAP, map);
+          if (canAutoRefreshPrices()) setPriceUpdatedLabel(formatPriceUpdateLabel());
         }
       }
 
@@ -605,6 +607,7 @@ export default function Explore() {
         if (Object.keys(map).length > 0) {
           setTwsePriceMap(map);
           setCache(CACHE_KEYS.TWSE_PRICE_MAP, map);
+          if (canAutoRefreshPrices()) setPriceUpdatedLabel(formatPriceUpdateLabel());
         }
       })
       .finally(() => {
@@ -673,6 +676,7 @@ export default function Explore() {
       running = true;
       const targetCodes = [...new Set(filtered.map(rec => rec.coid))].slice(0, 60);
       const officialMap = await fetchOfficialPriceMap().catch(() => ({} as Record<string, OfficialPriceMapEntry>));
+      const hasPriceUpdates = targetCodes.some(code => Boolean(officialMap[code]?.close));
       if (!cancelled) {
         setTwsePriceMap(prev => {
           const next = { ...prev };
@@ -692,6 +696,7 @@ export default function Explore() {
           setCache(CACHE_KEYS.TWSE_PRICE_MAP, next);
           return next;
         });
+        if (hasPriceUpdates) setPriceUpdatedLabel(formatPriceUpdateLabel());
       }
       running = false;
     }
@@ -1006,8 +1011,13 @@ export default function Explore() {
                   </span>
                 </button>
                 <div className="rec-right">
-                  <div className="stock-price">
-                    NT${getBestClose(displayRec.coid, displayRec.close)}
+                  <div className="rec-price-block">
+                    {priceUpdatedLabel && (
+                      <div className="stock-price-updated">{priceUpdatedLabel}</div>
+                    )}
+                    <div className="stock-price">
+                      NT${getBestClose(displayRec.coid, displayRec.close)}
+                    </div>
                   </div>
                   <div className={`rec-trend ${displayRec.ret_w === 'rise' ? 'text-profit' : 'text-loss'}`}>
                     {displayRec.ret_w === 'rise' ? '📈 週漲' : '📉 週跌'}

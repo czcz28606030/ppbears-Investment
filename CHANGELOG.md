@@ -1,9 +1,17 @@
 # 📦 PPBears Investment — 更新日誌
 
-> **目前版本：v1.24.83**（2026-06-12）
-> 最新更新：產業標籤改為可點擊說明，股票詳細頁也加入產業資訊，並改善 Supabase 連線異常時的登入提示。
+> **目前版本：v1.24.84**（2026-06-15）
+> 最新更新：Explore、Watchlist、Portfolio 的股票價格上方加入盤中更新時間標籤，方便確認報價 freshness。
 
 ---
+
+## [v1.24.84] - 2026-06-15
+### Added
+- Added compact price update time labels above stock prices in Explore, Watchlist, and Portfolio cards.
+- Added a shared price update label formatter using `MM/DD HH:mm` so list pages show consistent timestamp text.
+
+### Changed
+- Kept price update timestamps tied to successful market-hour price refreshes so stale or off-market prices are not marked as newly updated.
 
 ## [v1.24.83] - 2026-06-12
 ### Added

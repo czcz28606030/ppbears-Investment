@@ -7,7 +7,7 @@ import type { ActiveEtfRadarItem, OfficialPriceMapEntry, StockQuantData, StockQu
 import { getCache, setCache, clearCache, getPersistentCache, setPersistentCache, clearPersistentCache, CACHE_KEYS } from '../cache';
 import MarketBadge from '../components/MarketBadge';
 import IndustryIcon from '../components/IndustryIcon';
-import { canAutoRefreshPrices, PRICE_AUTO_REFRESH_MS } from '../utils/priceAutoRefresh';
+import { canAutoRefreshPrices, formatPriceUpdateLabel, PRICE_AUTO_REFRESH_MS } from '../utils/priceAutoRefresh';
 import { getIndustryTailwind, getIndustryTailwindScore } from '../utils/industryTailwinds';
 import { calculateAddPriority } from '../utils/addPriority';
 import './Portfolio.css';
@@ -251,6 +251,7 @@ export default function Portfolio() {
   const [activeEtfMap, setActiveEtfMap] = useState<Record<string, ActiveEtfRadarItem>>({});
   const [activeEtfDialog, setActiveEtfDialog] = useState<ActiveEtfInfoDialog | null>(null);
   const [quantMeta, setQuantMeta] = useState<StockQuantMeta | null>(null);
+  const [priceUpdatedLabel, setPriceUpdatedLabel] = useState('');
   const [enableCustomSignal, setEnableCustomSignal] = useState(() => {
     return localStorage.getItem('ppbears_custom_signal') === 'true';
   });
@@ -275,6 +276,9 @@ export default function Portfolio() {
       const result = await refreshHoldingPrices({ force });
       if (result.checkedCount > 0 && result.priceFoundCount === 0) {
         setPriceRefreshError('價格抓取失敗，畫面仍是上次庫存價格');
+      }
+      if (result.priceFoundCount > 0 && canAutoRefreshPrices()) {
+        setPriceUpdatedLabel(formatPriceUpdateLabel());
       }
       setLoadingProgress(prev => Math.max(prev, 62));
       return result;
@@ -961,6 +965,9 @@ export default function Portfolio() {
                       <div className="holding-avg">成本 {formatPrice(h.avgCost)}</div>
                     </div>
                     <div className="holding-right">
+                      {priceUpdatedLabel && (
+                        <div className="holding-price-updated">{priceUpdatedLabel}</div>
+                      )}
                       <div className="holding-current">NT$ {formatPrice(h.currentPrice)}</div>
                       <div className={`holding-pl ${itemIsProfit ? 'text-profit' : 'text-loss'}`}>
                         {itemIsProfit ? '+' : ''}{formatMoney(itemPL)}
