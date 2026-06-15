@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { fetchSimonsData, toRecommendation, fetchOfficialPriceMap, fetchStockQuantData, refreshDailyAiCache, clearQuantSignalTTLCache, clearSimonsDataTTLCache, fetchDailyAiCacheVersion, getKnownDailyAiCacheVersion, rememberDailyAiCacheVersion } from '../api';
+import { fetchOfficialClosePrice, fetchSimonsData, toRecommendation, fetchOfficialPriceMap, fetchStockQuantData, refreshDailyAiCache, clearQuantSignalTTLCache, clearSimonsDataTTLCache, fetchDailyAiCacheVersion, getKnownDailyAiCacheVersion, rememberDailyAiCacheVersion } from '../api';
 import type { StockRecommendation } from '../types';
 import type { OfficialPriceMapEntry, StockQuantData, StockQuantMeta } from '../api';
 import { useStore } from '../store';
@@ -675,22 +675,28 @@ export default function Explore() {
       if (running || cancelled || !canAutoRefreshPrices()) return;
       running = true;
       const targetCodes = [...new Set(filtered.map(rec => rec.coid))].slice(0, 60);
-      const officialMap = await fetchOfficialPriceMap().catch(() => ({} as Record<string, OfficialPriceMapEntry>));
-      const hasPriceUpdates = targetCodes.some(code => Boolean(officialMap[code]?.close));
+      const [officialMap, realtimeQuotes] = await Promise.all([
+        fetchOfficialPriceMap().catch(() => ({} as Record<string, OfficialPriceMapEntry>)),
+        Promise.all(targetCodes.map(code => fetchOfficialClosePrice(code).catch(() => null))),
+      ]);
+      const hasPriceUpdates = realtimeQuotes.some(quote => Boolean(quote?.price && quote.price > 0));
       if (!cancelled) {
         setTwsePriceMap(prev => {
           const next = { ...prev };
-          targetCodes.forEach((code) => {
+          targetCodes.forEach((code, index) => {
+            const realtime = realtimeQuotes[index];
             const result = officialMap[code];
-            if (!result) return;
             const existing = next[code];
+            if (!realtime && !result) return;
             next[code] = {
-              close: result.close,
-              change: result.change ?? existing?.change ?? '0',
-              name: result.name || existing?.name || '',
-              volume: result.volume ?? existing?.volume ?? 0,
-              date: result.date || existing?.date || getTodayString().replace(/-/g, ''),
-              market: existing?.market,
+              close: realtime?.price ? String(realtime.price) : result?.close || existing?.close || '0',
+              change: realtime?.previousClose
+                ? String(realtime.price - realtime.previousClose)
+                : result?.change ?? existing?.change ?? '0',
+              name: realtime?.name || result?.name || existing?.name || '',
+              volume: result?.volume ?? existing?.volume ?? 0,
+              date: realtime?.date || result?.date || existing?.date || getTodayString().replace(/-/g, ''),
+              market: existing?.market || result?.market,
             };
           });
           setCache(CACHE_KEYS.TWSE_PRICE_MAP, next);
@@ -701,6 +707,7 @@ export default function Explore() {
       running = false;
     }
 
+    refreshVisiblePrices();
     const intervalId = window.setInterval(refreshVisiblePrices, PRICE_AUTO_REFRESH_MS);
     document.addEventListener('visibilitychange', refreshVisiblePrices);
     return () => {

@@ -551,10 +551,13 @@ export type OfficialClosePrice = {
 
 function parseMISPrice(raw: unknown): number {
   if (typeof raw !== 'string') return 0;
-  const firstLevel = raw.split('_')[0]?.trim();
-  if (!firstLevel || firstLevel === '-') return 0;
-  const price = parseFloat(firstLevel);
-  return Number.isFinite(price) && price > 0 ? price : 0;
+  const levels = raw.split('_').map(level => level.trim()).filter(Boolean);
+  for (const level of levels) {
+    if (level === '-') continue;
+    const price = parseFloat(level);
+    if (Number.isFinite(price) && price > 0) return price;
+  }
+  return 0;
 }
 
 async function fetchMISRealtime(code: string, market: 'tse' | 'otc'): Promise<OfficialClosePrice | null> {

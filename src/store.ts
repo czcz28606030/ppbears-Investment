@@ -2,8 +2,8 @@ import { create } from 'zustand';
 import { supabase } from './supabase';
 import type { Session } from '@supabase/supabase-js';
 import type { UserAccount, Trade, Holding, WithdrawalRequest, FeatureOverride, SystemSettings, LessonResult, RewardRule, RewardTriggerType, WalletTransaction, RewardShopItem, RedemptionRequest, WatchlistItem, WatchlistSignal, WatchlistWarning, DividendPayment, StockData } from './types';
-import { fetchStockData, fetchOfficialPriceMap } from './api';
-import type { OfficialPriceMap } from './api';
+import { fetchStockData, fetchOfficialPriceMap, fetchOfficialClosePrice } from './api';
+import type { OfficialClosePrice, OfficialPriceMap } from './api';
 
 // ─── 股價刷新快取控制 ─────────────────────────────────────────────────────────
 let lastPriceRefreshAt: number | null = null;
@@ -1624,11 +1624,14 @@ export const useStore = create<InvestmentStore>((set, get) => ({
     }
     lastPriceRefreshAt = now;
 
-    // 1. 同時取雲端官方價格 map、逐檔官方價與 ifalgo。
+    // 1. 同時取雲端官方價格 map、盤中 MIS 即時價與 ifalgo。
     //    雲端 map 可避開本機逐檔 proxy 502 時整批無法更新的問題。
     //    比較兩者日期，使用較新的那筆 → 解決官方 API 盤後延遲問題
-    const [officialPriceMap, stockDatas] = await Promise.all([
+    const [officialPriceMap, realtimePrices, stockDatas] = await Promise.all([
       fetchOfficialPriceMap().catch((): OfficialPriceMap => ({})),
+      isMarketOpen()
+        ? Promise.all(holdings.map(h => fetchOfficialClosePrice(h.stockCode).catch((): OfficialClosePrice | null => null)))
+        : Promise.resolve([] as Array<OfficialClosePrice | null>),
       Promise.all(holdings.map(h => fetchStockData(h.stockCode))),
     ]);
 
@@ -1645,6 +1648,7 @@ export const useStore = create<InvestmentStore>((set, get) => ({
           }
         : null;
       const stockRes = stockDatas[i];
+      const realtime = realtimePrices[i];
 
       // ifalgo 最新收盤
       let ifalgoPrice = 0;
@@ -1657,7 +1661,9 @@ export const useStore = create<InvestmentStore>((set, get) => ({
 
       // 比較日期，選最新
       let newPrice = 0;
-      if (official && official.price > 0) {
+      if (realtime && realtime.price > 0) {
+        newPrice = realtime.price;
+      } else if (official && official.price > 0) {
         const officialDate = (official.date || '').replace(/-/g, '');
         if (ifalgoPrice > 0 && ifalgoDate.length === 8 && officialDate.length === 8 && ifalgoDate > officialDate) {
           newPrice = ifalgoPrice; // ifalgo 有更新的當日資料

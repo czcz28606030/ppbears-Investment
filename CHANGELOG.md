@@ -1,9 +1,15 @@
 # 📦 PPBears Investment — 更新日誌
 
-> **目前版本：v1.24.84**（2026-06-15）
-> 最新更新：Explore、Watchlist、Portfolio 的股票價格上方加入盤中更新時間標籤，方便確認報價 freshness。
+> **目前版本：v1.24.85**（2026-06-15）
+> 最新更新：修正盤中個股價格優先使用 MIS 即時報價，避免台燿 6274 類似狀況仍顯示昨日收盤價。
 
 ---
+
+## [v1.24.85] - 2026-06-15
+### Fixed
+- Fixed MIS realtime price parsing so quotes skip zero levels and use the first valid bid/ask/trade price, covering cases like TPEx 6274 where成交價 is blank but the live bid price is available.
+- Changed Portfolio, Watchlist, and Explore market-hour refreshes to prefer per-stock MIS realtime prices before falling back to the official daily close map or IFAlgo K-line data.
+- Updated Watchlist price loading so a valid realtime price can display even when the K-line fallback is still on the previous trading day.
 
 ## [v1.24.84] - 2026-06-15
 ### Added

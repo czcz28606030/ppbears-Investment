@@ -1,8 +1,8 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore, formatPrice } from '../store';
-import { fetchOfficialPriceMap, fetchSimonsData, fetchStockData, fetchStockQuantData, toRecommendation, fetchSimonsRecommendationCounts, refreshDailyAiCache, clearQuantSignalTTLCache, clearSimonsDataTTLCache, fetchDailyAiCacheVersion, getKnownDailyAiCacheVersion, rememberDailyAiCacheVersion, fetchActiveEtfRadarMap } from '../api';
-import type { ActiveEtfRadarItem, OfficialPriceMapEntry, StockQuantData, StockQuantMeta } from '../api';
+import { fetchOfficialClosePrice, fetchOfficialPriceMap, fetchSimonsData, fetchStockData, fetchStockQuantData, toRecommendation, fetchSimonsRecommendationCounts, refreshDailyAiCache, clearQuantSignalTTLCache, clearSimonsDataTTLCache, fetchDailyAiCacheVersion, getKnownDailyAiCacheVersion, rememberDailyAiCacheVersion, fetchActiveEtfRadarMap } from '../api';
+import type { ActiveEtfRadarItem, OfficialClosePrice, OfficialPriceMapEntry, StockQuantData, StockQuantMeta } from '../api';
 import type { SimonsItem, StockData, StockPrice, StockRecommendation, WatchlistSignal, WatchlistWarning } from '../types';
 import { getCache, setCache, clearCache, getPersistentCache, setPersistentCache, clearPersistentCache, CACHE_KEYS } from '../cache';
 import MarketBadge from '../components/MarketBadge';
@@ -390,36 +390,57 @@ export default function Watchlist() {
       const forceFresh = refreshKey > 0;
 
       const cachedOfficialMap = getCache<Record<string, OfficialPriceMapEntry>>(CACHE_KEYS.TWSE_PRICE_MAP);
-      const officialMapPromise = canAutoRefreshPrices()
+      const shouldRefreshPrices = canAutoRefreshPrices();
+      const officialMapPromise = shouldRefreshPrices
         ? fetchOfficialPriceMap().catch(() => cachedOfficialMap || {} as Record<string, OfficialPriceMapEntry>)
         : Promise.resolve(cachedOfficialMap || {} as Record<string, OfficialPriceMapEntry>);
+      const realtimeQuotesPromise = shouldRefreshPrices
+        ? Promise.all(watchlist.map(w => fetchOfficialClosePrice(w.stockCode).catch((): OfficialClosePrice | null => null)))
+        : Promise.resolve([] as Array<OfficialClosePrice | null>);
 
-      // 平行抓取觀察股票 K 線與官方報價；非開盤時官方報價只讀前端快取。
-      const [stockDatas, officialMap] = await Promise.all([
+      // 平行抓取觀察股票 K 線、盤中即時價與官方報價；非開盤時官方報價只讀前端快取。
+      const [stockDatas, officialMap, realtimeQuotes] = await Promise.all([
         Promise.all(watchlist.map(w => fetchStockData(w.stockCode).catch(() => null))),
         officialMapPromise,
+        realtimeQuotesPromise,
       ]);
       setMarketMap(officialMap);
 
       const quotes: Record<string, { close: number; change: number }> = {};
+      let realtimeQuoteCount = 0;
       const stockDataMap: Record<string, StockData | null> = {};
       const nextKlineMap: Record<string, StockPrice[]> = {};
       stockDatas.forEach((res, idx) => {
-        stockDataMap[watchlist[idx].stockCode] = res;
+        const code = watchlist[idx].stockCode;
+        const realtime = realtimeQuotes[idx];
+        const realtimeClose = realtime?.price && realtime.price > 0 ? realtime.price : 0;
+        stockDataMap[code] = res;
+        if (realtimeClose > 0) {
+          realtimeQuoteCount++;
+          quotes[code] = {
+            close: realtimeClose,
+            change: realtime?.previousClose && realtime.previousClose > 0
+              ? realtimeClose - realtime.previousClose
+              : 0,
+          };
+        }
         if (res && res.prices && res.prices.length >= 2) {
-          nextKlineMap[watchlist[idx].stockCode] = res.prices.slice(-126);
+          nextKlineMap[code] = res.prices.slice(-126);
           const latest = res.prices[res.prices.length - 1];
           const prev = res.prices[res.prices.length - 2];
-          const close = parseFloat(latest.close_d);
+          const close = realtimeClose || parseFloat(latest.close_d);
           const prevClose = parseFloat(prev.close_d);
 
           const todayStr = new Date().toISOString().split('T')[0].replace(/-/g, '');
-          const latestDateStr = (latest.mdate || '').replace(/-/g, '');
+          const latestDateStr = (realtime?.date || latest.mdate || '').replace(/-/g, '');
           const isToday = latestDateStr === todayStr;
+          const changeBase = realtime?.previousClose && realtime.previousClose > 0
+            ? close - realtime.previousClose
+            : close - prevClose;
 
-          quotes[watchlist[idx].stockCode] = {
+          quotes[code] = {
             close,
-            change: isToday ? close - prevClose : 0,
+            change: isToday ? changeBase : 0,
           };
         }
       });
@@ -435,7 +456,7 @@ export default function Watchlist() {
       setLiveQuotes(quotes);
       setKlineMap(nextKlineMap);
       setQuotesLoading(false);
-      const nextPriceUpdatedLabel = Object.keys(quotes).length > 0 && canAutoRefreshPrices()
+      const nextPriceUpdatedLabel = realtimeQuoteCount > 0 && canAutoRefreshPrices()
         ? formatPriceUpdateLabel()
         : '';
       if (nextPriceUpdatedLabel) setPriceUpdatedLabel(nextPriceUpdatedLabel);
@@ -606,18 +627,21 @@ export default function Watchlist() {
       if (running || cancelled || !canAutoRefreshPrices()) return;
       running = true;
       const codes = watchlist.map(w => w.stockCode);
-      const officialMap = await fetchOfficialPriceMap().catch(() => ({} as Record<string, OfficialPriceMapEntry>));
+      const realtimeQuotes = await Promise.all(
+        codes.map(code => fetchOfficialClosePrice(code).catch((): OfficialClosePrice | null => null))
+      );
       if (!cancelled) {
         const nextQuotes: Record<string, { close: number; change: number }> = {};
-        codes.forEach((code) => {
-          const result = officialMap[code];
+        codes.forEach((code, index) => {
+          const result = realtimeQuotes[index];
           if (!result) return;
-          const price = Number(result.close);
-          const change = Number(String(result.change || '0').replace(/,/g, ''));
+          const price = Number(result.price);
           if (!Number.isFinite(price) || price <= 0) return;
           nextQuotes[code] = {
             close: price,
-            change: Number.isFinite(change) ? change : liveQuotes[code]?.change ?? 0,
+            change: result.previousClose && result.previousClose > 0
+              ? price - result.previousClose
+              : liveQuotes[code]?.change ?? 0,
           };
         });
 
