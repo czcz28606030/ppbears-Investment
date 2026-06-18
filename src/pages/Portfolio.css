@@ -142,6 +142,170 @@
   color: var(--text-tertiary);
 }
 
+.portfolio-category-tabs-shell {
+  width: 100%;
+  max-width: 100%;
+  margin-top: -8px;
+  margin-bottom: 4px;
+  position: relative;
+  overflow: hidden;
+}
+
+.portfolio-category-tabs-shell::before,
+.portfolio-category-tabs-shell::after {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  bottom: 10px;
+  width: 22px;
+}
+
+.portfolio-category-tabs-shell::before {
+  left: 0;
+  background: linear-gradient(90deg, var(--bg-page), transparent);
+}
+
+.portfolio-category-tabs-shell::after {
+  right: 0;
+  background: linear-gradient(270deg, var(--bg-page), transparent);
+}
+
+.portfolio-category-tabs {
+  min-width: 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 2px 12px;
+  overflow-x: auto;
+  overflow-y: visible;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  scroll-behavior: smooth;
+  scroll-snap-type: x proximity;
+  touch-action: pan-x;
+  cursor: grab;
+  user-select: none;
+}
+
+.portfolio-category-tabs.is-dragging {
+  cursor: grabbing;
+  scroll-snap-type: none;
+}
+
+.portfolio-category-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.portfolio-category-tab {
+  appearance: none;
+  border: 1.5px solid rgba(43, 33, 24, 0.12);
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--text-secondary);
+  border-radius: 999px;
+  min-height: 34px;
+  padding: 7px 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  scroll-snap-align: start;
+  position: relative;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1;
+  cursor: pointer;
+  user-select: none;
+  box-shadow: 0 4px 10px rgba(43, 33, 24, 0.05);
+  transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease, background 0.16s ease;
+}
+
+.portfolio-category-tab:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 7px 14px rgba(43, 33, 24, 0.08);
+  z-index: 5;
+}
+
+.portfolio-category-tab.active {
+  color: #3b2f22;
+  border-color: rgba(255, 202, 58, 0.9);
+  background: linear-gradient(135deg, #fff4c9 0%, #ffffff 100%);
+  box-shadow: 0 8px 16px rgba(255, 202, 58, 0.2);
+}
+
+.portfolio-category-tab-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.8);
+}
+
+.portfolio-category-tab-label {
+  width: 4.5em;
+  max-width: 4.5em;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.portfolio-category-tab-count {
+  color: rgba(43, 33, 24, 0.52);
+  font-size: 11px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.portfolio-category-tab.active .portfolio-category-tab-count {
+  color: rgba(43, 33, 24, 0.72);
+}
+
+.portfolio-category-tab-detail {
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(4px);
+  position: absolute;
+  z-index: 20;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  width: max-content;
+  max-width: min(260px, calc(100vw - 40px));
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(43, 33, 24, 0.96);
+  color: #fffaf0;
+  box-shadow: 0 10px 24px rgba(43, 33, 24, 0.2);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.35;
+  text-align: left;
+  white-space: normal;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.portfolio-category-tab-detail strong,
+.portfolio-category-tab-detail span {
+  display: block;
+}
+
+.portfolio-category-tab-detail strong {
+  margin-bottom: 3px;
+  color: #ffdf75;
+  font-size: 11.5px;
+  font-weight: 900;
+}
+
+.portfolio-category-tab:hover .portfolio-category-tab-detail,
+.portfolio-category-tab:focus-visible .portfolio-category-tab-detail {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
 .pf-signal-legend {
   flex: 1 0 100%;
   border: 1px solid rgba(122, 106, 85, 0.22);
@@ -232,6 +396,37 @@
 
   .pf-signal-legend {
     width: 100%;
+  }
+
+  .portfolio-category-tabs-shell {
+    margin-top: -6px;
+  }
+
+  .portfolio-category-tabs {
+    padding-bottom: 12px;
+  }
+
+  .portfolio-category-tab {
+    min-height: 32px;
+    padding: 7px 9px;
+    font-size: 11.5px;
+  }
+
+  .portfolio-category-tab-detail {
+    position: fixed;
+    left: 12px;
+    right: 12px;
+    bottom: calc(82px + env(safe-area-inset-bottom, 0px));
+    width: auto;
+    max-width: none;
+    transform: translateY(6px);
+  }
+
+  .portfolio-category-tab:hover .portfolio-category-tab-detail,
+  .portfolio-category-tab:focus-visible .portfolio-category-tab-detail,
+  .portfolio-category-tab.active .portfolio-category-tab-detail {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 

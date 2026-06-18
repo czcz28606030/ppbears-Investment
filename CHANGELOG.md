@@ -1,9 +1,18 @@
 # 📦 PPBears Investment — 更新日誌
 
-> **目前版本：v1.24.86**（2026-06-18）
-> 最新更新：新增 Portfolio 總資產卡的庫存類別甜甜圈圖，顯示各產業類別占股票庫存市值比例。
+> **目前版本：v1.24.87**（2026-06-18）
+> 最新更新：將 Portfolio 庫存類別篩選列改成可拖曳橫向滑動，讓長分類清單更直覺可用。
 
 ---
+
+## [v1.24.87] - 2026-06-18
+### Added
+- Added drag-to-scroll behavior to the Portfolio inventory category filter strip so users can move through many categories directly on desktop and mobile.
+- Added compact four-character category labels with hover/focus or selected-state detail tooltips for full category names, market value, percentage, and holding count.
+
+### Changed
+- Removed category scroll arrow buttons and replaced them with a direct draggable strip with edge fade hints.
+- Kept category filtering from triggering accidentally while the user is dragging the strip.
 
 ## [v1.24.86] - 2026-06-18
 ### Added

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent, type WheelEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore, formatMoney, formatPrice } from '../store';
 import type { Holding, StockTradingSignal, Trade } from '../types';
@@ -53,6 +53,19 @@ function formatHoldingCategoryName(industry?: string): string {
   if (name.endsWith('類別')) return name;
   if (name.endsWith('業')) return `${name.slice(0, -1)}類別`;
   return `${name}類別`;
+}
+
+function formatCompactCategoryName(categoryName: string): string {
+  const base = categoryName
+    .replace(/類別$/u, '')
+    .split(/[、,，/／｜|]/u)
+    .map(part => part.trim())
+    .find(Boolean) || categoryName.replace(/類別$/u, '').trim();
+  const compact = base.replace(/\s+/g, '');
+  if (!compact) return '未分類';
+  if (compact.length >= 4) return compact.slice(0, 4);
+  if (compact.length >= 3) return `${compact}類`;
+  return `${compact}類別`.slice(0, 4);
 }
 
 function getChipLabel(pts: number | undefined): string {
@@ -274,8 +287,14 @@ export default function Portfolio() {
 
     const totalMarketValue = rawItems.reduce((sum, item) => sum + item.marketValue, 0);
     if (totalMarketValue <= 0) {
-      return { totalMarketValue: 0, itemCount: 0, items: [], gradient: '' };
+      return { totalMarketValue: 0, itemCount: 0, categories: [], items: [], gradient: '' };
     }
+
+    const categories = rawItems.map((item, index) => ({
+      ...item,
+      color: HOLDING_ALLOCATION_COLORS[index % HOLDING_ALLOCATION_COLORS.length],
+      percent: (item.marketValue / totalMarketValue) * 100,
+    }));
 
     const primaryItems = rawItems.slice(0, 5);
     const otherItems = rawItems.slice(5);
@@ -309,6 +328,7 @@ export default function Portfolio() {
     return {
       totalMarketValue,
       itemCount: rawItems.length,
+      categories,
       items,
       gradient: `conic-gradient(${segments.join(', ')})`,
     };
@@ -332,7 +352,80 @@ export default function Portfolio() {
   const [enableCustomSignal, setEnableCustomSignal] = useState(() => {
     return localStorage.getItem('ppbears_custom_signal') === 'true';
   });
+  const [selectedHoldingCategory, setSelectedHoldingCategory] = useState('ALL');
+  const categoryTabsRef = useRef<HTMLDivElement | null>(null);
+  const categoryDragRef = useRef({ active: false, startX: 0, scrollLeft: 0, moved: false });
+  const categoryClickBlockedRef = useRef(false);
+  const [isDraggingCategoryTabs, setIsDraggingCategoryTabs] = useState(false);
+  const filteredHoldings = useMemo(() => {
+    if (selectedHoldingCategory === 'ALL') return holdings;
+    return holdings.filter(h => formatHoldingCategoryName(h.industry) === selectedHoldingCategory);
+  }, [holdings, selectedHoldingCategory]);
   const isRefreshing = priceRefreshing || signalsLoading;
+
+  const selectHoldingCategory = useCallback((categoryName: string) => {
+    if (categoryClickBlockedRef.current) {
+      categoryClickBlockedRef.current = false;
+      return;
+    }
+    setSelectedHoldingCategory(categoryName);
+  }, []);
+
+  const handleCategoryTabsWheel = useCallback((event: WheelEvent<HTMLDivElement>) => {
+    const el = categoryTabsRef.current;
+    if (!el || el.scrollWidth <= el.clientWidth) return;
+    if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
+    event.preventDefault();
+    el.scrollLeft += event.deltaY;
+  }, []);
+
+  const handleCategoryTabsPointerDown = useCallback((event: PointerEvent<HTMLDivElement>) => {
+    const el = categoryTabsRef.current;
+    if (!el || el.scrollWidth <= el.clientWidth) return;
+    categoryDragRef.current = {
+      active: true,
+      startX: event.clientX,
+      scrollLeft: el.scrollLeft,
+      moved: false,
+    };
+    categoryClickBlockedRef.current = false;
+    setIsDraggingCategoryTabs(true);
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+  }, []);
+
+  const handleCategoryTabsPointerMove = useCallback((event: PointerEvent<HTMLDivElement>) => {
+    const drag = categoryDragRef.current;
+    const el = categoryTabsRef.current;
+    if (!drag.active || !el) return;
+    const deltaX = event.clientX - drag.startX;
+    if (Math.abs(deltaX) > 4) {
+      drag.moved = true;
+      categoryClickBlockedRef.current = true;
+    }
+    el.scrollLeft = drag.scrollLeft - deltaX;
+    event.preventDefault();
+  }, []);
+
+  const endCategoryTabsDrag = useCallback((event: PointerEvent<HTMLDivElement>) => {
+    const moved = categoryDragRef.current.moved;
+    categoryDragRef.current.active = false;
+    setIsDraggingCategoryTabs(false);
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
+    if (moved) {
+      window.setTimeout(() => {
+        categoryClickBlockedRef.current = false;
+      }, 160);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (
+      selectedHoldingCategory !== 'ALL' &&
+      !holdingAllocation.categories.some(item => item.categoryName === selectedHoldingCategory)
+    ) {
+      setSelectedHoldingCategory('ALL');
+    }
+  }, [holdingAllocation.categories, selectedHoldingCategory]);
 
   const runPriceRefresh = useCallback(async (force: boolean, message: string) => {
     if (holdings.length === 0) return;
@@ -922,7 +1015,9 @@ export default function Portfolio() {
       </div>
 
       <div className="section-header" style={{ marginTop: '24px', marginBottom: '4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h2 className="section-title" style={{ margin: 0 }}>📊 持股清單 ({holdings.length})</h2>
+        <h2 className="section-title" style={{ margin: 0 }}>
+          📊 持股清單 ({selectedHoldingCategory === 'ALL' ? holdings.length : `${filteredHoldings.length}/${holdings.length}`})
+        </h2>
         {!hasAiFeature && (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13.5px', color: '#555', cursor: 'pointer', fontWeight: 600, background: '#f5f5f5', padding: '6px 12px', borderRadius: '8px' }}>
@@ -994,6 +1089,51 @@ export default function Portfolio() {
         )}
       </div>
 
+      {holdingAllocation.categories.length > 0 && (
+        <div className="portfolio-category-tabs-shell">
+          <div
+            ref={categoryTabsRef}
+            className={`portfolio-category-tabs${isDraggingCategoryTabs ? ' is-dragging' : ''}`}
+            aria-label="庫存類別篩選"
+            onWheel={handleCategoryTabsWheel}
+            onPointerDown={handleCategoryTabsPointerDown}
+            onPointerMove={handleCategoryTabsPointerMove}
+            onPointerUp={endCategoryTabsDrag}
+            onPointerCancel={endCategoryTabsDrag}
+            onPointerLeave={endCategoryTabsDrag}
+          >
+            <button
+              type="button"
+              className={`portfolio-category-tab ${selectedHoldingCategory === 'ALL' ? 'active' : ''}`}
+              onClick={() => selectHoldingCategory('ALL')}
+            >
+              <span className="portfolio-category-tab-label">全部</span>
+              <span className="portfolio-category-tab-count">{holdings.length} 檔</span>
+            </button>
+            {holdingAllocation.categories.map(item => (
+              <button
+                type="button"
+                key={item.categoryName}
+                className={`portfolio-category-tab ${selectedHoldingCategory === item.categoryName ? 'active' : ''}`}
+                onClick={() => selectHoldingCategory(item.categoryName)}
+                title={`${item.categoryName}：NT$ ${formatMoney(item.marketValue)}，占庫存 ${item.percent.toFixed(1)}%`}
+              >
+                <span
+                  className="portfolio-category-tab-dot"
+                  style={{ backgroundColor: item.color }}
+                />
+                <span className="portfolio-category-tab-label">{formatCompactCategoryName(item.categoryName)}</span>
+                <span className="portfolio-category-tab-count">{item.stockCount} 檔</span>
+                <span className="portfolio-category-tab-detail" role="tooltip">
+                  <strong>{item.categoryName}</strong>
+                  <span>NT$ {formatMoney(item.marketValue)}・{item.percent.toFixed(1)}%・{item.stockCount} 檔</span>
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {activeEtfDialog && (
         <div className="pf-etf-info-overlay" onClick={() => setActiveEtfDialog(null)}>
           <div className="pf-etf-info-dialog" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
@@ -1029,8 +1169,16 @@ export default function Portfolio() {
                 🔍 去探索
               </button>
             </div>
+          ) : filteredHoldings.length === 0 ? (
+            <div className="empty-state">
+              <div className="empty-state-icon">🔎</div>
+              <div className="empty-state-title">這個類別目前沒有庫存</div>
+              <button className="btn btn-primary" onClick={() => setSelectedHoldingCategory('ALL')}>
+                顯示全部庫存
+              </button>
+            </div>
           ) : (
-            holdings.map((h: Holding) => {
+            filteredHoldings.map((h: Holding) => {
               const itemPL = (h.currentPrice - h.avgCost) * h.totalShares;
               const itemPLPct = ((h.currentPrice - h.avgCost) / h.avgCost * 100);
               const itemIsProfit = itemPL >= 0;
