@@ -349,6 +349,129 @@
   color: var(--loss-color) !important;
 }
 
+.portfolio-stock-mix {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 2px solid rgba(43, 33, 24, 0.08);
+  display: grid;
+  grid-template-columns: 156px minmax(0, 1fr);
+  align-items: center;
+  gap: 16px;
+}
+
+.portfolio-stock-mix-chart {
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  box-shadow: inset 0 0 0 1px rgba(43, 33, 24, 0.08), 0 10px 20px rgba(43, 33, 24, 0.08);
+  flex-shrink: 0;
+}
+
+.portfolio-stock-mix-hole {
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.94);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.15;
+  box-shadow: 0 2px 8px rgba(43, 33, 24, 0.1);
+}
+
+.portfolio-stock-mix-hole strong {
+  color: var(--text-primary);
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.portfolio-stock-mix-content {
+  min-width: 0;
+}
+
+.portfolio-stock-mix-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.portfolio-stock-mix-title {
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.portfolio-stock-mix-total {
+  color: rgba(43, 33, 24, 0.62);
+  font-size: 12px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.portfolio-stock-mix-list {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.portfolio-stock-mix-row {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) minmax(78px, auto) 52px;
+  align-items: center;
+  gap: 7px;
+  min-height: 26px;
+}
+
+.portfolio-stock-mix-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.72);
+}
+
+.portfolio-stock-mix-name {
+  min-width: 0;
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 900;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.portfolio-stock-mix-code {
+  margin-left: 5px;
+  color: rgba(43, 33, 24, 0.48);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.portfolio-stock-mix-value {
+  color: rgba(43, 33, 24, 0.58);
+  font-size: 11px;
+  font-weight: 800;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.portfolio-stock-mix-percent {
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 900;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
 @media (max-width: 640px) {
   .portfolio-asset-value {
     font-size: 34px;
@@ -369,6 +492,53 @@
 
   .portfolio-asset-pct {
     font-size: 0.78em;
+  }
+
+  .portfolio-stock-mix {
+    grid-template-columns: 128px minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  .portfolio-stock-mix-chart {
+    width: 124px;
+    height: 124px;
+  }
+
+  .portfolio-stock-mix-hole {
+    width: 74px;
+    height: 74px;
+  }
+
+  .portfolio-stock-mix-hole strong {
+    font-size: 16px;
+  }
+
+  .portfolio-stock-mix-row {
+    grid-template-columns: 10px minmax(0, 1fr) 50px;
+    gap: 6px;
+    min-height: 32px;
+  }
+
+  .portfolio-stock-mix-value {
+    grid-column: 2 / 3;
+    font-size: 10.5px;
+    text-align: left;
+  }
+
+  .portfolio-stock-mix-percent {
+    grid-column: 3 / 4;
+    grid-row: 1 / 3;
+    align-self: center;
+  }
+}
+
+@media (max-width: 380px) {
+  .portfolio-stock-mix {
+    grid-template-columns: 1fr;
+  }
+
+  .portfolio-stock-mix-chart {
+    justify-self: center;
   }
 }
 

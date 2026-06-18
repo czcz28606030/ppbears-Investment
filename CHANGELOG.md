@@ -1,9 +1,17 @@
 # 📦 PPBears Investment — 更新日誌
 
-> **目前版本：v1.24.85**（2026-06-15）
-> 最新更新：修正盤中個股價格優先使用 MIS 即時報價，避免台燿 6274 類似狀況仍顯示昨日收盤價。
+> **目前版本：v1.24.86**（2026-06-18）
+> 最新更新：新增 Portfolio 總資產卡的庫存類別甜甜圈圖，顯示各產業類別占股票庫存市值比例。
 
 ---
+
+## [v1.24.86] - 2026-06-18
+### Added
+- Added a Portfolio stock-category donut chart under the total asset card, grouping current holdings by industry category rather than individual stocks or cash balance.
+- Added category-level market value, holding count, and percentage rows so users can quickly see which industry groups dominate the stock inventory.
+
+### Changed
+- Enlarged the donut chart and tuned mobile layout so category labels, values, and percentages remain readable on narrow screens.
 
 ## [v1.24.85] - 2026-06-15
 ### Fixed

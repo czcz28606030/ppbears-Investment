@@ -36,6 +36,25 @@ type SignalCacheData = {
   [stockCode: string]: PortfolioAiSignal | StockQuantMeta | string | number | undefined;
 };
 
+const HOLDING_ALLOCATION_COLORS = [
+  '#ff5a66',
+  '#2e9cca',
+  '#31b27c',
+  '#ffb020',
+  '#8b5cf6',
+  '#14b8a6',
+  '#f97316',
+  '#64748b',
+];
+
+function formatHoldingCategoryName(industry?: string): string {
+  const name = industry?.trim();
+  if (!name) return '未分類類別';
+  if (name.endsWith('類別')) return name;
+  if (name.endsWith('業')) return `${name.slice(0, -1)}類別`;
+  return `${name}類別`;
+}
+
 function getChipLabel(pts: number | undefined): string {
   if (pts === undefined || !Number.isFinite(pts)) return '--';
   if (pts >= 9) return '最乾淨';
@@ -236,6 +255,64 @@ export default function Portfolio() {
 
   const pl = summary.totalProfitLoss;
   const isProfit = pl >= 0;
+  const holdingAllocation = useMemo(() => {
+    const categoryMap = holdings.reduce<Record<string, { categoryName: string; marketValue: number; stockCount: number }>>((acc, h) => {
+      const marketValue = Math.max(0, h.currentPrice * h.totalShares);
+      if (marketValue <= 0) return acc;
+
+      const categoryName = formatHoldingCategoryName(h.industry);
+      if (!acc[categoryName]) {
+        acc[categoryName] = { categoryName, marketValue: 0, stockCount: 0 };
+      }
+      acc[categoryName].marketValue += marketValue;
+      acc[categoryName].stockCount += 1;
+      return acc;
+    }, {});
+
+    const rawItems = Object.values(categoryMap)
+      .sort((a, b) => b.marketValue - a.marketValue);
+
+    const totalMarketValue = rawItems.reduce((sum, item) => sum + item.marketValue, 0);
+    if (totalMarketValue <= 0) {
+      return { totalMarketValue: 0, itemCount: 0, items: [], gradient: '' };
+    }
+
+    const primaryItems = rawItems.slice(0, 5);
+    const otherItems = rawItems.slice(5);
+    const displayItems = primaryItems.map((item, index) => ({
+      ...item,
+      color: HOLDING_ALLOCATION_COLORS[index % HOLDING_ALLOCATION_COLORS.length],
+    }));
+
+    if (otherItems.length > 0) {
+      displayItems.push({
+        categoryName: `其他 ${otherItems.length} 類別`,
+        marketValue: otherItems.reduce((sum, item) => sum + item.marketValue, 0),
+        stockCount: otherItems.reduce((sum, item) => sum + item.stockCount, 0),
+        color: HOLDING_ALLOCATION_COLORS[HOLDING_ALLOCATION_COLORS.length - 1],
+      });
+    }
+
+    const items = displayItems.map(item => ({
+      ...item,
+      percent: (item.marketValue / totalMarketValue) * 100,
+    }));
+
+    let cursor = 0;
+    const segments = items.map((item, index) => {
+      const start = cursor;
+      const end = index === items.length - 1 ? 100 : cursor + item.percent;
+      cursor = end;
+      return `${item.color} ${start.toFixed(2)}% ${end.toFixed(2)}%`;
+    });
+
+    return {
+      totalMarketValue,
+      itemCount: rawItems.length,
+      items,
+      gradient: `conic-gradient(${segments.join(', ')})`,
+    };
+  }, [holdings]);
 
   const [aiSignals, setAiSignals] = useState<Record<string, PortfolioAiSignal>>({});
   const [signalDataDate, setSignalDataDate] = useState<string>('');;
@@ -800,6 +877,48 @@ export default function Portfolio() {
             </span>
           </div>
         </div>
+
+        {holdingAllocation.totalMarketValue > 0 && (
+          <div className="portfolio-stock-mix" aria-label="庫存類別組成">
+            <div
+              className="portfolio-stock-mix-chart"
+              style={{ background: holdingAllocation.gradient }}
+            >
+              <div className="portfolio-stock-mix-hole">
+                <span>類別</span>
+                <strong>{holdingAllocation.itemCount} 個</strong>
+              </div>
+            </div>
+            <div className="portfolio-stock-mix-content">
+              <div className="portfolio-stock-mix-header">
+                <span className="portfolio-stock-mix-title">庫存類別組成</span>
+                <span className="portfolio-stock-mix-total">
+                  NT$ {formatMoney(holdingAllocation.totalMarketValue)}
+                </span>
+              </div>
+              <div className="portfolio-stock-mix-list">
+                {holdingAllocation.items.map(item => (
+                  <div className="portfolio-stock-mix-row" key={item.categoryName}>
+                    <span
+                      className="portfolio-stock-mix-swatch"
+                      style={{ backgroundColor: item.color }}
+                    />
+                    <span className="portfolio-stock-mix-name">
+                      {item.categoryName}
+                      <span className="portfolio-stock-mix-code">{item.stockCount} 檔</span>
+                    </span>
+                    <span className="portfolio-stock-mix-value">
+                      NT$ {formatMoney(item.marketValue)}
+                    </span>
+                    <span className="portfolio-stock-mix-percent">
+                      {item.percent.toFixed(1)}%
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="section-header" style={{ marginTop: '24px', marginBottom: '4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
