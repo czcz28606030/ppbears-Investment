@@ -1,10 +1,10 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { fetchOfficialClosePrice, fetchSimonsData, toRecommendation, fetchOfficialPriceMap, fetchStockQuantData, refreshDailyAiCache, clearQuantSignalTTLCache, clearSimonsDataTTLCache, fetchDailyAiCacheVersion, getKnownDailyAiCacheVersion, rememberDailyAiCacheVersion } from '../api';
+import { fetchOfficialClosePrice, fetchSimonsData, toRecommendation, fetchOfficialPriceMap, fetchStockQuantData, refreshDailyAiCache, clearQuantSignalTTLCache, clearSimonsDataTTLCache, fetchDailyAiCacheVersion, getKnownDailyAiCacheVersion, rememberDailyAiCacheVersion, ensureDailyAiCacheVersion } from '../api';
 import type { StockRecommendation } from '../types';
 import type { OfficialPriceMapEntry, StockQuantData, StockQuantMeta } from '../api';
 import { useStore } from '../store';
-import { getCache, setCache, clearCache, CACHE_KEYS } from '../cache';
+import { getCache, setCache, clearCache, getVersionedCache, invalidateDailyMarketDataCaches, CACHE_KEYS } from '../cache';
 import AdBanner from '../components/AdBanner';
 import MarketBadge from '../components/MarketBadge';
 import IndustryIcon from '../components/IndustryIcon';
@@ -63,6 +63,7 @@ export default function Explore() {
   const [simonsMeta, setSimonsMeta] = useState<Record<string, any>>({}); // 保存原始 SimonsItem 供重新評分用
   const [quantMeta, setQuantMeta] = useState<StockQuantMeta | null>(null);
   const [priceUpdatedLabel, setPriceUpdatedLabel] = useState('');
+  const [dailyDataVersion, setDailyDataVersion] = useState(() => getKnownDailyAiCacheVersion('explore') || '');
   const resultRef = useRef<HTMLDivElement>(null);
   const forceFreshQuantRef = useRef(false);
   const pendingScrollY = useRef(restored.current?.scrollY ?? 0);
@@ -73,6 +74,9 @@ export default function Explore() {
   }
 
   async function loadData(forceFresh = false) {
+    const dataVersion = await ensureDailyAiCacheVersion('explore', forceFresh);
+    if (dataVersion && dataVersion !== dailyDataVersion) setDailyDataVersion(dataVersion);
+
     if (forceFresh) {
       clearCache(CACHE_KEYS.TWSE_PRICE_MAP);
       clearCache(CACHE_KEYS.SIMONS_DATA);
@@ -102,8 +106,8 @@ export default function Explore() {
       }
 
       // 檢查 Simons 快取
-      type SimonsCacheData = { recs: StockRecommendation[]; meta: Record<string, any> };
-      const cachedSimons = forceFresh ? null : getCache<SimonsCacheData>(CACHE_KEYS.SIMONS_DATA);
+      type SimonsCacheData = { recs: StockRecommendation[]; meta: Record<string, any>; _dataVersion?: string };
+      const cachedSimons = forceFresh ? null : getVersionedCache<SimonsCacheData>(CACHE_KEYS.SIMONS_DATA, dataVersion);
       if (cachedSimons) {
         setSimonsMeta(cachedSimons.meta);
         setRecommendations(cachedSimons.recs);
@@ -122,7 +126,7 @@ export default function Explore() {
         const recs = items.map(item => toRecommendation(item));
         recs.sort((a, b) => b.score - a.score);
         setRecommendations(recs);
-        setCache<SimonsCacheData>(CACHE_KEYS.SIMONS_DATA, { recs, meta });
+        setCache<SimonsCacheData>(CACHE_KEYS.SIMONS_DATA, { recs, meta, _dataVersion: dataVersion || undefined });
         setLoading(false);
         return;
       }
@@ -146,23 +150,29 @@ export default function Explore() {
       const known = getKnownDailyAiCacheVersion('explore');
       if (!known) {
         rememberDailyAiCacheVersion(latest.version, 'explore');
+        setDailyDataVersion(latest.version);
         return;
       }
       if (latest.version !== known) {
         rememberDailyAiCacheVersion(latest.version, 'explore');
-        clearQuantSignalTTLCache();
-        clearSimonsDataTTLCache();
-        clearCache(CACHE_KEYS.SIMONS_DATA);
+        setDailyDataVersion(latest.version);
+        invalidateDailyMarketDataCaches();
         forceFreshQuantRef.current = true;
         loadData(true);
       }
     }
 
+    function handlePageShow() {
+      checkSharedAiCacheVersion();
+    }
+
     checkSharedAiCacheVersion();
     const timer = window.setInterval(checkSharedAiCacheVersion, DAILY_AI_CACHE_POLL_MS);
+    window.addEventListener('pageshow', handlePageShow);
     return () => {
       cancelled = true;
       window.clearInterval(timer);
+      window.removeEventListener('pageshow', handlePageShow);
     };
   }, [loading, quantLoading]);
 
@@ -193,6 +203,7 @@ export default function Explore() {
       search,
       activeStrategy,
       scrollY: window.scrollY,
+      _dataVersion: dailyDataVersion || getKnownDailyAiCacheVersion('explore') || undefined,
     }));
     // 保存當前篩選列表供 StockDetail 滑塊使用
     const stockList = filtered.map(r => {
@@ -206,7 +217,10 @@ export default function Explore() {
         chipPts: qd?.chipStability ? parseFloat(qd.chipStability.pts) : null,
       };
     });
-    sessionStorage.setItem('explore_stock_list', JSON.stringify(stockList));
+    sessionStorage.setItem('explore_stock_list', JSON.stringify({
+      _dataVersion: dailyDataVersion || getKnownDailyAiCacheVersion('explore') || undefined,
+      items: stockList,
+    }));
     navigate(`/stock/${coid}`);
   }
 
@@ -379,6 +393,7 @@ export default function Explore() {
   async function handleRefreshData() {
     setSearchQuantLoading(false);
     forceFreshQuantRef.current = true;
+    invalidateDailyMarketDataCaches();
     clearQuantSignalTTLCache();
     clearSimonsDataTTLCache();
     const stockCodes = [
@@ -387,7 +402,11 @@ export default function Explore() {
     ];
     await refreshDailyAiCache(stockCodes);
     const latest = await fetchDailyAiCacheVersion();
-    if (latest?.version) rememberDailyAiCacheVersion(latest.version, 'explore');
+    if (latest?.version) {
+      rememberDailyAiCacheVersion(latest.version, 'explore');
+      setDailyDataVersion(latest.version);
+      invalidateDailyMarketDataCaches();
+    }
     loadData(true);
   }
 

@@ -1,9 +1,19 @@
 # 📦 PPBears Investment — 更新日誌
 
-> **目前版本：v1.24.88**（2026-06-22）
-> 最新更新：在 Portfolio 庫存卡加入快速買入/賣出入口，並隱藏庫存分類篩選列。
+> **目前版本：v1.24.89**（2026-06-22）
+> 最新更新：加入一日資料版本門檻，避免返回頁面或本機快取沿用舊 AI 訊號與 K 線摘要。
 
 ---
+
+## [v1.24.89] - 2026-06-22
+### Added
+- Added a shared daily AI cache version gate so Explore, Watchlist, Portfolio, and Stock Detail only reuse cached AI signals and K-line summaries when they match the latest daily data version.
+- Added `pageshow` version checks for back/forward navigation so restored pages invalidate stale market-data cache before showing old AI signal results.
+
+### Changed
+- Versioned local Simons and quant TTL cache keys by the daily AI cache version, preventing old `AI 買進 / AI 中立 / AI 賣出` data from being reused after a daily refresh.
+- Versioned Explore's stock-detail return list payload and invalidates old session lists when the daily data version changes.
+- Changed the AI cache-version API response to `no-store` so freshness checks do not receive stale CDN responses.
 
 ## [v1.24.88] - 2026-06-22
 ### Added

@@ -23,6 +23,10 @@ interface PersistentCacheEntry<T> extends CacheEntry<T> {
   refreshSlot?: string;
 }
 
+export type VersionedMarketCache = {
+  _dataVersion?: string;
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const store: Map<string, CacheEntry<any>> = new Map();
 
@@ -35,6 +39,21 @@ export function getCache<T>(key: string): T | null {
     return null;
   }
   return entry.data as T;
+}
+
+/** 取得帶每日資料版本的快取；版本不合時直接淘汰，避免返回頁還原舊資料。 */
+export function getVersionedCache<T extends VersionedMarketCache>(key: string, dataVersion?: string | null): T | null {
+  const data = getCache<T>(key);
+  if (!data) return null;
+  if (dataVersion && data._dataVersion !== dataVersion) {
+    clearCache(key);
+    return null;
+  }
+  if (!dataVersion && !data._dataVersion) {
+    clearCache(key);
+    return null;
+  }
+  return data;
 }
 
 /** 寫入快取 */
@@ -65,6 +84,25 @@ export function getPersistentCache<T>(key: string, refreshSlot?: string): T | nu
   }
 }
 
+/** 讀取帶每日資料版本的跨頁快取；版本不合時清除 localStorage。 */
+export function getVersionedPersistentCache<T extends VersionedMarketCache>(
+  key: string,
+  refreshSlot?: string,
+  dataVersion?: string | null
+): T | null {
+  const data = getPersistentCache<T>(key, refreshSlot);
+  if (!data) return null;
+  if (dataVersion && data._dataVersion !== dataVersion) {
+    clearPersistentCache(key);
+    return null;
+  }
+  if (!dataVersion && !data._dataVersion) {
+    clearPersistentCache(key);
+    return null;
+  }
+  return data;
+}
+
 /** 寫入可跨頁面刷新保留的快取 */
 export function setPersistentCache<T>(key: string, data: T, ttlMs: number = DEFAULT_TTL_MS, refreshSlot?: string): void {
   if (typeof localStorage === 'undefined') return;
@@ -89,6 +127,31 @@ export function clearPersistentCache(key: string): void {
 /** 清除所有快取 */
 export function clearAllCache(): void {
   store.clear();
+}
+
+/** 清除每日 AI/量化/K 線摘要相關快取；保留非資料性的 UI 偏好。 */
+export function invalidateDailyMarketDataCaches(): void {
+  store.delete('simons_data');
+  store.delete('watchlist_full');
+  store.delete('portfolio_signals_v7');
+  try {
+    const localPrefixes = [
+      'ppbears_quant30_',
+      'ppbears_simons_daily7_',
+    ];
+    const exactLocalKeys = [
+      'ppbears_watchlist_full_v4',
+      'ppbears_portfolio_signals_v7',
+    ];
+    Object.keys(localStorage).forEach(key => {
+      if (exactLocalKeys.includes(key) || localPrefixes.some(prefix => key.startsWith(prefix))) {
+        localStorage.removeItem(key);
+      }
+    });
+  } catch {}
+  try {
+    sessionStorage.removeItem('explore_stock_list');
+  } catch {}
 }
 
 /** 取得快取剩餘時間（毫秒），-1 表示不存在 */

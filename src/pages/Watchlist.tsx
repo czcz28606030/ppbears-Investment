@@ -1,10 +1,10 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore, formatPrice } from '../store';
-import { fetchOfficialClosePrice, fetchOfficialPriceMap, fetchSimonsData, fetchStockData, fetchStockQuantData, toRecommendation, fetchSimonsRecommendationCounts, refreshDailyAiCache, clearQuantSignalTTLCache, clearSimonsDataTTLCache, fetchDailyAiCacheVersion, getKnownDailyAiCacheVersion, rememberDailyAiCacheVersion, fetchActiveEtfRadarMap } from '../api';
+import { fetchOfficialClosePrice, fetchOfficialPriceMap, fetchSimonsData, fetchStockData, fetchStockQuantData, toRecommendation, fetchSimonsRecommendationCounts, refreshDailyAiCache, clearQuantSignalTTLCache, clearSimonsDataTTLCache, fetchDailyAiCacheVersion, getKnownDailyAiCacheVersion, rememberDailyAiCacheVersion, ensureDailyAiCacheVersion, fetchActiveEtfRadarMap } from '../api';
 import type { ActiveEtfRadarItem, OfficialClosePrice, OfficialPriceMapEntry, StockQuantData, StockQuantMeta } from '../api';
 import type { SimonsItem, StockData, StockPrice, StockRecommendation, WatchlistSignal, WatchlistWarning } from '../types';
-import { getCache, setCache, clearCache, getPersistentCache, setPersistentCache, clearPersistentCache, CACHE_KEYS } from '../cache';
+import { getCache, setCache, clearCache, getVersionedCache, getPersistentCache, getVersionedPersistentCache, setPersistentCache, invalidateDailyMarketDataCaches, CACHE_KEYS } from '../cache';
 import MarketBadge from '../components/MarketBadge';
 import IndustryIcon from '../components/IndustryIcon';
 import { canAutoRefreshPrices, formatPriceUpdateLabel, PRICE_AUTO_REFRESH_MS } from '../utils/priceAutoRefresh';
@@ -200,6 +200,7 @@ export default function Watchlist() {
   const [recommendationCounts, setRecommendationCounts] = useState<Record<string, number>>({});
   const [activeEtfMap, setActiveEtfMap] = useState<Record<string, ActiveEtfRadarItem>>({});
   const [priceUpdatedLabel, setPriceUpdatedLabel] = useState('');
+  const [dailyDataVersion, setDailyDataVersion] = useState(() => getKnownDailyAiCacheVersion('watchlist') || '');
 
   // 進入頁面時抓取即時報價 + 訊號分析
   useEffect(() => {
@@ -218,6 +219,14 @@ export default function Watchlist() {
       sortDirection,
     }));
   }, [filterWarnOnly, filterAiSignal, filterAiRemark, sortKey, sortDirection]);
+  useEffect(() => {
+    if (dailyDataVersion) return;
+    let cancelled = false;
+    ensureDailyAiCacheVersion('watchlist').then(version => {
+      if (!cancelled && version) setDailyDataVersion(version);
+    });
+    return () => { cancelled = true; };
+  }, [dailyDataVersion]);
 
   useEffect(() => {
     if (hasAiFeature) return;
@@ -302,14 +311,13 @@ export default function Watchlist() {
       const known = getKnownDailyAiCacheVersion('watchlist');
       if (!known) {
         rememberDailyAiCacheVersion(latest.version, 'watchlist');
+        setDailyDataVersion(latest.version);
         return;
       }
       if (latest.version !== known) {
         rememberDailyAiCacheVersion(latest.version, 'watchlist');
-        clearCache(CACHE_KEYS.WATCHLIST_FULL);
-        clearPersistentCache(WATCHLIST_PERSISTENT_CACHE_KEY);
-        clearQuantSignalTTLCache();
-        clearSimonsDataTTLCache();
+        setDailyDataVersion(latest.version);
+        invalidateDailyMarketDataCaches();
         setLastAnalyzedAt(null);
         setUsingWatchlistCache(false);
         setLiveQuotes({});
@@ -321,11 +329,17 @@ export default function Watchlist() {
       }
     }
 
+    function handlePageShow() {
+      checkSharedAiCacheVersion();
+    }
+
     checkSharedAiCacheVersion();
     const timer = window.setInterval(checkSharedAiCacheVersion, DAILY_AI_CACHE_POLL_MS);
+    window.addEventListener('pageshow', handlePageShow);
     return () => {
       cancelled = true;
       window.clearInterval(timer);
+      window.removeEventListener('pageshow', handlePageShow);
     };
   }, [watchlist.length, dataLoading, hasAiFeature]);
 
@@ -348,13 +362,15 @@ export default function Watchlist() {
       accessScope?: 'ai' | 'basic';
       refreshSlot?: string;
       priceUpdatedLabel?: string;
+      _dataVersion?: string;
     };
     const cacheKey = CACHE_KEYS.WATCHLIST_FULL;
     const watchlistCodes = watchlist.map(w => w.stockCode);
     const watchlistKeys = watchlistCodes.slice().sort().join(',');
     const refreshSlot = getRefreshSlotInfo();
+    const dataVersion = dailyDataVersion || getKnownDailyAiCacheVersion('watchlist');
     const cached = refreshKey === 0
-      ? getCache<WatchlistCacheData>(cacheKey) || getPersistentCache<WatchlistCacheData>(WATCHLIST_PERSISTENT_CACHE_KEY, refreshSlot.key)
+      ? getVersionedCache<WatchlistCacheData>(cacheKey, dataVersion) || getVersionedPersistentCache<WatchlistCacheData>(WATCHLIST_PERSISTENT_CACHE_KEY, refreshSlot.key, dataVersion)
       : null;
     if (
       refreshKey === 0 &&
@@ -520,6 +536,7 @@ export default function Watchlist() {
           accessScope: 'basic',
           refreshSlot: refreshSlot.key,
           priceUpdatedLabel: nextPriceUpdatedLabel || undefined,
+          _dataVersion: dataVersion || undefined,
         };
         const ttlMs = Math.min(WATCHLIST_FULL_TTL_MS, refreshSlot.ttlMs);
         setCache<WatchlistCacheData>(cacheKey, cacheData, ttlMs);
@@ -602,7 +619,8 @@ export default function Watchlist() {
         accessScope: 'ai',
         refreshSlot: refreshSlot.key,
         priceUpdatedLabel: nextPriceUpdatedLabel || undefined,
-      };
+          _dataVersion: dataVersion || undefined,
+        };
       const ttlMs = Math.min(WATCHLIST_FULL_TTL_MS, refreshSlot.ttlMs);
       setCache<WatchlistCacheData>(cacheKey, cacheData, ttlMs);
       setPersistentCache<WatchlistCacheData>(WATCHLIST_PERSISTENT_CACHE_KEY, cacheData, ttlMs, refreshSlot.key);
@@ -616,7 +634,7 @@ export default function Watchlist() {
       setQuotesLoading(false);
       setLoadingStep('資料讀取失敗，請稍後再試或手動重新抓取');
     });
-  }, [watchlist, refreshKey, checkWatchlistSignals, hasAiFeature]);
+  }, [watchlist, refreshKey, checkWatchlistSignals, hasAiFeature, dailyDataVersion]);
 
   useEffect(() => {
     if (watchlist.length === 0) return;
@@ -1360,15 +1378,18 @@ export default function Watchlist() {
             title={hasAiFeature ? '手動檢查每日 AI 快取並更新價格' : '手動重新整理觀察資料'}
             disabled={dataLoading}
             onClick={async () => {
-              clearCache(CACHE_KEYS.WATCHLIST_FULL);
-              clearPersistentCache(WATCHLIST_PERSISTENT_CACHE_KEY);
+              invalidateDailyMarketDataCaches();
               clearSimonsDataTTLCache();
               if (hasAiFeature) {
                 clearQuantSignalTTLCache();
                 setLoadingStep('正在手動檢查 Simons 每日資料...');
                 await refreshDailyAiCache(watchlist.map(item => item.stockCode));
                 const latest = await fetchDailyAiCacheVersion();
-                if (latest?.version) rememberDailyAiCacheVersion(latest.version, 'watchlist');
+                if (latest?.version) {
+                  rememberDailyAiCacheVersion(latest.version, 'watchlist');
+                  setDailyDataVersion(latest.version);
+                  invalidateDailyMarketDataCaches();
+                }
               }
               // 重新讀取每日快取。
               setLastAnalyzedAt(null);

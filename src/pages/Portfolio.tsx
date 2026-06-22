@@ -2,9 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent, t
 import { useNavigate } from 'react-router-dom';
 import { useStore, formatMoney, formatPrice } from '../store';
 import type { Holding, StockTradingSignal, Trade } from '../types';
-import { fetchOfficialPriceMap, fetchStockQuantData, fetchStockTradingSignals, fetchSimonsRecommendationCounts, clearOfficialPriceMapCache, refreshDailyAiCache, clearQuantSignalTTLCache, fetchDailyAiCacheVersion, getKnownDailyAiCacheVersion, rememberDailyAiCacheVersion, fetchActiveEtfRadarMap } from '../api';
+import { fetchOfficialPriceMap, fetchStockQuantData, fetchStockTradingSignals, fetchSimonsRecommendationCounts, clearOfficialPriceMapCache, refreshDailyAiCache, clearQuantSignalTTLCache, fetchDailyAiCacheVersion, getKnownDailyAiCacheVersion, rememberDailyAiCacheVersion, ensureDailyAiCacheVersion, fetchActiveEtfRadarMap } from '../api';
 import type { ActiveEtfRadarItem, OfficialPriceMapEntry, StockQuantData, StockQuantMeta } from '../api';
-import { getCache, setCache, clearCache, getPersistentCache, setPersistentCache, clearPersistentCache, CACHE_KEYS } from '../cache';
+import { getCache, setCache, clearCache, getVersionedCache, getVersionedPersistentCache, setPersistentCache, clearPersistentCache, invalidateDailyMarketDataCaches, CACHE_KEYS } from '../cache';
 import MarketBadge from '../components/MarketBadge';
 import IndustryIcon from '../components/IndustryIcon';
 import StockTradeModal from '../components/StockTradeModal';
@@ -34,6 +34,7 @@ type SignalCacheData = {
   _refreshSlot?: string;
   _createdAt?: number;
   _quantMeta?: StockQuantMeta;
+  _dataVersion?: string;
   [stockCode: string]: PortfolioAiSignal | StockQuantMeta | string | number | undefined;
 };
 
@@ -351,6 +352,7 @@ export default function Portfolio() {
   const [selectedTrade, setSelectedTrade] = useState<{ mode: 'buy' | 'sell'; holding: Holding } | null>(null);
   const [quantMeta, setQuantMeta] = useState<StockQuantMeta | null>(null);
   const [priceUpdatedLabel, setPriceUpdatedLabel] = useState('');
+  const [dailyDataVersion, setDailyDataVersion] = useState(() => getKnownDailyAiCacheVersion('portfolio') || '');
   const [enableCustomSignal, setEnableCustomSignal] = useState(() => {
     return localStorage.getItem('ppbears_custom_signal') === 'true';
   });
@@ -491,6 +493,14 @@ export default function Portfolio() {
     setEnableCustomSignal(val);
     localStorage.setItem('ppbears_custom_signal', String(val));
   };
+  useEffect(() => {
+    if (dailyDataVersion) return;
+    let cancelled = false;
+    ensureDailyAiCacheVersion('portfolio').then(version => {
+      if (!cancelled && version) setDailyDataVersion(version);
+    });
+    return () => { cancelled = true; };
+  }, [dailyDataVersion]);
 
   const holdingStartDates = useMemo(() => {
     const dates: Record<string, string | undefined> = {};
@@ -531,13 +541,13 @@ export default function Portfolio() {
       const known = getKnownDailyAiCacheVersion('portfolio');
       if (!known) {
         rememberDailyAiCacheVersion(latest.version, 'portfolio');
+        setDailyDataVersion(latest.version);
         return;
       }
       if (latest.version !== known) {
         rememberDailyAiCacheVersion(latest.version, 'portfolio');
-        clearCache(CACHE_KEYS.PORTFOLIO_SIGNALS);
-        clearPersistentCache(PORTFOLIO_PERSISTENT_CACHE_KEY);
-        clearQuantSignalTTLCache();
+        setDailyDataVersion(latest.version);
+        invalidateDailyMarketDataCaches();
         setAiSignals({});
         setSignalDataDate('');
         setQuantMeta(null);
@@ -547,11 +557,17 @@ export default function Portfolio() {
       }
     }
 
+    function handlePageShow() {
+      checkSharedAiCacheVersion();
+    }
+
     checkSharedAiCacheVersion();
     const timer = window.setInterval(checkSharedAiCacheVersion, DAILY_AI_CACHE_POLL_MS);
+    window.addEventListener('pageshow', handlePageShow);
     return () => {
       cancelled = true;
       window.clearInterval(timer);
+      window.removeEventListener('pageshow', handlePageShow);
     };
   }, [holdings.length, isRefreshing]);
 
@@ -717,8 +733,9 @@ export default function Portfolio() {
         .join(',');
       const cacheKey = CACHE_KEYS.PORTFOLIO_SIGNALS;
       const refreshSlot = getRefreshSlotInfo();
+      const dataVersion = dailyDataVersion || getKnownDailyAiCacheVersion('portfolio');
       const cached = refreshKey === 0
-        ? getCache<SignalCacheData>(cacheKey) || getPersistentCache<SignalCacheData>(PORTFOLIO_PERSISTENT_CACHE_KEY, refreshSlot.key)
+        ? getVersionedCache<SignalCacheData>(cacheKey, dataVersion) || getVersionedPersistentCache<SignalCacheData>(PORTFOLIO_PERSISTENT_CACHE_KEY, refreshSlot.key, dataVersion)
         : null;
       const canUseCachedSignals = refreshKey === 0 && isFreshTodaySignalCache(cached, holdingKeys) && cached._refreshSlot === refreshSlot.key;
       if (canUseCachedSignals) {
@@ -880,6 +897,7 @@ export default function Portfolio() {
           _refreshSlot: refreshSlot.key,
           _createdAt: createdAt,
           _quantMeta: latestQuantMeta || undefined,
+          _dataVersion: dataVersion || undefined,
         };
         const ttlMs = Math.min(PORTFOLIO_SIGNAL_TTL_MS, refreshSlot.ttlMs);
         setCache(cacheKey, cacheData, ttlMs);
@@ -895,7 +913,7 @@ export default function Portfolio() {
       }
     });
     return () => { mounted = false; };
-  }, [holdings, holdingStartDates, hasAiFeature, enableCustomSignal, refreshKey]);
+  }, [holdings, holdingStartDates, hasAiFeature, enableCustomSignal, refreshKey, dailyDataVersion]);
 
   useEffect(() => {
     let mounted = true;
@@ -1065,7 +1083,11 @@ export default function Portfolio() {
                 setLoadingMsg('正在手動檢查 Simons 每日資料...');
                 await refreshDailyAiCache(holdings.map(h => h.stockCode));
                 const latest = await fetchDailyAiCacheVersion();
-                if (latest?.version) rememberDailyAiCacheVersion(latest.version, 'portfolio');
+                if (latest?.version) {
+                  rememberDailyAiCacheVersion(latest.version, 'portfolio');
+                  setDailyDataVersion(latest.version);
+                  invalidateDailyMarketDataCaches();
+                }
                 await runPriceRefresh(true, '正在重新抓取持股價格...');
                 // 遞增 refreshKey 重新讀取每日 AI 快取。
                 setRefreshKey(k => k + 1);

@@ -1510,7 +1510,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (type === 'ai-cache-version') {
-      res.setHeader('Cache-Control', 's-maxage=30, stale-while-revalidate=60');
+      res.setHeader('Cache-Control', 'no-store, max-age=0');
       return res.status(200).json(await getDailyAiCacheVersion());
     }
 

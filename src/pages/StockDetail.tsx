@@ -9,6 +9,7 @@ import StockChart from '../components/TradingViewChart';
 import MarketBadge from '../components/MarketBadge';
 import IndustryIcon from '../components/IndustryIcon';
 import StockTradeModal from '../components/StockTradeModal';
+import { invalidateDailyMarketDataCaches } from '../cache';
 import { calculateAddPriority } from '../utils/addPriority';
 import { getIndustryTailwind, getIndustryTailwindScore } from '../utils/industryTailwinds';
 import './StockDetail.css';
@@ -280,37 +281,48 @@ export default function StockDetail() {
 
   // ─── Explore 推薦股票滑塊 ─────────────────────────────
   type ExploreStock = { coid: string; name: string; close: string; aiRemark: string | null; cumRet: string | null; chipPts: number | null };
+  type ExploreStockListPayload = { _dataVersion?: string; items: ExploreStock[] };
   const [exploreStockList, setExploreStockList] = useState<ExploreStock[]>([]);
   useEffect(() => {
     try {
       const raw = sessionStorage.getItem('explore_stock_list');
-      if (raw) {
-        const parsed: ExploreStock[] = JSON.parse(raw);
-        setExploreStockList(parsed);
-        // 如果量化資料缺失（非 AI 策略進來），批次補抓
-        // aiRemark === null 表示尚未抓取（'' 表示已抓但無資料）
-        const missing = parsed.filter(s => s.coid !== code && s.aiRemark === null).slice(0, 15);
-        if (missing.length > 0) {
-          Promise.all(missing.map(async s => {
-            try { return await fetchStockQuantData(s.coid); }
-            catch { return null; }
-          })).then(results => {
-            const updated = parsed.map(s => {
-              const idx = missing.findIndex(m => m.coid === s.coid);
-              if (idx === -1) return s;
-              const qd = results[idx];
-              return {
-                ...s,
-                aiRemark: qd?.aiQuanBackDataComment?.remark ?? '',
-                cumRet: qd?.aiQuanBackDataComment?.cum_ret ?? '',
-                chipPts: qd?.chipStability ? parseFloat(qd.chipStability.pts) : -1,
-              };
-            });
-            setExploreStockList(updated);
-            // 寫回 sessionStorage，避免換股時重複抓取
-            try { sessionStorage.setItem('explore_stock_list', JSON.stringify(updated)); } catch {}
-          }).catch(() => {});
-        }
+      if (!raw) return;
+
+      const parsedRaw = JSON.parse(raw) as ExploreStock[] | ExploreStockListPayload;
+      const parsedVersion = Array.isArray(parsedRaw) ? undefined : parsedRaw._dataVersion;
+      const parsed = Array.isArray(parsedRaw) ? parsedRaw : parsedRaw.items;
+      const currentVersion = getKnownDailyAiCacheVersion('stock-detail');
+      if (!Array.isArray(parsed) || (currentVersion && parsedVersion !== currentVersion)) {
+        sessionStorage.removeItem('explore_stock_list');
+        return;
+      }
+
+      setExploreStockList(parsed);
+      const missing = parsed.filter(s => s.coid !== code && s.aiRemark === null).slice(0, 15);
+      if (missing.length > 0) {
+        Promise.all(missing.map(async s => {
+          try { return await fetchStockQuantData(s.coid); }
+          catch { return null; }
+        })).then(results => {
+          const updated = parsed.map(s => {
+            const idx = missing.findIndex(m => m.coid === s.coid);
+            if (idx === -1) return s;
+            const qd = results[idx];
+            return {
+              ...s,
+              aiRemark: qd?.aiQuanBackDataComment?.remark ?? '',
+              cumRet: qd?.aiQuanBackDataComment?.cum_ret ?? '',
+              chipPts: qd?.chipStability ? parseFloat(qd.chipStability.pts) : -1,
+            };
+          });
+          setExploreStockList(updated);
+          try {
+            sessionStorage.setItem('explore_stock_list', JSON.stringify({
+              _dataVersion: parsedVersion || currentVersion || undefined,
+              items: updated,
+            }));
+          } catch {}
+        }).catch(() => {});
       }
     } catch {}
   }, [code]);
@@ -476,6 +488,7 @@ export default function StockDetail() {
       }
       if (latest.version !== known) {
         rememberDailyAiCacheVersion(latest.version, 'stock-detail');
+        invalidateDailyMarketDataCaches();
         clearQuantSignalTTLCache();
         clearSimonsDataTTLCache();
         setQuantLoading(true);
@@ -2121,10 +2134,4 @@ export default function StockDetail() {
     </div>
   );
 }
-
-
-
-
-
-
 

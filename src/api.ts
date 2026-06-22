@@ -122,6 +122,16 @@ export type DailyAiCacheVersion = {
 };
 
 const DAILY_AI_CACHE_VERSION_KEY = 'ppbears_daily_ai_cache_version_v1';
+const DAILY_AI_CACHE_GLOBAL_SURFACE = 'global';
+
+function toDailyAiVersionToken(version: string | null | undefined): string {
+  if (!version) return 'unversioned';
+  return version.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 160);
+}
+
+function getDailyAiCacheVersionToken(): string {
+  return toDailyAiVersionToken(getKnownDailyAiCacheVersion(DAILY_AI_CACHE_GLOBAL_SURFACE));
+}
 
 export async function fetchDailyAiCacheVersion(): Promise<DailyAiCacheVersion | null> {
   try {
@@ -138,18 +148,37 @@ export async function fetchDailyAiCacheVersion(): Promise<DailyAiCacheVersion | 
   }
 }
 
-export function getKnownDailyAiCacheVersion(surface = 'global'): string | null {
+export function getKnownDailyAiCacheVersion(surface = DAILY_AI_CACHE_GLOBAL_SURFACE): string | null {
   try {
-    return localStorage.getItem(`${DAILY_AI_CACHE_VERSION_KEY}_${surface}`);
+    const surfaceVersion = localStorage.getItem(`${DAILY_AI_CACHE_VERSION_KEY}_${surface}`);
+    if (surfaceVersion) return surfaceVersion;
+    if (surface !== DAILY_AI_CACHE_GLOBAL_SURFACE) {
+      return localStorage.getItem(`${DAILY_AI_CACHE_VERSION_KEY}_${DAILY_AI_CACHE_GLOBAL_SURFACE}`);
+    }
+    return null;
   } catch {
     return null;
   }
 }
 
-export function rememberDailyAiCacheVersion(version: string, surface = 'global'): void {
+export function rememberDailyAiCacheVersion(version: string, surface = DAILY_AI_CACHE_GLOBAL_SURFACE): void {
   try {
+    localStorage.setItem(`${DAILY_AI_CACHE_VERSION_KEY}_${DAILY_AI_CACHE_GLOBAL_SURFACE}`, version);
     localStorage.setItem(`${DAILY_AI_CACHE_VERSION_KEY}_${surface}`, version);
   } catch {}
+}
+
+export async function ensureDailyAiCacheVersion(surface = DAILY_AI_CACHE_GLOBAL_SURFACE, forceFetch = false): Promise<string | null> {
+  if (!forceFetch) {
+    const known = getKnownDailyAiCacheVersion(surface);
+    if (known) return known;
+  }
+  const latest = await fetchDailyAiCacheVersion();
+  if (latest?.version) {
+    rememberDailyAiCacheVersion(latest.version, surface);
+    return latest.version;
+  }
+  return getKnownDailyAiCacheVersion(surface);
 }
 
 export async function refreshDailyAiCache(stockCodes: string[] = []): Promise<DailyAiCacheRefreshResult> {
@@ -777,7 +806,7 @@ export async function getFreshStockAnalysis(
 export async function fetchStockData(coid: string): Promise<StockData | null> {
   try {
     const url = `${IFALGO_BASE}/stock?coid=${coid}`;
-    const res = await fetch(url);
+    const res = await fetch(url, { cache: 'no-store' });
     const json = await res.json();
     if (json.data?.stock?.position) {
       return json.data.stock.position;
@@ -1145,7 +1174,8 @@ export async function fetchStockQuantData(coid: string, sinceDate?: string, opti
     },
   };
   // v5: 改用 30 分鐘 TTL 快取（原每日快取會讓訊號延遲整天，盤中訊號不可接受）
-  const cacheKey = sinceDate ? `ppbears_quant30_${QUANT_SIGNAL_CACHE_VERSION}_${coid}_${sinceDate}` : `ppbears_quant30_${QUANT_SIGNAL_CACHE_VERSION}_${coid}`;
+  const dailyVersionToken = getDailyAiCacheVersionToken();
+  const cacheKey = sinceDate ? `ppbears_quant30_${QUANT_SIGNAL_CACHE_VERSION}_${dailyVersionToken}_${coid}_${sinceDate}` : `ppbears_quant30_${QUANT_SIGNAL_CACHE_VERSION}_${dailyVersionToken}_${coid}`;
   const legacyCacheKey = sinceDate ? `ppbears_quant30_${coid}_${sinceDate}` : `ppbears_quant30_${coid}`;
   if (!options.forceFresh) {
     const cached = getTTLCache<StockQuantData>(cacheKey);
@@ -1226,8 +1256,9 @@ export async function fetchSimonsData(
   const d = date || _todayStr();
   // 指定歷史日期時仍用每日快取；今日資料保存到隔天早上 7 點
   const isToday = !date || date === _todayStr();
+  const dailyVersionToken = isToday ? getDailyAiCacheVersionToken() : '';
   const cacheKey = isToday
-    ? `ppbears_simons_daily7_${d}`
+    ? `ppbears_simons_daily7_${d}_${dailyVersionToken}`
     : `ppbears_daily_simons_${d}`;     // 歷史：每日快取
   const cached = options.forceFresh
     ? null
