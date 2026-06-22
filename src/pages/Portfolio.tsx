@@ -7,6 +7,7 @@ import type { ActiveEtfRadarItem, OfficialPriceMapEntry, StockQuantData, StockQu
 import { getCache, setCache, clearCache, getPersistentCache, setPersistentCache, clearPersistentCache, CACHE_KEYS } from '../cache';
 import MarketBadge from '../components/MarketBadge';
 import IndustryIcon from '../components/IndustryIcon';
+import StockTradeModal from '../components/StockTradeModal';
 import { canAutoRefreshPrices, formatPriceUpdateLabel, PRICE_AUTO_REFRESH_MS } from '../utils/priceAutoRefresh';
 import { getIndustryTailwind, getIndustryTailwindScore } from '../utils/industryTailwinds';
 import { calculateAddPriority } from '../utils/addPriority';
@@ -262,7 +263,7 @@ function getCurrentHoldingStartDate(stockCode: string, trades: Trade[]): string 
 
 export default function Portfolio() {
   const navigate = useNavigate();
-  const { holdings, trades, getPortfolioSummary, hasFeature, refreshHoldingPrices } = useStore();
+  const { holdings, trades, dataReady, getPortfolioSummary, hasFeature, refreshHoldingPrices } = useStore();
   const hasAiFeature = hasFeature('ai_portfolio_advice');
   const summary = getPortfolioSummary();
 
@@ -347,6 +348,7 @@ export default function Portfolio() {
   const [recommendationCounts, setRecommendationCounts] = useState<Record<string, number>>({});
   const [activeEtfMap, setActiveEtfMap] = useState<Record<string, ActiveEtfRadarItem>>({});
   const [activeEtfDialog, setActiveEtfDialog] = useState<ActiveEtfInfoDialog | null>(null);
+  const [selectedTrade, setSelectedTrade] = useState<{ mode: 'buy' | 'sell'; holding: Holding } | null>(null);
   const [quantMeta, setQuantMeta] = useState<StockQuantMeta | null>(null);
   const [priceUpdatedLabel, setPriceUpdatedLabel] = useState('');
   const [enableCustomSignal, setEnableCustomSignal] = useState(() => {
@@ -357,10 +359,7 @@ export default function Portfolio() {
   const categoryDragRef = useRef({ active: false, startX: 0, scrollLeft: 0, moved: false });
   const categoryClickBlockedRef = useRef(false);
   const [isDraggingCategoryTabs, setIsDraggingCategoryTabs] = useState(false);
-  const filteredHoldings = useMemo(() => {
-    if (selectedHoldingCategory === 'ALL') return holdings;
-    return holdings.filter(h => formatHoldingCategoryName(h.industry) === selectedHoldingCategory);
-  }, [holdings, selectedHoldingCategory]);
+  const filteredHoldings = holdings;
   const isRefreshing = priceRefreshing || signalsLoading;
 
   const selectHoldingCategory = useCallback((categoryName: string) => {
@@ -1016,7 +1015,7 @@ export default function Portfolio() {
 
       <div className="section-header" style={{ marginTop: '24px', marginBottom: '4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h2 className="section-title" style={{ margin: 0 }}>
-          📊 持股清單 ({selectedHoldingCategory === 'ALL' ? holdings.length : `${filteredHoldings.length}/${holdings.length}`})
+          📊 持股清單 ({holdings.length})
         </h2>
         {!hasAiFeature && (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
@@ -1244,12 +1243,47 @@ export default function Portfolio() {
                       </div>
                     </div>
                   </div>
-
+                  <div className="holding-trade-actions" aria-label={`${h.stockName} 快速交易`}>
+                    <button
+                      type="button"
+                      className="holding-trade-btn holding-trade-btn-buy"
+                      disabled={!dataReady}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setSelectedTrade({ mode: 'buy', holding: h });
+                      }}
+                    >
+                      買入
+                    </button>
+                    <button
+                      type="button"
+                      className="holding-trade-btn holding-trade-btn-sell"
+                      disabled={!dataReady || h.totalShares <= 0}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setSelectedTrade({ mode: 'sell', holding: h });
+                      }}
+                    >
+                      賣出
+                    </button>
+                  </div>
                 </div>
               );
             })
           )}
         </div>
+      {selectedTrade && (
+        <StockTradeModal
+          isOpen={Boolean(selectedTrade)}
+          mode={selectedTrade.mode}
+          stockCode={selectedTrade.holding.stockCode}
+          stockName={selectedTrade.holding.stockName}
+          price={selectedTrade.holding.currentPrice}
+          industry={selectedTrade.holding.industry || ''}
+          onClose={() => setSelectedTrade(null)}
+        />
+      )}
     </div>
   );
 }
+

@@ -1,9 +1,19 @@
 # 📦 PPBears Investment — 更新日誌
 
-> **目前版本：v1.24.87**（2026-06-18）
-> 最新更新：將 Portfolio 庫存類別篩選列改成可拖曳橫向滑動，讓長分類清單更直覺可用。
+> **目前版本：v1.24.88**（2026-06-22）
+> 最新更新：在 Portfolio 庫存卡加入快速買入/賣出入口，並隱藏庫存分類篩選列。
 
 ---
+
+## [v1.24.88] - 2026-06-22
+### Added
+- Added compact buy and sell actions directly on Portfolio holding cards so users can trade current holdings without opening the Stock Detail page first.
+- Added a shared stock trade modal used by both Portfolio and Stock Detail, keeping trade unit selection, notes, fee/tax preview, success state, and buy-risk warnings consistent.
+- Added a first-screen current inventory pill on Stock Detail pages showing the user's current holding quantity in shares or lots.
+
+### Changed
+- Hid the Portfolio category filter strip and made the holdings list always show all current inventory.
+- Simplified the Portfolio holdings count label so it reports the total holding count instead of filtered counts.
 
 ## [v1.24.87] - 2026-06-18
 ### Added
@@ -1215,3 +1225,4 @@
   - `?∠巨閰單? (StockDetail)`: ?單??勗?PBear ?咱??隞晶??祇?? (P/E, P/B)??蝣潮???眺鞈?漱????  - `摨怠? (Portfolio)`: 蝮質??Ｙ絞閮?券???脣漲???∪?銵具風?脖漱????  - `摮貊? (Learn)`: 6 ??鞈??曄??箇?隤脩?
 - **鞈?????*:
   - 銝脫 IFalgo API ???啗?單??勗?風?脫??  - 銝脫 IFalgo Simons API ??瘥?刻??鈭箸???  - 撱箇? AI ??撱箄降?摩嚗?靘???鞎琿脯??都?箏遣霅?  - ?券?游? **Supabase ?脩垢鞈?摨?* (PostgreSQL)嚗??其??單??啗??蝙?刻董?眺鞈?漱??(Trades)?澈摮?(Holdings) ???Ｚ???
+

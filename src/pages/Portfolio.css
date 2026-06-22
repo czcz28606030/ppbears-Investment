@@ -143,6 +143,7 @@
 }
 
 .portfolio-category-tabs-shell {
+  display: none;
   width: 100%;
   max-width: 100%;
   margin-top: -8px;
@@ -397,7 +398,6 @@
   .pf-signal-legend {
     width: 100%;
   }
-
   .portfolio-category-tabs-shell {
     margin-top: -6px;
   }
@@ -930,6 +930,52 @@
 
 .holding-item:active {
   transform: scale(0.98);
+}
+.holding-trade-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(43, 33, 24, 0.08);
+}
+
+.holding-trade-btn {
+  appearance: none;
+  min-width: 58px;
+  min-height: 30px;
+  padding: 0 12px;
+  border: 1.5px solid transparent;
+  border-radius: 999px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1;
+  cursor: pointer;
+  transition: transform 0.16s ease, box-shadow 0.16s ease, filter 0.16s ease, opacity 0.16s ease;
+}
+
+.holding-trade-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 7px 14px rgba(43, 33, 24, 0.1);
+}
+
+.holding-trade-btn:disabled {
+  opacity: 0.48;
+  cursor: not-allowed;
+}
+
+.holding-trade-btn-buy {
+  color: #ffffff;
+  background: linear-gradient(135deg, #ff6b6b 0%, #ff4f63 100%);
+  border-color: rgba(255, 79, 99, 0.36);
+}
+
+.holding-trade-btn-sell {
+  color: #2f4a08;
+  background: linear-gradient(135deg, #d8f96a 0%, #8bd629 100%);
+  border-color: rgba(107, 160, 18, 0.28);
 }
 
 .holding-left {
@@ -1488,6 +1534,19 @@ button.holding-quant-chip:hover {
   font-size: 13px;
   font-weight: 800;
 }
+@media (max-width: 420px) {
+  .holding-trade-actions {
+    justify-content: flex-start;
+    padding-left: 92px;
+  }
+
+  .holding-trade-btn {
+    min-width: 54px;
+    min-height: 28px;
+    padding: 0 10px;
+    font-size: 11px;
+  }
+}
 
 @media (max-width: 640px) {
   .holding-center {
@@ -1738,3 +1797,4 @@ button.holding-quant-chip:hover {
   letter-spacing: 0.03em;
   margin-top: 2px;
 }
+

@@ -261,6 +261,29 @@
 .stock-title-symbol {
   line-height: 1;
 }
+.stock-holding-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 34px;
+  margin: 10px auto 4px;
+  padding: 7px 13px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.86);
+  border: 1.5px solid rgba(255, 202, 58, 0.48);
+  box-shadow: 0 8px 20px rgba(69, 45, 11, 0.08);
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.stock-holding-pill strong {
+  color: var(--text-primary);
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
 
 /* ── Simons 量化模型：統一卡片系統 ─────────────────────── */
 
@@ -2745,3 +2768,4 @@
   background: rgba(123, 44, 191, 0.06);
   box-shadow: none;
 }
+

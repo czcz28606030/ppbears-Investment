@@ -8,6 +8,7 @@ import type { StockData, StockPrice, StockRecommendation, StockLiveAnalysis, Sim
 import StockChart from '../components/TradingViewChart';
 import MarketBadge from '../components/MarketBadge';
 import IndustryIcon from '../components/IndustryIcon';
+import StockTradeModal from '../components/StockTradeModal';
 import { calculateAddPriority } from '../utils/addPriority';
 import { getIndustryTailwind, getIndustryTailwindScore } from '../utils/industryTailwinds';
 import './StockDetail.css';
@@ -18,6 +19,18 @@ const DAILY_AI_CACHE_POLL_MS = 90 * 1000;
 function formatTrendDate(date: string): string {
   const [, month, day] = date.split('-');
   return month && day ? `${month}/${day}` : date;
+}
+function formatDetailHoldingShares(shares: number): string {
+  if (!Number.isFinite(shares)) return '-- 股';
+  if (Math.abs(shares) >= 1000) {
+    const lots = shares / 1000;
+    const formattedLots = lots.toLocaleString('zh-TW', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: lots >= 100 ? 0 : 2,
+    });
+    return `${formattedLots} 張`;
+  }
+  return `${shares.toLocaleString('zh-TW')} 股`;
 }
 
 function ChipStabilityTrendChart({
@@ -159,12 +172,7 @@ export default function StockDetail() {
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [analysisRetryTick, setAnalysisRetryTick] = useState(0);
   const [tradeMode, setTradeMode] = useState<'buy' | 'sell' | null>(null);
-  const [quantity, setQuantity] = useState('');
-  const [tradeUnit, setTradeUnit] = useState<'share' | 'lot'>('share');
-  const [tradeReason, setTradeReason] = useState('');
-  const [tradeResult, setTradeResult] = useState<{ success: boolean; message: string } | null>(null);
   const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
-  const [isTrading, setIsTrading] = useState(false);
   const [latestYield, setLatestYield] = useState<number | null>(null);
   const [quantData, setQuantData] = useState<StockQuantData | null>(null);
   const [quantHistory, setQuantHistory] = useState<StockQuantHistoryPoint[]>([]);
@@ -222,10 +230,9 @@ export default function StockDetail() {
     };
   }, [activeTooltip]);
   
-  const { user, holdings, dataReady, executeBuy, executeSell, getPortfolioSummary, hasFeature, isInWatchlist, addToWatchlist, removeFromWatchlist } = useStore();
+  const { user, holdings, dataReady, hasFeature, isInWatchlist, addToWatchlist, removeFromWatchlist } = useStore();
   const hasAiFeature = hasFeature('ai_stock_picking');
   const holding = holdings.find(h => h.stockCode === code);
-  const summary = getPortfolioSummary();
   const [wlBusy, setWlBusy] = useState(false);
 
   // ─── 响应式 Tooltip 组件 ─────────────────────────────
@@ -327,17 +334,6 @@ export default function StockDetail() {
     return () => { el.removeEventListener('pointerdown', onDown); el.removeEventListener('pointerup', onUp); el.removeEventListener('pointerleave', onUp); el.removeEventListener('pointermove', onMove); };
   }, [relatedStocks.length]);
 
-  // ─── Risk Warning State ───────────────────────────────
-  type RiskWarning = {
-    title: string;
-    message: string;
-    tip: string;
-    icon: string;
-    level?: 'info' | 'caution' | 'danger';
-    details?: Array<{ label: string; value: string; tone?: 'normal' | 'profit' | 'loss' | 'warning' }>;
-  };
-  const [pendingWarnings, setPendingWarnings] = useState<RiskWarning[]>([]);
-  const [showWarningModal, setShowWarningModal] = useState(false);
   const analysisRequestRef = useRef<{ key: string; startedAt: number }>({ key: '', startedAt: 0 });
 
   const stockEmoji = POPULAR_STOCKS.find(s => s.code === code)?.emoji || '📊';
@@ -345,11 +341,6 @@ export default function StockDetail() {
   useEffect(() => {
     // 切換到不同股票時，重置所有下單狀態，避免 isTrading 卡住
     setTradeMode(null);
-    setQuantity('');
-    setTradeUnit('share');
-    setTradeReason('');
-    setTradeResult(null);
-    setIsTrading(false);
     setLiveAnalysis(null);
     setAnalysisError(null);
     setAnalysisRetryTick(0);
@@ -748,194 +739,6 @@ export default function StockDetail() {
         ? parseFloat(tpexQuote.Close)
         : ifalgoClose;
 
-  const quantityNumber = parseInt(quantity, 10);
-  const tradeShares = Number.isFinite(quantityNumber) && quantityNumber > 0
-    ? quantityNumber * (tradeUnit === 'lot' ? 1000 : 1)
-    : 0;
-  const tradeUnitLabel = tradeUnit === 'lot' ? '張' : '股';
-
-  async function handleTrade() {
-    if (!code || !tradeMode || price <= 0) return;
-    const qty = tradeShares;
-
-    // ─── Only check risk on BUY ──────────────────────────────────────
-    if (tradeMode === 'buy') {
-      const warnings: RiskWarning[] = [];
-      const totalAssets = summary.totalAssets;
-      const buyAmount = qty * price;
-      const feeRate = user?.brokerFeeRate ?? 0.001425;
-      const minFee = user?.brokerMinFee ?? 20;
-      const estimatedFee = Math.max(minFee, Math.round(buyAmount * feeRate));
-      const finalBuyCost = buyAmount + estimatedFee;
-      const stopLossPct = Math.min(80, Math.max(1, user?.stopLossAlertPct ?? 20));
-      const stopLossPrice = price * (1 - stopLossPct / 100);
-      const existingShares = holding?.totalShares ?? 0;
-      const existingAvgCost = holding?.avgCost ?? 0;
-      const existingCost = existingShares * existingAvgCost;
-      const existingMarketValue = existingShares * price;
-      const existingPnL = existingMarketValue - existingCost;
-      const existingPnLPct = existingCost > 0 ? (existingPnL / existingCost) * 100 : 0;
-      const newShares = existingShares + qty;
-      const newAvgCost = newShares > 0 ? (existingCost + buyAmount) / newShares : price;
-      const newPositionValue = newShares * price;
-      const newPositionWeight = totalAssets > 0 ? (newPositionValue / totalAssets) * 100 : 0;
-      const newPositionCost = existingCost + buyAmount;
-      const balanceAfter = user ? user.availableBalance - finalBuyCost : null;
-      const addOnStopLossLoss = Math.round(Math.max(0, price - stopLossPrice) * qty);
-      const wholePositionStopLossPnL = Math.round((stopLossPrice - newAvgCost) * newShares);
-      const addOnDetails: RiskWarning['details'] = holding ? [
-        { label: '目前持股', value: `${existingShares.toLocaleString('zh-TW')} 股` },
-        { label: '目前平均成本', value: `NT$ ${formatPrice(existingAvgCost)}` },
-        { label: '目前價格', value: `NT$ ${formatPrice(price)}` },
-        {
-          label: '目前帳面損益',
-          value: `${existingPnL >= 0 ? '+' : '-'}NT$ ${formatMoney(Math.abs(existingPnL))} (${existingPnLPct >= 0 ? '+' : ''}${existingPnLPct.toFixed(1)}%)`,
-          tone: existingPnL >= 0 ? 'profit' : 'loss',
-        },
-        { label: '這次買入', value: `${qty.toLocaleString('zh-TW')} 股 / NT$ ${formatMoney(buyAmount)}` },
-        { label: '預估含手續費花費', value: `NT$ ${formatMoney(finalBuyCost)}`, tone: 'warning' },
-        { label: '買後總持股', value: `${newShares.toLocaleString('zh-TW')} 股` },
-        { label: '買後平均成本', value: `NT$ ${formatPrice(newAvgCost)}`, tone: price < existingAvgCost ? 'warning' : 'normal' },
-        { label: '買後總投入成本', value: `NT$ ${formatMoney(newPositionCost)}` },
-        { label: '買後部位市值', value: `NT$ ${formatMoney(newPositionValue)}（總資產 ${newPositionWeight.toFixed(1)}%）`, tone: newPositionWeight > 15 ? 'warning' : 'normal' },
-        { label: `跌到 -${stopLossPct}% 參考價`, value: `NT$ ${formatPrice(stopLossPrice)}` },
-        { label: '本次加碼可能損失', value: `NT$ ${formatMoney(addOnStopLossLoss)}`, tone: 'loss' },
-        {
-          label: '整檔到參考價損益',
-          value: `${wholePositionStopLossPnL >= 0 ? '+' : '-'}NT$ ${formatMoney(Math.abs(wholePositionStopLossPnL))}`,
-          tone: wholePositionStopLossPnL >= 0 ? 'profit' : 'loss',
-        },
-        ...(balanceAfter !== null ? [{ label: '買後可用餘額', value: `NT$ ${formatMoney(balanceAfter)}`, tone: balanceAfter < 0 ? 'loss' : 'normal' } as const] : []),
-      ] : undefined;
-
-      // Risk 1: 買入後單一該股超過總資金 15%
-      if (totalAssets > 0 && newPositionValue / totalAssets > 0.15) {
-        const pct = newPositionWeight.toFixed(1);
-        warnings.push({
-          icon: '📦',
-          title: '單一股票部位偏高',
-          message: `買入後，「${stockData?.stkname || code}」將占你總資金的 ${pct}%，超過了建議的 15% 上限。`,
-          tip: '部位太集中時，單一股票下跌會明顯影響整體資產。下單前請確認這不是因為一時看好而把資金壓得太集中。',
-          level: 'danger',
-          details: [
-            { label: '買後部位市值', value: `NT$ ${formatMoney(newPositionValue)}` },
-            { label: '買後總資產占比', value: `${pct}%`, tone: 'warning' },
-            { label: '建議上限', value: '15%' },
-          ],
-        });
-      }
-
-      // Risk 2: 已持股再買，依獲利/攤平狀態顯示加碼後果
-      if (holding) {
-        if (price > holding.avgCost) {
-          const profitRate = ((price - holding.avgCost) / holding.avgCost) * 100;
-          warnings.push({
-            icon: '📈',
-            title: '獲利中加碼提醒',
-            message: `目前這檔已有 ${profitRate.toFixed(1)}% 帳面獲利。獲利加碼可以是順勢，但買完後平均成本會提高，部位也會變大。`,
-            tip: '請確認這次加碼是因為新的理由仍然成立，而不是因為目前賺錢就追高。加碼後如果回跌，原本獲利可能會被吃掉。',
-            level: 'caution',
-            details: addOnDetails,
-          });
-        } else if (price < holding.avgCost) {
-          const lossRate = ((holding.avgCost - price) / holding.avgCost) * 100;
-          const halfStopLossPct = stopLossPct / 2;
-          const isOverStopLoss = lossRate >= stopLossPct;
-          const isNearStopLoss = !isOverStopLoss && lossRate >= halfStopLossPct;
-          warnings.push({
-            icon: isOverStopLoss ? '🛑' : isNearStopLoss ? '🚨' : '⚠️',
-            title: isOverStopLoss
-              ? '超過停損提醒仍想攤平'
-              : isNearStopLoss
-                ? '接近停損區攤平警告'
-                : '虧損中攤平警告',
-            message: isOverStopLoss
-              ? `目前已虧損 ${lossRate.toFixed(1)}%，超過你設定的 -${stopLossPct}% 停損提醒。這次買入會降低平均成本，但也會把更多資金放進正在虧損的股票。`
-              : isNearStopLoss
-                ? `目前已虧損 ${lossRate.toFixed(1)}%，接近你設定的 -${stopLossPct}% 停損提醒。攤平前要先確認走勢或理由是否真的改善。`
-                : `目前已虧損 ${lossRate.toFixed(1)}%。攤平會讓平均成本下降，但帳面虧損不會消失，總投入金額會變大。`,
-            tip: isOverStopLoss
-              ? '這是最高風險加碼情境。請確認不是因為不想認賠而加碼；如果投資理由已經改變，先停下來比繼續投入更重要。'
-              : '攤平不是降低風險，只是用更多資金換一個較低的平均成本。請把加碼後的總投入、總部位和可能損失一起看。',
-            level: isOverStopLoss || isNearStopLoss ? 'danger' : 'caution',
-            details: addOnDetails,
-          });
-        } else {
-          warnings.push({
-            icon: '⚖️',
-            title: '接近成本加碼提醒',
-            message: '目前價格接近你的平均成本。這次買入後部位會變大，後續上漲或下跌對帳戶的影響也會放大。',
-            tip: '加碼前請先確認這筆新增資金的目的，是提高長期部位，還是只是因為價格沒有明顯變動就順手買進。',
-            level: 'info',
-            details: addOnDetails,
-          });
-        }
-      }
-
-      // Risk 3: 一次買超過現有持股的 1/3
-      if (holding && holding.totalShares > 0) {
-        const oneThirdShares = holding.totalShares / 3;
-        if (qty > oneThirdShares) {
-          const addOnPct = (qty / holding.totalShares) * 100;
-          warnings.push({
-            icon: '⚠️',
-            title: '一次加碼太多了！',
-            message: `你已持有 ${holding.totalShares.toLocaleString('zh-TW')} 股，這次想再買 ${qty.toLocaleString('zh-TW')} 股，等於現持股的 ${addOnPct.toFixed(1)}%，超過建議的 1/3。`,
-            tip: '穩健的加碼方式通常是分批，而不是一次把部位拉大。請確認這筆單就算判斷錯了，帳戶仍然承受得住。',
-            level: 'danger',
-            details: [
-              { label: '目前持股', value: `${holding.totalShares.toLocaleString('zh-TW')} 股` },
-              { label: '本次加碼', value: `${qty.toLocaleString('zh-TW')} 股` },
-              { label: '加碼比例', value: `${addOnPct.toFixed(1)}%`, tone: 'warning' },
-              { label: '建議上限', value: `${Math.floor(oneThirdShares).toLocaleString('zh-TW')} 股以內` },
-            ],
-          });
-        }
-      }
-
-      if (warnings.length > 0) {
-        setPendingWarnings(warnings);
-        setShowWarningModal(true);
-        return;
-      }
-    }
-
-    await doExecuteTrade();
-  }
-
-  async function doExecuteTrade() {
-    if (!code || !tradeMode) return;
-    if (price <= 0) {
-      setTradeResult({ success: false, message: '❌ 無法取得目前股價，請稍後重試或重新整理頁面。' });
-      return;
-    }
-    if (isTrading) return;
-    setIsTrading(true);
-    setShowWarningModal(false);
-    const qty = tradeShares;
-
-    try {
-      let result;
-      if (tradeMode === 'buy') {
-        const name = stockData?.stkname || twseQuote?.Name || tpexQuote?.CompanyName || code;
-        result = await executeBuy(code, name, qty, price, stockData?.subindustry || '', tradeReason.trim());
-      } else {
-        result = await executeSell(code, qty, price, tradeReason.trim());
-      }
-      setTradeResult(result);
-      if (result.success) {
-        setQuantity('');
-        setTradeUnit('share');
-        setTradeReason('');
-      }
-    } catch (err) {
-      console.error('doExecuteTrade error:', err);
-      setTradeResult({ success: false, message: '⚠️ 交易時發生錯誤，請檢查網路後再試一次。' });
-    } finally {
-      setIsTrading(false);
-    }
-  }
-
   // 漲跌計算：TWSE/TPEx Change 是絕對金額，轉為%
   const changeAbsolute = twseQuote?.Change
     ? parseFloat(twseQuote.Change)
@@ -1310,6 +1113,12 @@ export default function StockDetail() {
         <div className="price-date">
           收盤價 · {priceDate}
         </div>
+        {holding && (
+          <div className="stock-holding-pill" aria-label={`目前庫存 ${formatDetailHoldingShares(holding.totalShares)}`}>
+            <span>目前庫存</span>
+            <strong>{formatDetailHoldingShares(holding.totalShares)}</strong>
+          </div>
+        )}
         <div className="stock-detail-actions">
           <IndustryIcon stockCode={code} industry={stockData?.subindustry} compact={false} className="stock-detail-industry-icon" />
           <button
@@ -2284,7 +2093,7 @@ export default function StockDetail() {
           className="btn btn-buy btn-lg"
           style={{ flex: 1, opacity: dataReady ? 1 : 0.45, cursor: dataReady ? 'pointer' : 'not-allowed' }}
           disabled={!dataReady}
-          onClick={() => { setTradeMode('buy'); setTradeResult(null); }}
+          onClick={() => setTradeMode('buy')}
         >
           {dataReady ? '🛒 買入' : '⏳ 同步中...'}
         </button>
@@ -2292,335 +2101,30 @@ export default function StockDetail() {
           className="btn btn-sell btn-lg"
           style={{ flex: 1, opacity: dataReady ? 1 : 0.45, cursor: (!holding || !dataReady) ? 'not-allowed' : 'pointer' }}
           disabled={!holding || !dataReady}
-          onClick={() => { setTradeMode('sell'); setTradeResult(null); }}
+          onClick={() => setTradeMode('sell')}
         >
           {dataReady ? '💰 賣出' : '⏳ 同步中...'}
         </button>
       </div>
 
-      {/* 交易面板 */}
-      {tradeMode && (
-        <div className="modal-overlay" onClick={() => setTradeMode(null)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-handle"></div>
-            {tradeResult?.success ? (
-              <div className="trade-success-screen" style={{ textAlign: 'center', padding: '20px 0' }}>
-                <div style={{ fontSize: '64px', animation: 'bounce 1s infinite' }}>🎉</div>
-                <h3 style={{ margin: '16px 0', color: 'var(--text-primary)' }}>{tradeMode === 'buy' ? '買入成功！' : '賣出成功！'}</h3>
-                <div className="trade-result trade-success" style={{ marginBottom: 24, fontSize: '16px' }}>
-                  {tradeResult.message}
-                </div>
-                <button
-                  className="btn btn-buy btn-lg btn-block"
-                  onClick={() => { setTradeMode(null); setTradeResult(null); }}
-                >
-                  太棒了 🐻
-                </button>
-              </div>
-            ) : (
-              <>
-                <h3 className="trade-modal-title">
-                  {tradeMode === 'buy' ? '🛒 買入' : '💰 賣出'} {stockData?.stkname || code}
-                </h3>
-
-                <div className="trade-modal-price">
-                  以收盤價 <strong>NT$ {formatPrice(price)}</strong> 交易
-                </div>
-
-                {tradeMode === 'buy' && (
-                  <div className="trade-modal-balance">
-                    可用餘額：NT$ {formatMoney(user!.availableBalance)}
-                  </div>
-                )}
-                {tradeMode === 'sell' && holding && (
-                  <div className="trade-modal-balance">
-                    可賣股數：{holding.totalShares} 股
-                  </div>
-                )}
-
-                <div className="input-group">
-                  <div className="trade-unit-header">
-                    <label className="input-label">交易單位</label>
-                    <div className="trade-unit-toggle" role="group" aria-label="選擇交易單位">
-                      <button
-                        type="button"
-                        className={`trade-unit-btn${tradeUnit === 'share' ? ' active' : ''}`}
-                        onClick={() => setTradeUnit('share')}
-                      >
-                        股
-                      </button>
-                      <button
-                        type="button"
-                        className={`trade-unit-btn${tradeUnit === 'lot' ? ' active' : ''}`}
-                        onClick={() => setTradeUnit('lot')}
-                      >
-                        張
-                      </button>
-                    </div>
-                  </div>
-                  <input
-                    className="input-field"
-                    type="number"
-                    min="1"
-                    step="1"
-                    placeholder={tradeUnit === 'lot' ? '輸入要交易的張數' : '輸入要交易的股數'}
-                    value={quantity}
-                    onChange={(e) => setQuantity(e.target.value)}
-                  />
-                  <div className="trade-unit-hint">
-                    {quantity && tradeShares > 0
-                      ? `${quantity} ${tradeUnitLabel} = ${tradeShares.toLocaleString('zh-TW')} 股`
-                      : tradeUnit === 'lot'
-                        ? '1 張 = 1,000 股'
-                        : '以 1 股為單位交易'}
-                  </div>
-                </div>
-
-                <div className="input-group" style={{ marginTop: 16 }}>
-                  <label className="input-label">投資筆記（告訴 PPBear 為什麼想{tradeMode === 'buy' ? '買' : '賣'}？）</label>
-                  <textarea
-                    className="input-field"
-                    style={{ minHeight: 80, resize: 'vertical' }}
-                    placeholder="我想要因為..."
-                    value={tradeReason}
-                    onChange={(e) => setTradeReason(e.target.value)}
-                  />
-                </div>
-
-                {quantity && tradeShares > 0 && (() => {
-                  const q = tradeShares;
-                  const baseValue = q * price;
-                  const feeRate = user?.brokerFeeRate ?? 0.001425;
-                  const minFee = user?.brokerMinFee ?? 20;
-                  const taxRate = user?.brokerTaxRate ?? 0.003;
-                  
-                  const estFee = Math.max(minFee, Math.round(baseValue * feeRate));
-                  const estTax = tradeMode === 'sell' ? Math.round(baseValue * taxRate) : 0;
-                  const finalTotal = tradeMode === 'buy' ? baseValue + estFee : baseValue - estFee - estTax;
-                  const stopLossPct = Math.min(80, Math.max(1, user?.stopLossAlertPct ?? 20));
-                  const stopLossPrice = price * (1 - stopLossPct / 100);
-                  const estimatedStopLossLoss = Math.round((price - stopLossPrice) * q);
-                  const affordableLossPct = user?.availableBalance
-                    ? (estimatedStopLossLoss / Math.max(user.availableBalance, 1)) * 100
-                    : 0;
-
-                  return (
-                    <div className="trade-preview" style={{ background: '#f8f9fa', padding: '12px', borderRadius: '8px', marginTop: '12px' }}>
-                      <div className="trade-preview-row" style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: '#666', marginBottom: '4px' }}>
-                        <span>交易股數</span>
-                        <span>{q.toLocaleString('zh-TW')} 股</span>
-                      </div>
-                      <div className="trade-preview-row" style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: '#666', marginBottom: '4px' }}>
-                        <span>股票市值</span>
-                        <span>NT$ {formatMoney(baseValue)}</span>
-                      </div>
-                      <div className="trade-preview-row" style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: '#666', marginBottom: '4px' }}>
-                        <span>券商手續費</span>
-                        <span>NT$ {formatMoney(estFee)}</span>
-                      </div>
-                      {tradeMode === 'sell' && (
-                        <div className="trade-preview-row" style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: '#666', marginBottom: '8px' }}>
-                          <span>證交稅</span>
-                          <span>NT$ {formatMoney(estTax)}</span>
-                        </div>
-                      )}
-                      <div className="trade-preview-row" style={{ display: 'flex', justifyContent: 'space-between', fontSize: '15px', fontWeight: 'bold', color: 'var(--text-primary)', borderTop: '1px solid #ddd', paddingTop: '8px', marginTop: '4px' }}>
-                        <span>預估{tradeMode === 'buy' ? '總花費' : '實收金額'}</span>
-                        <span className={tradeMode === 'buy' ? '' : 'text-profit'}>NT$ {formatMoney(finalTotal)}</span>
-                      </div>
-                      {tradeMode === 'buy' && (
-                        <div className="trade-risk-preview" style={{ marginTop: 12, padding: '12px', borderRadius: 12, background: 'rgba(255, 89, 94, 0.08)', border: '1.5px solid rgba(255, 89, 94, 0.22)' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-                            <span style={{ fontWeight: 900, color: '#c62828', fontSize: 14 }}>🛡️ 停損風險預估</span>
-                            <span style={{ fontSize: 12, fontWeight: 900, color: '#c62828', background: '#fff', borderRadius: 999, padding: '3px 8px' }}>
-                              -{stopLossPct}%
-                            </span>
-                          </div>
-                          <div className="trade-preview-row" style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: '#666', marginBottom: '4px' }}>
-                            <span>停損參考價</span>
-                            <span>NT$ {formatPrice(stopLossPrice)}</span>
-                          </div>
-                          <div className="trade-preview-row" style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: '#666', marginBottom: '4px' }}>
-                            <span>跌到停損時預估損失</span>
-                            <span style={{ color: '#c62828', fontWeight: 900 }}>NT$ {formatMoney(estimatedStopLossLoss)}</span>
-                          </div>
-                          <div style={{ marginTop: 8, fontSize: 12.5, lineHeight: 1.5, color: '#7a3f00', fontWeight: 700 }}>
-                            如果股價跌到 NT$ {formatPrice(stopLossPrice)}，這筆單大約會虧 NT$ {formatMoney(estimatedStopLossLoss)}
-                            {user?.availableBalance ? `，約佔目前可用餘額 ${affordableLossPct.toFixed(1)}%。` : '。'}
-                            下單前先想想：這個損失你能接受嗎？
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })()}
-
-                {tradeResult && !tradeResult.success && (
-                  <div className="trade-result trade-error">
-                    {tradeResult.message}
-                  </div>
-                )}
-
-                <button
-                  className={`btn ${tradeMode === 'buy' ? 'btn-buy' : 'btn-sell'} btn-lg btn-block`}
-                  disabled={isTrading || !dataReady}
-                  onClick={() => {
-                    if (!dataReady) {
-                      alert('⚠️ 帳號資料尚未同步完成，請稍候幾秒後再下單！');
-                      return;
-                    }
-                    if (!quantity || tradeShares <= 0) {
-                      alert(`⚠️ 請輸入大於 0 的正確交易${tradeUnitLabel}數！`);
-                      return;
-                    }
-                    if (!tradeReason.trim()) {
-                      alert(`⚠️ 下單前請先填寫「投資筆記」，告訴 PPBear 為什麼想${tradeMode === 'buy' ? '買' : '賣'}這檔股票喔！`);
-                      return;
-                    }
-                    handleTrade();
-                  }}
-                  style={(isTrading || !dataReady) ? { opacity: 0.85, cursor: 'not-allowed' } : {}}
-                >
-                  {!dataReady ? (
-                    <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
-                      <span style={{
-                        width: 18, height: 18,
-                        border: '3px solid rgba(255,255,255,0.4)',
-                        borderTopColor: '#fff',
-                        borderRadius: '50%',
-                        display: 'inline-block',
-                        animation: 'spin 0.7s linear infinite',
-                        flexShrink: 0,
-                      }} />
-                      資料同步中...
-                    </span>
-                  ) : isTrading ? (
-                    <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
-                      <span style={{
-                        width: 18, height: 18,
-                        border: '3px solid rgba(255,255,255,0.4)',
-                        borderTopColor: '#fff',
-                        borderRadius: '50%',
-                        display: 'inline-block',
-                        animation: 'spin 0.7s linear infinite',
-                        flexShrink: 0,
-                      }} />
-                      交易中，請稍候...
-                    </span>
-                  ) : `確認${tradeMode === 'buy' ? '買入' : '賣出'}`}
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-      )}
-      {/* 風險警示彈窗 */}
-      {showWarningModal && (
-        <div className="modal-overlay">
-          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxHeight: '85vh', overflowY: 'auto' }}>
-            <div className="modal-handle"></div>
-            <div style={{ textAlign: 'center', marginBottom: 8 }}>
-              <span style={{ fontSize: 40 }}>🐻‍❄️</span>
-            </div>
-            <h3 style={{ textAlign: 'center', color: '#cc0000', marginBottom: 4 }}>讓 PPBear 先警告你！</h3>
-            <p style={{ textAlign: 'center', fontSize: 13, color: '#888', marginBottom: 16 }}>
-              這次交易有 {pendingWarnings.length} 個地方需要注意，但你還是可以自己決定
-            </p>
-
-            {pendingWarnings.map((w, idx) => (
-              <div key={idx} style={{
-                background: w.level === 'danger' ? '#fff8f8' : w.level === 'caution' ? '#fffaf0' : '#f7fbff',
-                border: `1.5px solid ${w.level === 'danger' ? '#ffcccc' : w.level === 'caution' ? '#ffd98a' : '#b8d9ff'}`,
-                borderRadius: 12,
-                padding: '14px 16px', marginBottom: 12
-              }}>
-                <div style={{ fontSize: 22, marginBottom: 6 }}>
-                  {w.icon} <span style={{
-                    fontWeight: 800,
-                    fontSize: 15,
-                    color: w.level === 'danger' ? '#cc0000' : w.level === 'caution' ? '#a85f00' : '#1d5f99',
-                  }}>{w.title}</span>
-                </div>
-                <p style={{ margin: '0 0 8px', fontSize: 14, color: '#333' }}>{w.message}</p>
-                {w.details && w.details.length > 0 && (
-                  <div style={{
-                    background: '#fff',
-                    border: '1px solid rgba(0,0,0,0.07)',
-                    borderRadius: 10,
-                    overflow: 'hidden',
-                    marginBottom: 10,
-                  }}>
-                    {w.details.map((detail, detailIdx) => (
-                      <div key={`${detail.label}-${detailIdx}`} style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        gap: 12,
-                        padding: '8px 10px',
-                        borderTop: detailIdx === 0 ? 'none' : '1px solid rgba(0,0,0,0.06)',
-                        fontSize: 13,
-                        lineHeight: 1.35,
-                      }}>
-                        <span style={{ color: '#666', flex: '0 0 42%' }}>{detail.label}</span>
-                        <span style={{
-                          color: detail.tone === 'profit'
-                            ? 'var(--profit-color)'
-                            : detail.tone === 'loss'
-                              ? 'var(--loss-color)'
-                              : detail.tone === 'warning'
-                                ? '#b06a00'
-                                : 'var(--text-primary)',
-                          fontWeight: 900,
-                          textAlign: 'right',
-                          wordBreak: 'break-word',
-                        }}>
-                          {detail.value}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                <div style={{ background: '#fff3cd', borderRadius: 8, padding: '8px 12px', fontSize: 12.5, color: '#7a5800', lineHeight: 1.5 }}>
-                  💡 <strong>投資教室：</strong> {w.tip}
-                </div>
-              </div>
-            ))}
-
-            <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
-              <button
-                className="btn"
-                style={{ flex: 1, background: '#f5f5f5', color: '#555', fontWeight: 700 }}
-                disabled={isTrading}
-                onClick={() => setShowWarningModal(false)}
-              >
-                再想想🤔
-              </button>
-              <button
-                className="btn btn-buy"
-                style={{ flex: 1, background: '#cc4444' }}
-                disabled={isTrading}
-                onClick={doExecuteTrade}
-              >
-                {isTrading ? (
-                    <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
-                      <span style={{
-                        width: 16, height: 16,
-                        border: '3px solid rgba(255,255,255,0.4)',
-                        borderTopColor: '#fff',
-                        borderRadius: '50%',
-                        display: 'inline-block',
-                        animation: 'spin 0.7s linear infinite',
-                        flexShrink: 0,
-                      }} />
-                      交易中，請稍候...
-                    </span>
-                  ) : pendingWarnings.some(w => w.level === 'danger')
-                    ? '我知道後果，仍要買'
-                    : '我已看過數據，仍要買'}
-              </button>
-            </div>
-          </div>
-        </div>
+      {code && tradeMode && (
+        <StockTradeModal
+          isOpen={Boolean(tradeMode)}
+          mode={tradeMode}
+          stockCode={code}
+          stockName={stockDisplayName || code}
+          price={price}
+          industry={stockData?.subindustry || holding?.industry || ''}
+          onClose={() => setTradeMode(null)}
+        />
       )}
     </div>
   );
 }
+
+
+
+
+
+
+
