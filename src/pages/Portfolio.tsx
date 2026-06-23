@@ -1210,12 +1210,13 @@ export default function Portfolio() {
               const itemPL = (h.currentPrice - h.avgCost) * h.totalShares;
               const itemPLPct = ((h.currentPrice - h.avgCost) / h.avgCost * 100);
               const itemIsProfit = itemPL >= 0;
+              const isStopLossAlert = Number.isFinite(itemPLPct) && itemPLPct <= -20;
               const signal = aiSignals[h.stockCode];
               const memberQuantChips = hasAiFeature ? renderMemberQuantChips(signal) : null;
               return (
                 <div
                   key={h.stockCode}
-                  className={`holding-item${signal ? ` signal-${signal.primaryType}` : ''}`}
+                  className={`holding-item${signal ? ` signal-${signal.primaryType}` : ''}${isStopLossAlert ? ' holding-item-stop-loss' : ''}`}
                   onClick={() => navigate(`/stock/${h.stockCode}`)}
                 >
                   <div className="holding-main-row">

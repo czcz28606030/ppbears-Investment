@@ -1,9 +1,14 @@
 # 📦 PPBears Investment — 更新日誌
 
-> **目前版本：v1.24.90**（2026-06-23）
-> 最新更新：看庫存持股損益達 -20% 時，直接顯示醒目的紅色「建議停損」警示。
+> **目前版本：v1.24.91**（2026-06-24）
+> 最新更新：看庫存持股達停損條件時，整張庫存小卡會變成紅色框線警示。
 
 ---
+
+## [v1.24.91] - 2026-06-24
+### Changed
+- Changed Portfolio stop-loss holdings so any card at -20% or worse gets a full red frame, red-tinted background, stronger red loss text, and heavier warning shadow.
+- Increased the `⚠ 建議停損` badge weight and border so stop-loss holdings are visible at a glance even when AI signal styling is also present.
 
 ## [v1.24.90] - 2026-06-23
 ### Changed
