@@ -685,6 +685,16 @@ export default function Portfolio() {
 
   function renderProfitLossLevelBadge(profitLossPct: number, signal?: PortfolioAiSignal) {
     if (!Number.isFinite(profitLossPct)) return null;
+    if (profitLossPct <= -20) {
+      return (
+        <span
+          className="holding-pl-level-badge holding-pl-level-stop"
+          title={`目前庫存損益 ${profitLossPct.toFixed(1)}%，已達 -20% 停損警示`}
+        >
+          ⚠ 建議停損
+        </span>
+      );
+    }
     if (!signal || signal.primaryType === 'neutral') return null;
 
     if (signal.primaryType === 'buy') {
@@ -704,9 +714,6 @@ export default function Portfolio() {
     }
 
     if (signal.primaryType === 'sell') {
-      if (profitLossPct <= -20) {
-        return <span className="holding-pl-level-badge holding-pl-level-stop">☠ 建議停損</span>;
-      }
       if (profitLossPct >= 20) {
         return <span className="holding-pl-level-badge holding-pl-level-take-profit">◇ 分批停利</span>;
       }
@@ -1244,7 +1251,7 @@ export default function Portfolio() {
                           {renderActiveEtfRadarChip(h.stockCode, h.stockName)}
                           {memberQuantChips}
                           {!hasAiFeature && renderRecommendationCountBadge(h.stockCode)}
-                          {!hasAiFeature && renderProfitLossLevelBadge(itemPLPct, signal)}
+                          {renderProfitLossLevelBadge(itemPLPct, signal)}
                         </div>
                       </div>
                     </div>
