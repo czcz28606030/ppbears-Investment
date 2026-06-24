@@ -1,9 +1,16 @@
 # 📦 PPBears Investment — 更新日誌
 
-> **目前版本：v1.24.91**（2026-06-24）
-> 最新更新：看庫存持股達停損條件時，整張庫存小卡會變成紅色框線警示。
+> **目前版本：v1.24.92**（2026-06-24）
+> 最新更新：觀察名單新增股票搜尋，找股票搜尋改為確保載入全市場股票。
 
 ---
+
+## [v1.24.92] - 2026-06-24
+### Added
+- Added Watchlist search by stock name or code, persisted with the existing session filters and combined with AI filters, recommendation level filters, and sorting.
+
+### Changed
+- Changed Explore search to load the full official TWSE/TPEx price map before treating market search as ready, preventing partial recommendation-only maps from limiting results.
 
 ## [v1.24.91] - 2026-06-24
 ### Changed

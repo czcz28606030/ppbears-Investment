@@ -19,6 +19,11 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null> {
 }
 
 const DAILY_AI_CACHE_POLL_MS = 90 * 1000;
+const FULL_MARKET_PRICE_MAP_MIN_SIZE = 1000;
+
+function isFullMarketPriceMap(map: Record<string, OfficialPriceMapEntry>): boolean {
+  return Object.keys(map).length >= FULL_MARKET_PRICE_MAP_MIN_SIZE;
+}
 
 export default function Explore() {
   const navigate = useNavigate();
@@ -52,6 +57,7 @@ export default function Explore() {
   const [activeStrategy, setActiveStrategy] = useState(initialStrategy);
   const [error, setError] = useState('');
   const [twsePriceMap, setTwsePriceMap] = useState<Record<string, OfficialPriceMapEntry>>({});
+  const [hasLoadedFullMarketPriceMap, setHasLoadedFullMarketPriceMap] = useState(false);
   const [quantDataMap, setQuantDataMap] = useState<Record<string, StockQuantData>>({});
   const [quantLoading, setQuantLoading] = useState(false);
   const [quantProgress, setQuantProgress] = useState(0); // 量化分析進度 (0~100)
@@ -80,6 +86,7 @@ export default function Explore() {
     if (forceFresh) {
       clearCache(CACHE_KEYS.TWSE_PRICE_MAP);
       clearCache(CACHE_KEYS.SIMONS_DATA);
+      setHasLoadedFullMarketPriceMap(false);
     }
 
     setLoading(true);
@@ -96,10 +103,12 @@ export default function Explore() {
       const cachedTwse = forceFresh ? null : getCache<TwsePriceMapType>(CACHE_KEYS.TWSE_PRICE_MAP);
       if (cachedTwse) {
         setTwsePriceMap(cachedTwse);
+        setHasLoadedFullMarketPriceMap(isFullMarketPriceMap(cachedTwse));
       } else if (forceFresh || canAutoRefreshPrices()) {
         const map = await fetchOfficialPriceMap();
         if (Object.keys(map).length > 0) {
           setTwsePriceMap(map);
+          setHasLoadedFullMarketPriceMap(true);
           setCache(CACHE_KEYS.TWSE_PRICE_MAP, map);
           if (canAutoRefreshPrices()) setPriceUpdatedLabel(formatPriceUpdateLabel());
         }
@@ -613,7 +622,7 @@ export default function Explore() {
 
   useEffect(() => {
     const q = search.trim();
-    if (!q || Object.keys(twsePriceMap).length > 0) {
+    if (!q || hasLoadedFullMarketPriceMap) {
       setSearchPriceLoading(false);
       return;
     }
@@ -625,6 +634,7 @@ export default function Explore() {
         if (cancelled) return;
         if (Object.keys(map).length > 0) {
           setTwsePriceMap(map);
+          setHasLoadedFullMarketPriceMap(true);
           setCache(CACHE_KEYS.TWSE_PRICE_MAP, map);
           if (canAutoRefreshPrices()) setPriceUpdatedLabel(formatPriceUpdateLabel());
         }
@@ -636,7 +646,7 @@ export default function Explore() {
     return () => {
       cancelled = true;
     };
-  }, [search, twsePriceMap]);
+  }, [search, hasLoadedFullMarketPriceMap]);
 
   useEffect(() => {
     const q = search.trim();

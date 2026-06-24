@@ -24,6 +24,7 @@ type WatchlistFilterState = {
   aiRemark: WatchlistRemarkFilter;
   sortKey: WatchlistSortKey;
   sortDirection: WatchlistSortDirection;
+  search: string;
 };
 type WatchlistInfoDialog = {
   kind: 'score';
@@ -138,9 +139,17 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null> {
 }
 
 function readSavedWatchlistFilters(): WatchlistFilterState {
+  const fallback: WatchlistFilterState = {
+    warnOnly: false,
+    aiSignal: 'all',
+    aiRemark: 'all',
+    sortKey: DEFAULT_WATCHLIST_SORT_KEY,
+    sortDirection: 'desc',
+    search: '',
+  };
   try {
     const raw = sessionStorage.getItem(WATCHLIST_FILTER_STORAGE_KEY);
-    if (!raw) return { warnOnly: false, aiSignal: 'all', aiRemark: 'all', sortKey: DEFAULT_WATCHLIST_SORT_KEY, sortDirection: 'desc' };
+    if (!raw) return fallback;
     const parsed = JSON.parse(raw) as Partial<WatchlistFilterState>;
     const aiSignal: WatchlistAiFilter =
       parsed.aiSignal === 'buy' || parsed.aiSignal === 'neutral' || parsed.aiSignal === 'sell'
@@ -158,9 +167,10 @@ function readSavedWatchlistFilters(): WatchlistFilterState {
         ? parsed.sortKey
         : DEFAULT_WATCHLIST_SORT_KEY,
       sortDirection: parsed.sortDirection === 'asc' ? 'asc' : 'desc',
+      search: typeof parsed.search === 'string' ? parsed.search : '',
     };
   } catch {
-    return { warnOnly: false, aiSignal: 'all', aiRemark: 'all', sortKey: DEFAULT_WATCHLIST_SORT_KEY, sortDirection: 'desc' };
+    return fallback;
   }
 }
 
@@ -190,6 +200,7 @@ export default function Watchlist() {
   const [filterAiRemark, setFilterAiRemark] = useState<WatchlistRemarkFilter>(savedFilters.aiRemark);
   const [sortKey, setSortKey] = useState<WatchlistSortKey>(savedFilters.sortKey);
   const [sortDirection, setSortDirection] = useState<WatchlistSortDirection>(savedFilters.sortDirection);
+  const [watchlistSearch, setWatchlistSearch] = useState(savedFilters.search);
   const [dataLoading, setDataLoading] = useState(false);
   const [loadingStep, setLoadingStep] = useState<string>('正在連線...');
   const [refreshKey, setRefreshKey] = useState(0);
@@ -217,8 +228,9 @@ export default function Watchlist() {
       aiRemark: filterAiRemark,
       sortKey,
       sortDirection,
+      search: watchlistSearch,
     }));
-  }, [filterWarnOnly, filterAiSignal, filterAiRemark, sortKey, sortDirection]);
+  }, [filterWarnOnly, filterAiSignal, filterAiRemark, sortKey, sortDirection, watchlistSearch]);
   useEffect(() => {
     if (dailyDataVersion) return;
     let cancelled = false;
@@ -1283,6 +1295,8 @@ export default function Watchlist() {
     setFilterAiRemark('all');
   };
 
+  const normalizedWatchlistSearch = watchlistSearch.trim().toLowerCase();
+
   // 排序：預設用股票本質；同分或缺資料時再用技術訊號與 AI 推薦等級補排序。
   const sortedWatchlist = [...watchlist]
     .sort((a, b) => {
@@ -1313,6 +1327,11 @@ export default function Watchlist() {
       return getRemarkScore(b.stockCode) - getRemarkScore(a.stockCode);
     })
     .filter(w => {
+      if (normalizedWatchlistSearch) {
+        const code = w.stockCode.toLowerCase();
+        const name = w.stockName.toLowerCase();
+        if (!code.includes(normalizedWatchlistSearch) && !name.includes(normalizedWatchlistSearch)) return false;
+      }
       if (filterWarnOnly)   return getWarningForStock(w.stockCode)?.level === 'remove';
       if (hasAiFeature && filterAiSignal !== 'all' && getAiSignalForStock(w.stockCode) !== filterAiSignal) return false;
       if (hasAiFeature && filterAiRemark !== 'all' && getRemarkFilterForStock(w.stockCode) !== filterAiRemark) return false;
@@ -1340,7 +1359,8 @@ export default function Watchlist() {
   const activeCompositeFilterCount =
     (hasAiFeature && filterAiSignal !== 'all' ? 1 : 0)
     + (hasAiFeature && filterAiRemark !== 'all' ? 1 : 0)
-    + (hasAiFeature && (sortKey !== DEFAULT_WATCHLIST_SORT_KEY || sortDirection !== 'desc') ? 1 : 0);
+    + (hasAiFeature && (sortKey !== DEFAULT_WATCHLIST_SORT_KEY || sortDirection !== 'desc') ? 1 : 0)
+    + (normalizedWatchlistSearch ? 1 : 0);
   const remarkFilterCounts = watchlist.reduce((acc, w) => {
     const remark = getRemarkFilterForStock(w.stockCode);
     if (remark !== 'all') acc[remark] = (acc[remark] || 0) + 1;
@@ -1352,6 +1372,30 @@ export default function Watchlist() {
       <div className="page-header">
         <h1 className="page-title">👁️ 觀察名單</h1>
       </div>
+
+      {watchlist.length > 0 && (
+        <div className="wl-search-bar" role="search">
+          <span className="wl-search-icon" aria-hidden="true">🔎</span>
+          <input
+            className="wl-search-input"
+            type="text"
+            placeholder="搜尋觀察股票名稱或代號..."
+            value={watchlistSearch}
+            onChange={(event) => setWatchlistSearch(event.target.value)}
+            aria-label="搜尋觀察名單股票"
+          />
+          {watchlistSearch.trim() && (
+            <button
+              className="wl-search-clear"
+              type="button"
+              onClick={() => setWatchlistSearch('')}
+              aria-label="清除觀察搜尋"
+            >
+              清除
+            </button>
+          )}
+        </div>
+      )}
 
       {dataLoading && watchlist.length > 0 && (
         <div className="wl-loading-bar wl-loading-bar-soft">
@@ -1602,8 +1646,9 @@ export default function Watchlist() {
               {filterAiSignal !== 'all' && <span>{filterAiSignal === 'buy' ? 'AI進場' : filterAiSignal === 'sell' ? 'AI出場' : 'AI中立'}</span>}
               {filterAiRemark !== 'all' && <span>{getRemarkFilterLabel(filterAiRemark)}</span>}
               {(sortKey !== DEFAULT_WATCHLIST_SORT_KEY || sortDirection !== 'desc') && <span>排序：{getSortLabel(sortKey)}・{getSortDirectionLabel(sortDirection)}</span>}
+              {normalizedWatchlistSearch && <span>搜尋：{watchlistSearch.trim()}</span>}
               <strong>{sortedWatchlist.length} 檔符合</strong>
-              <button className="wl-ai-filter-clear" onClick={() => { clearCompositeFilters(); setSortKey(DEFAULT_WATCHLIST_SORT_KEY); setSortDirection('desc'); }}>✕ 清除全部</button>
+              <button className="wl-ai-filter-clear" onClick={() => { clearCompositeFilters(); setSortKey(DEFAULT_WATCHLIST_SORT_KEY); setSortDirection('desc'); setWatchlistSearch(''); }}>✕ 清除全部</button>
             </div>
           )}
         </div>
@@ -1633,18 +1678,23 @@ export default function Watchlist() {
       {watchlist.length > 0 && sortedWatchlist.length === 0 && (
         <div className="empty-state">
           <div className="empty-state-icon">🔎</div>
-          <div className="empty-state-title">沒有符合條件的股票</div>
+          <div className="empty-state-title">{normalizedWatchlistSearch ? '找不到觀察股票' : '沒有符合條件的股票'}</div>
           <div className="empty-state-desc">
-            可以放寬其中一個條件，或清除篩選後重新查看全部觀察名單。
+            {normalizedWatchlistSearch
+              ? `觀察名單內沒有符合「${watchlistSearch.trim()}」的股票。`
+              : '可以放寬其中一個條件，或清除篩選後重新查看全部觀察名單。'}
           </div>
           <button
             className="btn btn-primary btn-lg"
             onClick={() => {
+              setWatchlistSearch('');
               setFilterWarnOnly(false);
               clearCompositeFilters();
+              setSortKey(DEFAULT_WATCHLIST_SORT_KEY);
+              setSortDirection('desc');
             }}
           >
-            清除所有篩選
+            {normalizedWatchlistSearch ? '清除搜尋與篩選' : '清除所有篩選'}
           </button>
         </div>
       )}
