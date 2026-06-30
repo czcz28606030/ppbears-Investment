@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent, t
 import { useNavigate } from 'react-router-dom';
 import { useStore, formatMoney, formatPrice } from '../store';
 import type { Holding, StockTradingSignal, Trade } from '../types';
-import { fetchOfficialPriceMap, fetchStockQuantData, fetchStockTradingSignals, fetchSimonsRecommendationCounts, clearOfficialPriceMapCache, refreshDailyAiCache, clearQuantSignalTTLCache, fetchDailyAiCacheVersion, getKnownDailyAiCacheVersion, rememberDailyAiCacheVersion, ensureDailyAiCacheVersion, fetchActiveEtfRadarMap } from '../api';
+import { fetchOfficialPriceMap, fetchStockQuantData, fetchStockTradingSignals, fetchSimonsRecommendationCounts, clearOfficialPriceMapCache, refreshDailyAiCache, clearQuantSignalTTLCache, fetchDailyAiCacheVersion, getKnownDailyAiCacheVersion, rememberDailyAiCacheVersion, ensureDailyAiCacheVersion, fetchActiveEtfRadarMap, fetchUserMarketDailyCache } from '../api';
 import type { ActiveEtfRadarItem, OfficialPriceMapEntry, StockQuantData, StockQuantMeta } from '../api';
 import { getCache, setCache, clearCache, getVersionedCache, getVersionedPersistentCache, setPersistentCache, clearPersistentCache, invalidateDailyMarketDataCaches, CACHE_KEYS } from '../cache';
 import MarketBadge from '../components/MarketBadge';
@@ -759,6 +759,33 @@ export default function Portfolio() {
           setCache(cacheKey, cached, refreshSlot.ttlMs);
         }
         return;
+      }
+
+      if (refreshKey === 0 && hasAiFeature) {
+        const holdingCodeSignature = holdings.map(h => h.stockCode).sort().join(',');
+        const cloud = await fetchUserMarketDailyCache<SignalCacheData>('portfolio');
+        if (mounted && cloud?.payload && cloud.signature === holdingCodeSignature) {
+          const cloudCache: SignalCacheData = {
+            ...cloud.payload,
+            _holdingKeys: holdingKeys,
+            _refreshSlot: refreshSlot.key,
+            _dataVersion: dataVersion || cloud.payload._dataVersion,
+          };
+          const cloudSignals: Record<string, PortfolioAiSignal> = {};
+          Object.entries(cloudCache).forEach(([key, value]) => {
+            if (key.startsWith('_')) return;
+            cloudSignals[key] = value as PortfolioAiSignal;
+          });
+          setAiSignals(cloudSignals);
+          setSignalDataDate(cloudCache._date);
+          setQuantMeta(cloudCache._quantMeta || null);
+          setUsingSignalCache(true);
+          setSignalsLoading(false);
+          setLoadingProgress(0);
+          setCache(cacheKey, cloudCache, Math.min(PORTFOLIO_SIGNAL_TTL_MS, refreshSlot.ttlMs));
+          setPersistentCache(PORTFOLIO_PERSISTENT_CACHE_KEY, cloudCache, Math.min(PORTFOLIO_SIGNAL_TTL_MS, refreshSlot.ttlMs), refreshSlot.key);
+          return;
+        }
       }
 
       if (mounted) {

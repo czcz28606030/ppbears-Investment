@@ -1,9 +1,19 @@
 # 📦 PPBears Investment — 更新日誌
 
-> **目前版本：v1.24.92**（2026-06-24）
-> 最新更新：觀察名單新增股票搜尋，找股票搜尋改為確保載入全市場股票。
+> **目前版本：v1.24.93**（2026-06-30）
+> 最新更新：新增觀察名單與庫存的背景預載快取，讓使用者進頁優先讀取已準備好的每日資料。
 
 ---
+
+## [v1.24.93] - 2026-06-30
+### Added
+- Added a `user_market_daily_cache` Supabase table with RLS for per-user Watchlist and Portfolio daily page payloads.
+- Added protected user-market warmup inside `/api/app-cache` with Vercel schedules for 05:00 Taiwan preload plus 08:10 weekday refresh.
+- Added `/api/app-cache?type=user-market-cache` so signed-in users can read only their own prepared page cache before falling back to live fetches.
+
+### Changed
+- Changed Watchlist and Portfolio startup flow to prefer local cache, then user-level cloud cache, then the existing live per-stock fetch path.
+- Updated the background warmup to prepare shared stock data, AI quant snapshots, recommendation counts, ETF radar, and Portfolio holding prices before users open the app.
 
 ## [v1.24.92] - 2026-06-24
 ### Added

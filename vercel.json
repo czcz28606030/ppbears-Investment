@@ -5,6 +5,14 @@
       "schedule": "0 0 * * *"
     },
     {
+      "path": "/api/app-cache",
+      "schedule": "0 21 * * *"
+    },
+    {
+      "path": "/api/app-cache",
+      "schedule": "10 0 * * 1-5"
+    },
+    {
       "path": "/api/cron-newsletter-prepare",
       "schedule": "0 0 * * *"
     },

@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore, formatPrice } from '../store';
-import { fetchOfficialClosePrice, fetchOfficialPriceMap, fetchSimonsData, fetchStockData, fetchStockQuantData, toRecommendation, fetchSimonsRecommendationCounts, refreshDailyAiCache, clearQuantSignalTTLCache, clearSimonsDataTTLCache, fetchDailyAiCacheVersion, getKnownDailyAiCacheVersion, rememberDailyAiCacheVersion, ensureDailyAiCacheVersion, fetchActiveEtfRadarMap } from '../api';
+import { fetchOfficialClosePrice, fetchOfficialPriceMap, fetchSimonsData, fetchStockData, fetchStockQuantData, toRecommendation, fetchSimonsRecommendationCounts, refreshDailyAiCache, clearQuantSignalTTLCache, clearSimonsDataTTLCache, fetchDailyAiCacheVersion, getKnownDailyAiCacheVersion, rememberDailyAiCacheVersion, ensureDailyAiCacheVersion, fetchActiveEtfRadarMap, fetchUserMarketDailyCache } from '../api';
 import type { ActiveEtfRadarItem, OfficialClosePrice, OfficialPriceMapEntry, StockQuantData, StockQuantMeta } from '../api';
 import type { SimonsItem, StockData, StockPrice, StockRecommendation, WatchlistSignal, WatchlistWarning } from '../types';
 import { getCache, setCache, clearCache, getVersionedCache, getPersistentCache, getVersionedPersistentCache, setPersistentCache, invalidateDailyMarketDataCaches, CACHE_KEYS } from '../cache';
@@ -374,6 +374,8 @@ export default function Watchlist() {
       accessScope?: 'ai' | 'basic';
       refreshSlot?: string;
       priceUpdatedLabel?: string;
+      recommendationCounts?: Record<string, number>;
+      activeEtfMap?: Record<string, ActiveEtfRadarItem>;
       _dataVersion?: string;
     };
     const cacheKey = CACHE_KEYS.WATCHLIST_FULL;
@@ -407,6 +409,43 @@ export default function Watchlist() {
       setUsingWatchlistCache(true);
       setCache(cacheKey, cached, refreshSlot.ttlMs);
       return;
+    }
+
+    async function tryLoadCloudCache(): Promise<boolean> {
+      if (refreshKey !== 0) return false;
+      const cloud = await fetchUserMarketDailyCache<WatchlistCacheData>('watchlist');
+      if (!cloud?.payload) return false;
+      const payload = cloud.payload;
+      if (
+        cloud.signature !== watchlistKeys ||
+        payload.watchlistKeys !== watchlistKeys ||
+        payload.analyzedDate !== getTodayString() ||
+        payload.cacheVersion !== WATCHLIST_CACHE_VERSION ||
+        payload.accessScope !== (hasAiFeature ? 'ai' : 'basic')
+      ) {
+        return false;
+      }
+
+      const cloudCache: WatchlistCacheData = {
+        ...payload,
+        refreshSlot: refreshSlot.key,
+        _dataVersion: dataVersion || payload._dataVersion,
+      };
+      setLiveQuotes(cloudCache.quotes || {});
+      setIndustryMap(cloudCache.industryMap || {});
+      setMarketMap(cloudCache.marketMap || {});
+      setKlineMap(cloudCache.klineMap || {});
+      setQuantDataMap(hasAiFeature ? cloudCache.quantDataMap || {} : {});
+      setSimonsRecMap(cloudCache.simonsRecMap || {});
+      setRecommendationCounts(cloudCache.recommendationCounts || {});
+      setActiveEtfMap(cloudCache.activeEtfMap || {});
+      setLatestKlineDate(cloudCache.latestKlineDate || '');
+      setLastAnalyzedAt(cloudCache.analyzedAt);
+      setPriceUpdatedLabel(cloudCache.priceUpdatedLabel || '');
+      setUsingWatchlistCache(true);
+      setCache<WatchlistCacheData>(cacheKey, cloudCache, Math.min(WATCHLIST_FULL_TTL_MS, refreshSlot.ttlMs));
+      setPersistentCache<WatchlistCacheData>(WATCHLIST_PERSISTENT_CACHE_KEY, cloudCache, Math.min(WATCHLIST_FULL_TTL_MS, refreshSlot.ttlMs), refreshSlot.key);
+      return true;
     }
 
     async function fetchQuotesAndSignals() {
@@ -640,12 +679,17 @@ export default function Watchlist() {
       setDataLoading(false);
     }
 
-    fetchQuotesAndSignals().catch((err) => {
-      console.error('watchlist fetchQuotesAndSignals error:', err);
-      setDataLoading(false);
-      setQuotesLoading(false);
-      setLoadingStep('資料讀取失敗，請稍後再試或手動重新抓取');
-    });
+    tryLoadCloudCache()
+      .then((loaded) => {
+        if (!loaded) return fetchQuotesAndSignals();
+        return undefined;
+      })
+      .catch((err) => {
+        console.error('watchlist fetchQuotesAndSignals error:', err);
+        setDataLoading(false);
+        setQuotesLoading(false);
+        setLoadingStep('資料讀取失敗，請稍後再試或手動重新抓取');
+      });
   }, [watchlist, refreshKey, checkWatchlistSignals, hasAiFeature, dailyDataVersion]);
 
   useEffect(() => {

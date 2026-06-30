@@ -121,6 +121,20 @@ export type DailyAiCacheVersion = {
   generatedAt: string;
 };
 
+export type UserMarketCacheSurface = 'watchlist' | 'portfolio';
+
+export type UserMarketDailyCache<T = unknown> = {
+  cache_date: string;
+  user_id: string;
+  surface: UserMarketCacheSurface;
+  signature: string;
+  payload: T;
+  status: 'ready' | 'partial' | 'waiting-simons' | 'empty';
+  data_date: string | null;
+  generated_at: string;
+  stale_reason: string | null;
+};
+
 const DAILY_AI_CACHE_VERSION_KEY = 'ppbears_daily_ai_cache_version_v1';
 const DAILY_AI_CACHE_GLOBAL_SURFACE = 'global';
 
@@ -179,6 +193,27 @@ export async function ensureDailyAiCacheVersion(surface = DAILY_AI_CACHE_GLOBAL_
     return latest.version;
   }
   return getKnownDailyAiCacheVersion(surface);
+}
+
+export async function fetchUserMarketDailyCache<T>(surface: UserMarketCacheSurface): Promise<UserMarketDailyCache<T> | null> {
+  try {
+    const sessionResult = supabase ? await supabase.auth.getSession().catch(() => null) : null;
+    const token = sessionResult?.data.session?.access_token;
+    if (!token) return null;
+    const params = new URLSearchParams({ type: 'user-market-cache', surface, t: String(Date.now()) });
+    const res = await fetch(`/api/app-cache?${params.toString()}`, {
+      cache: 'no-store',
+      headers: {
+        accept: 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data?.cache || null;
+  } catch {
+    return null;
+  }
 }
 
 export async function refreshDailyAiCache(stockCodes: string[] = []): Promise<DailyAiCacheRefreshResult> {

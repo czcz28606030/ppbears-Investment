@@ -10,6 +10,7 @@ import {
   saveTodayCache,
 } from '../src/server/newsletter-utils.js';
 import handleInstitutionCost from '../src/server/institution-cost.js';
+import { buildAndSaveUserMarketCaches } from '../src/server/user-market-cache.js';
 
 const IFALGO_BASE = 'https://api.ifalgo.com.tw/frontapi';
 const TAIPEI_OFFSET_MS = 8 * 60 * 60 * 1000;
@@ -1407,6 +1408,10 @@ async function handleWarmup(req: VercelRequest, res: VercelResponse) {
     ...await getUserStockCodes(80),
   ])].slice(0, 120) : [];
   const stockWarmResults = stockCodes.length > 0 ? await warmInBatches(baseUrl, stockCodes) : [];
+  const userMarketWarmup = await buildAndSaveUserMarketCaches(req).catch(error => ({
+    success: false,
+    error: error instanceof Error ? error.message : String(error),
+  }));
 
   return res.status(200).json({
     success: true,
@@ -1416,8 +1421,35 @@ async function handleWarmup(req: VercelRequest, res: VercelResponse) {
     stockCount: stockCodes.length,
     coreWarm: `${warmResults.filter(r => r.ok).length}/${warmResults.length}`,
     stockWarm: `${stockWarmResults.filter(r => r.ok).length}/${stockWarmResults.length}`,
+    userMarketWarmup,
     failed: stockWarmResults.filter(r => !r.ok).slice(0, 10),
   });
+}
+
+async function handleUserMarketCache(req: VercelRequest, res: VercelResponse) {
+  const surface = String(req.query.surface || '').trim();
+  if (surface !== 'watchlist' && surface !== 'portfolio') return res.status(400).json({ error: 'Invalid surface' });
+
+  const token = req.headers.authorization?.replace(/^Bearer\s+/i, '');
+  if (!token) return res.status(401).json({ error: '請先登入會員帳號' });
+
+  const supabase = getAdminClient();
+  const { data: authData, error: authError } = await supabase.auth.getUser(token);
+  if (authError || !authData.user) return res.status(401).json({ error: '登入狀態已失效，請重新登入' });
+
+  const { data, error } = await supabase
+    .from('user_market_daily_cache')
+    .select('cache_date,user_id,surface,signature,payload,status,data_date,generated_at,stale_reason')
+    .eq('cache_date', todayTaipei())
+    .eq('user_id', authData.user.id)
+    .eq('surface', surface)
+    .maybeSingle();
+
+  if (error) return res.status(500).json({ error: error.message });
+  if (!data) return res.status(404).json({ error: 'cache miss' });
+
+  res.setHeader('Cache-Control', 'private, max-age=60');
+  return res.status(200).json({ cache: data });
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -1430,6 +1462,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     if (type === 'warmup') return await handleWarmup(req, res);
+    if (type === 'user-market-cache') return await handleUserMarketCache(req, res);
     if (type === 'ifalgo-stock') {
       res.setHeader('Cache-Control', 'no-store, max-age=0');
       const coid = String(req.query.coid || '').trim();
