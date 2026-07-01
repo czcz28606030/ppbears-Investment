@@ -1,9 +1,15 @@
 # 📦 PPBears Investment — 更新日誌
 
-> **目前版本：v1.24.94**（2026-07-01）
-> 最新更新：修正看庫存返回頁面時可能誤用不完整背景快取，導致 AI 訊號退回中立簡版的問題。
+> **目前版本：v1.24.95**（2026-07-01）
+> 最新更新：修正觀察名單進頁反覆逐檔抓取，改為先顯示可用快取並在背景補齊 K 線與推薦資料。
 
 ---
+
+## [v1.24.95] - 2026-07-01
+### Fixed
+- Fixed Watchlist startup so matching or covering local/cloud cache can render immediately even when K-line data is incomplete, with missing K-line and recommendation data refreshed in the background.
+- Fixed Watchlist cache writes to wait for the daily AI cache version token before saving, preventing freshly loaded cache from being invalidated by a later version check.
+- Added per-user Watchlist background-cache completeness markers so partial preload rows record missing K-line or recommendation coverage instead of forcing opaque full-page reloads.
 
 ## [v1.24.94] - 2026-07-01
 ### Fixed

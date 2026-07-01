@@ -272,6 +272,9 @@ function buildWatchlistPayload(rows: WatchlistRow[], ctx: WarmContext, accessSco
   const klineMap: Record<string, unknown[]> = {};
   const quantDataMap: Record<string, StockQuantData> = {};
   const simonsRecMap: Record<string, unknown> = {};
+  const incompleteCodes = new Set<string>();
+  const missingKlineCodes: string[] = [];
+  const missingRecommendationCodes: string[] = [];
 
   for (const row of rows) {
     const code = row.stock_code;
@@ -283,13 +286,37 @@ function buildWatchlistPayload(rows: WatchlistRow[], ctx: WarmContext, accessSco
     const prevClose = numberValue(prev?.close_d);
     if (close > 0) {
       quotes[code] = { close, change: numberValue(official?.change) || (prevClose > 0 ? close - prevClose : 0) };
+    } else {
+      incompleteCodes.add(code);
     }
     if (stockData?.subindustry) industryMap[code] = stockData.subindustry;
-    if (stockData?.prices?.length) klineMap[code] = stockData.prices.slice(-126);
+    if (stockData?.prices?.length) {
+      klineMap[code] = stockData.prices.slice(-126);
+    } else {
+      incompleteCodes.add(code);
+      missingKlineCodes.push(code);
+    }
     const quant = ctx.quantMap[code] || emptyQuantData();
-    if (accessScope === 'ai') quantDataMap[code] = quant;
+    if (accessScope === 'ai') {
+      quantDataMap[code] = quant;
+      if (quant.meta?.source === 'empty') incompleteCodes.add(code);
+    }
     const simonsItem = ctx.simonsItemMap[code];
-    if (simonsItem) simonsRecMap[code] = buildRecommendation(simonsItem, accessScope === 'ai' ? quant : undefined);
+    if (simonsItem) {
+      simonsRecMap[code] = buildRecommendation(simonsItem, accessScope === 'ai' ? quant : undefined);
+    } else if (accessScope === 'ai' && quant.aiQuanBackDataComment) {
+      simonsRecMap[code] = buildRecommendation({
+        coid: code,
+        stkname: row.stock_name,
+        close: String(close || ''),
+        psr: 0,
+        strength: '0',
+        subindustry: stockData?.subindustry || row.note || null,
+        status: stockData?.status || null,
+      }, quant);
+    } else {
+      missingRecommendationCodes.push(code);
+    }
   }
 
   return {
@@ -309,6 +336,9 @@ function buildWatchlistPayload(rows: WatchlistRow[], ctx: WarmContext, accessSco
     accessScope,
     priceUpdatedLabel: '',
     _dataVersion: ctx.dataVersion,
+    _incompleteCodes: [...incompleteCodes],
+    _missingKlineCodes: missingKlineCodes,
+    _missingRecommendationCodes: missingRecommendationCodes,
   };
 }
 
@@ -468,8 +498,6 @@ export async function buildAndSaveUserMarketCaches(req: VercelRequest) {
   const usersById = new Map(users.map(user => [user.id, user]));
   const allCodes = normalizeCodes([...holdings, ...watchlist]);
   const ctx = await buildWarmContext(getBaseUrl(req), allCodes);
-  const hasPartialData = allCodes.some(code => !ctx.stockDataMap[code] || ctx.quantMap[code]?.meta?.source === 'empty');
-  const rowStatus = ctx.simonsStatus === 'waiting-simons' ? 'waiting-simons' : hasPartialData ? 'partial' : 'ready';
   const updatedHoldingPrices = await updateHoldingPrices(supabase, holdings, ctx.officialMap);
 
   const holdingsByUser = new Map<string, HoldingRow[]>();
@@ -489,16 +517,22 @@ export async function buildAndSaveUserMarketCaches(req: VercelRequest) {
 
     if (userWatchlist.length > 0) {
       const signature = stockListSignature(userWatchlist.map(row => row.stock_code));
+      const watchlistPayload = buildWatchlistPayload(userWatchlist, ctx, watchlistAccess);
+      const incompleteCodes = Array.isArray(watchlistPayload._incompleteCodes) ? watchlistPayload._incompleteCodes : [];
       rows.push({
         cache_date: ctx.today,
         user_id: user.id,
         surface: 'watchlist',
         signature,
-        payload: buildWatchlistPayload(userWatchlist, ctx, watchlistAccess),
-        status: rowStatus,
+        payload: watchlistPayload,
+        status: ctx.simonsStatus === 'waiting-simons' ? 'waiting-simons' : incompleteCodes.length > 0 ? 'partial' : 'ready',
         data_date: ctx.simonsDataDate || null,
         generated_at: ctx.generatedAt,
-        stale_reason: ctx.simonsStatus === 'waiting-simons' ? 'Simons latest completed trading day data is not ready yet' : null,
+        stale_reason: ctx.simonsStatus === 'waiting-simons'
+          ? 'Simons latest completed trading day data is not ready yet'
+          : incompleteCodes.length > 0
+            ? `Missing complete watchlist data for ${incompleteCodes.length} stock(s)`
+            : null,
       });
     }
 

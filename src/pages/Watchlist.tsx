@@ -118,9 +118,34 @@ function getDataFreshness(meta: StockQuantMeta | null, loading: boolean, hasData
   return { className: 'wl-data-freshness-fresh', label: '已使用每日 AI 訊號快取' };
 }
 
-function hasCompleteKlineCache(klineMap: Record<string, StockPrice[]> | undefined, stockCodes: string[]): boolean {
-  if (!klineMap || stockCodes.length === 0) return false;
-  return stockCodes.every(code => (klineMap[code] || []).length >= 12);
+
+function cacheCoversWatchlist(cacheKeys: string | undefined, stockCodes: string[]): boolean {
+  if (!cacheKeys || stockCodes.length === 0) return false;
+  const cachedCodes = new Set(cacheKeys.split(',').map(code => code.trim()).filter(Boolean));
+  return stockCodes.every(code => cachedCodes.has(code));
+}
+
+function getMissingKlineCodes(klineMap: Record<string, StockPrice[]> | undefined, stockCodes: string[]): string[] {
+  return stockCodes.filter(code => (klineMap?.[code] || []).length < 12);
+}
+
+function hasUsableWatchlistCache(
+  cache: {
+    quotes?: Record<string, { close: number; change: number }>;
+    klineMap?: Record<string, StockPrice[]>;
+    quantDataMap?: Record<string, StockQuantData>;
+    simonsRecMap?: Record<string, StockRecommendation>;
+  },
+  stockCodes: string[],
+  hasAiFeature: boolean
+): boolean {
+  if (stockCodes.length === 0) return false;
+  const hasQuote = stockCodes.some(code => Boolean(cache.quotes?.[code]));
+  const hasKline = stockCodes.some(code => (cache.klineMap?.[code] || []).length >= 12);
+  if (!hasAiFeature) return hasQuote || hasKline;
+  const hasQuant = stockCodes.some(code => Boolean(cache.quantDataMap?.[code]));
+  const hasRecommendation = stockCodes.some(code => Boolean(cache.simonsRecMap?.[code]));
+  return hasQuote || hasKline || hasQuant || hasRecommendation;
 }
 
 function formatTodayDate(): string {
@@ -383,31 +408,144 @@ export default function Watchlist() {
     const watchlistKeys = watchlistCodes.slice().sort().join(',');
     const refreshSlot = getRefreshSlotInfo();
     const dataVersion = dailyDataVersion || getKnownDailyAiCacheVersion('watchlist');
+    if (refreshKey === 0 && hasAiFeature && !dataVersion) {
+      ensureDailyAiCacheVersion('watchlist', true).then(version => {
+        setDailyDataVersion(version || 'unversioned');
+      });
+      return;
+    }
     const cached = refreshKey === 0
       ? getVersionedCache<WatchlistCacheData>(cacheKey, dataVersion) || getVersionedPersistentCache<WatchlistCacheData>(WATCHLIST_PERSISTENT_CACHE_KEY, refreshSlot.key, dataVersion)
       : null;
+
+    function applyWatchlistCache(cache: WatchlistCacheData) {
+      setLiveQuotes(cache.quotes || {});
+      setIndustryMap(cache.industryMap || {});
+      setMarketMap(cache.marketMap || {});
+      setKlineMap(cache.klineMap || {});
+      setQuantDataMap(hasAiFeature ? cache.quantDataMap || {} : {});
+      setSimonsRecMap(cache.simonsRecMap || {});
+      setRecommendationCounts(cache.recommendationCounts || {});
+      setActiveEtfMap(cache.activeEtfMap || {});
+      setLatestKlineDate(cache.latestKlineDate || '');
+      setLastAnalyzedAt(cache.analyzedAt);
+      setPriceUpdatedLabel(cache.priceUpdatedLabel || '');
+      setUsingWatchlistCache(true);
+    }
+
+    async function refreshMissingCacheData(baseCache: WatchlistCacheData) {
+      const missingKlineCodes = getMissingKlineCodes(baseCache.klineMap, watchlistCodes);
+      const needsRecommendation = hasAiFeature && watchlistCodes.some(code => !baseCache.simonsRecMap?.[code]);
+      if (missingKlineCodes.length === 0 && !needsRecommendation) return;
+
+      const stockDataMap: Record<string, StockData | null> = {};
+      watchlist.forEach(item => {
+        const cachedPrices = baseCache.klineMap?.[item.stockCode] || [];
+        stockDataMap[item.stockCode] = cachedPrices.length > 0
+          ? {
+              coid: item.stockCode,
+              stkname: item.stockName,
+              subindustry: baseCache.industryMap?.[item.stockCode] || '',
+              status: '',
+              prices: cachedPrices,
+            }
+          : null;
+      });
+
+      const fetchedRows = await Promise.all(
+        missingKlineCodes.map(code => fetchStockData(code).catch(() => null))
+      );
+      const mergedQuotes = { ...(baseCache.quotes || {}) };
+      const mergedIndustry = { ...(baseCache.industryMap || {}) };
+      const mergedKline = { ...(baseCache.klineMap || {}) };
+      missingKlineCodes.forEach((code, index) => {
+        const data = fetchedRows[index];
+        stockDataMap[code] = data;
+        if (!data?.prices?.length) return;
+        mergedIndustry[code] = data.subindustry || mergedIndustry[code] || '';
+        mergedKline[code] = data.prices.slice(-126);
+        const latest = data.prices[data.prices.length - 1];
+        const prev = data.prices.length > 1 ? data.prices[data.prices.length - 2] : null;
+        const close = Number(latest?.close_d);
+        const prevClose = Number(prev?.close_d);
+        if (Number.isFinite(close) && close > 0) {
+          mergedQuotes[code] = {
+            close,
+            change: Number.isFinite(prevClose) && prevClose > 0 ? close - prevClose : mergedQuotes[code]?.change || 0,
+          };
+        }
+      });
+
+      const mergedQuant = { ...(baseCache.quantDataMap || {}) };
+      const mergedRec = { ...(baseCache.simonsRecMap || {}) };
+      if (needsRecommendation) {
+        const simonsItems = await fetchSimonsData(undefined, { forceFresh: false }).catch(() => []);
+        const simonsItemMap: Record<string, SimonsItem> = {};
+        simonsItems.forEach(item => { simonsItemMap[item.coid] = item; });
+        watchlist.forEach(item => {
+          if (mergedRec[item.stockCode]) return;
+          const qd = mergedQuant[item.stockCode];
+          const simonsItem = simonsItemMap[item.stockCode];
+          if (simonsItem) {
+            mergedRec[item.stockCode] = toRecommendation(simonsItem, hasAiFeature ? qd : undefined);
+          } else if (qd?.aiQuanBackDataComment) {
+            mergedRec[item.stockCode] = toRecommendation(
+              buildFallbackSimonsItem(item.stockCode, item.stockName, qd, stockDataMap[item.stockCode], mergedQuotes[item.stockCode]),
+              qd
+            );
+          }
+        });
+      }
+
+      const latestKlineDate = watchlistCodes.reduce((latest, code) => {
+        const rows = mergedKline[code] || [];
+        const date = rows[rows.length - 1]?.mdate || '';
+        return date > latest ? date : latest;
+      }, baseCache.latestKlineDate || '');
+      const refreshedCache: WatchlistCacheData = {
+        ...baseCache,
+        quotes: mergedQuotes,
+        industryMap: mergedIndustry,
+        klineMap: mergedKline,
+        quantDataMap: mergedQuant,
+        simonsRecMap: mergedRec,
+        latestKlineDate,
+        watchlistKeys,
+        refreshSlot: refreshSlot.key,
+        _dataVersion: dataVersion || baseCache._dataVersion,
+      };
+
+      setLiveQuotes(mergedQuotes);
+      setIndustryMap(mergedIndustry);
+      setKlineMap(mergedKline);
+      setSimonsRecMap(mergedRec);
+      setLatestKlineDate(latestKlineDate);
+      setCache<WatchlistCacheData>(cacheKey, refreshedCache, Math.min(WATCHLIST_FULL_TTL_MS, refreshSlot.ttlMs));
+      setPersistentCache<WatchlistCacheData>(WATCHLIST_PERSISTENT_CACHE_KEY, refreshedCache, Math.min(WATCHLIST_FULL_TTL_MS, refreshSlot.ttlMs), refreshSlot.key);
+      if (missingKlineCodes.length > 0) {
+        checkWatchlistSignals(stockDataMap).catch(() => {});
+      }
+    }
     if (
       refreshKey === 0 &&
       cached &&
-      cached.watchlistKeys === watchlistKeys &&
+      cacheCoversWatchlist(cached.watchlistKeys, watchlistCodes) &&
       cached.analyzedDate === getTodayString() &&
       cached.cacheVersion === WATCHLIST_CACHE_VERSION &&
       cached.accessScope === (hasAiFeature ? 'ai' : 'basic') &&
       cached.refreshSlot === refreshSlot.key &&
-      hasCompleteKlineCache(cached.klineMap, watchlistCodes)
+      hasUsableWatchlistCache(cached, watchlistCodes, hasAiFeature)
     ) {
-      // 資料未過期、觀察名單未變更、且是今天的資料 → 直接讀快取
-      setLiveQuotes(cached.quotes);
-      setIndustryMap(cached.industryMap);
-      setMarketMap(cached.marketMap || {});
-      setKlineMap(cached.klineMap || {});
-      setQuantDataMap(hasAiFeature ? cached.quantDataMap : {});
-      setSimonsRecMap(cached.simonsRecMap);
-      setLatestKlineDate(cached.latestKlineDate);
-      setLastAnalyzedAt(cached.analyzedAt);
-      setPriceUpdatedLabel(cached.priceUpdatedLabel || '');
-      setUsingWatchlistCache(true);
-      setCache(cacheKey, cached, refreshSlot.ttlMs);
+      const normalizedCache: WatchlistCacheData = {
+        ...cached,
+        watchlistKeys,
+        refreshSlot: refreshSlot.key,
+        _dataVersion: dataVersion || cached._dataVersion,
+      };
+      applyWatchlistCache(normalizedCache);
+      setCache(cacheKey, normalizedCache, refreshSlot.ttlMs);
+      setPersistentCache(WATCHLIST_PERSISTENT_CACHE_KEY, normalizedCache, refreshSlot.ttlMs, refreshSlot.key);
+      refreshMissingCacheData(normalizedCache).catch(() => {});
       return;
     }
 
@@ -417,34 +555,28 @@ export default function Watchlist() {
       if (!cloud?.payload) return false;
       const payload = cloud.payload;
       if (
-        cloud.signature !== watchlistKeys ||
-        payload.watchlistKeys !== watchlistKeys ||
+        cloud.status === 'waiting-simons' ||
+        cloud.status === 'empty' ||
+        !cacheCoversWatchlist(cloud.signature, watchlistCodes) ||
+        !cacheCoversWatchlist(payload.watchlistKeys, watchlistCodes) ||
         payload.analyzedDate !== getTodayString() ||
         payload.cacheVersion !== WATCHLIST_CACHE_VERSION ||
-        payload.accessScope !== (hasAiFeature ? 'ai' : 'basic')
+        payload.accessScope !== (hasAiFeature ? 'ai' : 'basic') ||
+        !hasUsableWatchlistCache(payload, watchlistCodes, hasAiFeature)
       ) {
         return false;
       }
 
       const cloudCache: WatchlistCacheData = {
         ...payload,
+        watchlistKeys,
         refreshSlot: refreshSlot.key,
         _dataVersion: dataVersion || payload._dataVersion,
       };
-      setLiveQuotes(cloudCache.quotes || {});
-      setIndustryMap(cloudCache.industryMap || {});
-      setMarketMap(cloudCache.marketMap || {});
-      setKlineMap(cloudCache.klineMap || {});
-      setQuantDataMap(hasAiFeature ? cloudCache.quantDataMap || {} : {});
-      setSimonsRecMap(cloudCache.simonsRecMap || {});
-      setRecommendationCounts(cloudCache.recommendationCounts || {});
-      setActiveEtfMap(cloudCache.activeEtfMap || {});
-      setLatestKlineDate(cloudCache.latestKlineDate || '');
-      setLastAnalyzedAt(cloudCache.analyzedAt);
-      setPriceUpdatedLabel(cloudCache.priceUpdatedLabel || '');
-      setUsingWatchlistCache(true);
+      applyWatchlistCache(cloudCache);
       setCache<WatchlistCacheData>(cacheKey, cloudCache, Math.min(WATCHLIST_FULL_TTL_MS, refreshSlot.ttlMs));
       setPersistentCache<WatchlistCacheData>(WATCHLIST_PERSISTENT_CACHE_KEY, cloudCache, Math.min(WATCHLIST_FULL_TTL_MS, refreshSlot.ttlMs), refreshSlot.key);
+      refreshMissingCacheData(cloudCache).catch(() => {});
       return true;
     }
 
