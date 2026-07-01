@@ -1541,6 +1541,7 @@ export const useStore = create<InvestmentStore>((set, get) => ({
   approveWithdrawal: async (requestId) => {
     if (!supabase) return { error: '資料庫未連線' };
     try {
+      const request = get().withdrawalRequests.find(r => r.id === requestId);
       const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
       if (sessionError) return { error: sessionError.message };
       const token = sessionData.session?.access_token;
@@ -1557,8 +1558,20 @@ export const useStore = create<InvestmentStore>((set, get) => ({
       const result = await response.json().catch(() => ({}));
       if (!response.ok) return { error: result.error || '同意出金失敗' };
 
-      await get().loadWithdrawalRequests();
-      await get().loadChildren();
+      const reviewedAt = new Date().toISOString();
+      const nextStatus = result.status === 'rejected' ? 'rejected' : 'approved';
+      set(s => ({
+        withdrawalRequests: s.withdrawalRequests.map(r =>
+          r.id === requestId ? { ...r, status: nextStatus, reviewedAt } : r
+        ),
+        children: request && typeof result.balance === 'number'
+          ? s.children.map(child =>
+              child.id === request.childId ? { ...child, availableBalance: result.balance } : child
+            )
+          : s.children,
+      }));
+      void get().loadWithdrawalRequests();
+      void get().loadChildren();
       return { error: null };
     } catch (e) {
       return { error: e instanceof Error ? e.message : '同意出金失敗' };
@@ -1584,7 +1597,14 @@ export const useStore = create<InvestmentStore>((set, get) => ({
       const result = await response.json().catch(() => ({}));
       if (!response.ok) return { error: result.error || '拒絕出金失敗' };
 
-      await get().loadWithdrawalRequests();
+      const reviewedAt = new Date().toISOString();
+      const nextStatus = result.status === 'approved' ? 'approved' : 'rejected';
+      set(s => ({
+        withdrawalRequests: s.withdrawalRequests.map(r =>
+          r.id === requestId ? { ...r, status: nextStatus, reviewedAt } : r
+        ),
+      }));
+      void get().loadWithdrawalRequests();
       return { error: null };
     } catch (e) {
       return { error: e instanceof Error ? e.message : '拒絕出金失敗' };
@@ -1600,12 +1620,26 @@ export const useStore = create<InvestmentStore>((set, get) => ({
     if (amount <= 0) return { error: '申請金額必須大於 0' };
     if (amount > user.availableBalance) return { error: '申請金額超過可用餘額' };
 
+    const createdAt = new Date().toISOString();
+    const localRequest: WithdrawalRequest = {
+      id: `local-${createdAt}-${Math.random().toString(36).slice(2)}`,
+      childId: user.id,
+      childName: user.displayName,
+      childAvatar: user.avatar,
+      parentId: user.parentId,
+      amount,
+      reason: reason || undefined,
+      status: 'pending',
+      createdAt,
+    };
+
     const { error } = await supabase.from('withdrawal_requests').insert([{
       child_id: user.id, parent_id: user.parentId,
       amount, reason: reason || null, status: 'pending',
     }]);
     if (error) return { error: error.message };
-    await get().loadWithdrawalRequests();
+    set(s => ({ withdrawalRequests: [localRequest, ...s.withdrawalRequests] }));
+    void get().loadWithdrawalRequests();
     return { error: null };
   },
 

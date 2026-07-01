@@ -13,17 +13,22 @@ export default function WithdrawalApproval() {
   const [wReason, setWReason] = useState('');
   const [wError, setWError] = useState('');
   const [wLoading, setWLoading] = useState(false);
+  const [reviewingId, setReviewingId] = useState<string | null>(null);
 
   const pending = withdrawalRequests.filter(r => r.status === 'pending');
   const reviewed = withdrawalRequests.filter(r => r.status !== 'pending');
 
   const handleApprove = async (id: string) => {
+    setReviewingId(`approve:${id}`);
     const result = await approveWithdrawal(id);
+    setReviewingId(null);
     if (result.error) alert('無法同意：' + result.error);
   };
 
   const handleReject = async (id: string) => {
+    setReviewingId(`reject:${id}`);
     const result = await rejectWithdrawal(id);
+    setReviewingId(null);
     if (result.error) alert('操作失敗：' + result.error);
   };
 
@@ -142,11 +147,19 @@ export default function WithdrawalApproval() {
                 )}
                 {isParent ? (
                   <div className="request-actions">
-                    <button className="btn-reject" onClick={() => handleReject(req.id)}>
-                      ❌ 拒絕
+                    <button
+                      className="btn-reject"
+                      onClick={() => handleReject(req.id)}
+                      disabled={reviewingId !== null}
+                    >
+                      {reviewingId === `reject:${req.id}` ? '拒絕中...' : '❌ 拒絕'}
                     </button>
-                    <button className="btn-approve" onClick={() => handleApprove(req.id)}>
-                      ✅ 同意出金
+                    <button
+                      className="btn-approve"
+                      onClick={() => handleApprove(req.id)}
+                      disabled={reviewingId !== null}
+                    >
+                      {reviewingId === `approve:${req.id}` ? '同意中...' : '✅ 同意出金'}
                     </button>
                   </div>
                 ) : (

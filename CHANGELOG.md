@@ -1,10 +1,15 @@
 # 📦 PPBears Investment — 更新日誌
 
-> **目前版本：v1.24.95**（2026-07-01）
-> 最新更新：修正觀察名單進頁反覆逐檔抓取，改為先顯示可用快取並在背景補齊 K 線與推薦資料。
+> **目前版本：v1.24.96**（2026-07-01）
+> 最新更新：修正出金審核成功後等待重新同步太久，改為審核成功即時更新畫面並在背景補同步。
 
 ---
 
+## [v1.24.96] - 2026-07-01
+### Fixed
+- Fixed withdrawal approval and rejection so successful review actions update the visible request status immediately, with list and child-balance refreshes continuing in the background.
+- Added an in-progress state to withdrawal review buttons to prevent duplicate clicks while approval or rejection is being sent.
+- Updated child withdrawal submission to show the new pending request locally right after the insert succeeds, then reconcile with cloud data in the background.
 ## [v1.24.95] - 2026-07-01
 ### Fixed
 - Fixed Watchlist startup so matching or covering local/cloud cache can render immediately even when K-line data is incomplete, with missing K-line and recommendation data refreshed in the background.
@@ -1273,4 +1278,3 @@
   - `?∠巨閰單? (StockDetail)`: ?單??勗?PBear ?咱??隞晶??祇?? (P/E, P/B)??蝣潮???眺鞈?漱????  - `摨怠? (Portfolio)`: 蝮質??Ｙ絞閮?券???脣漲???∪?銵具風?脖漱????  - `摮貊? (Learn)`: 6 ??鞈??曄??箇?隤脩?
 - **鞈?????*:
   - 銝脫 IFalgo API ???啗?單??勗?風?脫??  - 銝脫 IFalgo Simons API ??瘥?刻??鈭箸???  - 撱箇? AI ??撱箄降?摩嚗?靘???鞎琿脯??都?箏遣霅?  - ?券?游? **Supabase ?脩垢鞈?摨?* (PostgreSQL)嚗??其??單??啗??蝙?刻董?眺鞈?漱??(Trades)?澈摮?(Holdings) ???Ｚ???
-

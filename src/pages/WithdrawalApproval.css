@@ -219,8 +219,16 @@
   transition: all 0.2s;
 }
 
-.btn-reject:hover {
+.btn-reject:hover:not(:disabled) {
   background: rgba(244, 67, 54, 0.15);
+}
+
+.btn-reject:disabled,
+.btn-approve:disabled {
+  opacity: 0.6;
+  cursor: wait;
+  transform: none;
+  box-shadow: none;
 }
 
 .btn-approve {
@@ -238,7 +246,7 @@
   box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
 }
 
-.btn-approve:hover {
+.btn-approve:hover:not(:disabled) {
   transform: translateY(-1px);
   box-shadow: 0 6px 16px rgba(76, 175, 80, 0.4);
 }
