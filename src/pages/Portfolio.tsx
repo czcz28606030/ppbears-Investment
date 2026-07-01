@@ -29,13 +29,15 @@ type ActiveEtfInfoDialog = {
 };
 
 type SignalCacheData = {
+  _schema?: string;
   _date: string;
   _holdingKeys: string;
   _refreshSlot?: string;
   _createdAt?: number;
   _quantMeta?: StockQuantMeta;
   _dataVersion?: string;
-  [stockCode: string]: PortfolioAiSignal | StockQuantMeta | string | number | undefined;
+  _incompleteCodes?: string[];
+  [stockCode: string]: PortfolioAiSignal | StockQuantMeta | string | number | string[] | undefined;
 };
 
 const HOLDING_ALLOCATION_COLORS = [
@@ -126,7 +128,8 @@ type FinMindPriceRow = {
 };
 
 const PORTFOLIO_SIGNAL_TTL_MS = 18 * 60 * 60 * 1000;
-const PORTFOLIO_PERSISTENT_CACHE_KEY = 'ppbears_portfolio_signals_v7';
+const PORTFOLIO_SIGNAL_CACHE_SCHEMA = 'portfolio-signal-rich-v2';
+const PORTFOLIO_PERSISTENT_CACHE_KEY = 'ppbears_portfolio_signals_v8';
 const DAILY_AI_CACHE_POLL_MS = 90 * 1000;
 const DATA_REFRESH_SCHEDULE = [
   { label: '08:00', minutes: 8 * 60 },
@@ -233,10 +236,44 @@ function getDataFreshness(meta: StockQuantMeta | null, loading: boolean, hasData
   return { className: 'pf-data-freshness-fresh', label: '已使用每日 AI 訊號快取' };
 }
 
-function isFreshTodaySignalCache(cached: SignalCacheData | null, holdingKeys: string): cached is SignalCacheData {
+function isPortfolioSignal(value: unknown): value is PortfolioAiSignal {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const signal = value as Partial<PortfolioAiSignal>;
+  return typeof signal.primaryLabel === 'string'
+    && (signal.primaryType === 'buy' || signal.primaryType === 'sell' || signal.primaryType === 'neutral')
+    && typeof signal.primaryIcon === 'string';
+}
+
+function hasRichAiSignal(signal: PortfolioAiSignal | undefined): boolean {
+  if (!signal) return false;
+  if (signal.aiRemark || signal.cumRet) return true;
+  return signal.chipPts !== undefined && Number.isFinite(signal.chipPts);
+}
+
+function isFreshTodaySignalCache(
+  cached: SignalCacheData | null,
+  holdingKeys: string,
+  stockCodes: string[],
+  requireRichAiSignals: boolean
+): cached is SignalCacheData {
   if (!cached || cached._holdingKeys !== holdingKeys) return false;
+  if (cached._schema !== PORTFOLIO_SIGNAL_CACHE_SCHEMA) return false;
+  if (cached._incompleteCodes?.length) return false;
   const cacheDate = cached._date?.slice(0, 10);
-  return cacheDate === getTodayString();
+  if (cacheDate !== getTodayString()) return false;
+  if (!requireRichAiSignals) return true;
+  return stockCodes.every(code => hasRichAiSignal(isPortfolioSignal(cached[code]) ? cached[code] : undefined));
+}
+
+function canUseCloudPortfolioCache(
+  cloudStatus: string | undefined,
+  cache: SignalCacheData,
+  holdingKeys: string,
+  stockCodes: string[],
+  requireRichAiSignals: boolean
+): boolean {
+  if (cloudStatus === 'waiting-simons' || cloudStatus === 'empty') return false;
+  return isFreshTodaySignalCache(cache, holdingKeys, stockCodes, requireRichAiSignals);
 }
 
 function getCurrentHoldingStartDate(stockCode: string, trades: Trade[]): string | undefined {
@@ -738,13 +775,14 @@ export default function Portfolio() {
         .map(h => `${h.stockCode}:${h.totalShares}:${h.avgCost}:${h.currentPrice}:${holdingStartDates[h.stockCode] ?? ''}`)
         .sort()
         .join(',');
+      const holdingStockCodes = holdings.map(h => h.stockCode).sort();
       const cacheKey = CACHE_KEYS.PORTFOLIO_SIGNALS;
       const refreshSlot = getRefreshSlotInfo();
       const dataVersion = dailyDataVersion || getKnownDailyAiCacheVersion('portfolio');
       const cached = refreshKey === 0
         ? getVersionedCache<SignalCacheData>(cacheKey, dataVersion) || getVersionedPersistentCache<SignalCacheData>(PORTFOLIO_PERSISTENT_CACHE_KEY, refreshSlot.key, dataVersion)
         : null;
-      const canUseCachedSignals = refreshKey === 0 && isFreshTodaySignalCache(cached, holdingKeys) && cached._refreshSlot === refreshSlot.key;
+      const canUseCachedSignals = refreshKey === 0 && isFreshTodaySignalCache(cached, holdingKeys, holdingStockCodes, hasAiFeature) && cached._refreshSlot === refreshSlot.key;
       if (canUseCachedSignals) {
         if (mounted) {
           const cachedSignals: Record<string, PortfolioAiSignal> = {};
@@ -762,7 +800,7 @@ export default function Portfolio() {
       }
 
       if (refreshKey === 0 && hasAiFeature) {
-        const holdingCodeSignature = holdings.map(h => h.stockCode).sort().join(',');
+        const holdingCodeSignature = holdingStockCodes.join(',');
         const cloud = await fetchUserMarketDailyCache<SignalCacheData>('portfolio');
         if (mounted && cloud?.payload && cloud.signature === holdingCodeSignature) {
           const cloudCache: SignalCacheData = {
@@ -771,20 +809,22 @@ export default function Portfolio() {
             _refreshSlot: refreshSlot.key,
             _dataVersion: dataVersion || cloud.payload._dataVersion,
           };
-          const cloudSignals: Record<string, PortfolioAiSignal> = {};
-          Object.entries(cloudCache).forEach(([key, value]) => {
-            if (key.startsWith('_')) return;
-            cloudSignals[key] = value as PortfolioAiSignal;
-          });
-          setAiSignals(cloudSignals);
-          setSignalDataDate(cloudCache._date);
-          setQuantMeta(cloudCache._quantMeta || null);
-          setUsingSignalCache(true);
-          setSignalsLoading(false);
-          setLoadingProgress(0);
-          setCache(cacheKey, cloudCache, Math.min(PORTFOLIO_SIGNAL_TTL_MS, refreshSlot.ttlMs));
-          setPersistentCache(PORTFOLIO_PERSISTENT_CACHE_KEY, cloudCache, Math.min(PORTFOLIO_SIGNAL_TTL_MS, refreshSlot.ttlMs), refreshSlot.key);
-          return;
+          if (canUseCloudPortfolioCache(cloud.status, cloudCache, holdingKeys, holdingStockCodes, hasAiFeature)) {
+            const cloudSignals: Record<string, PortfolioAiSignal> = {};
+            Object.entries(cloudCache).forEach(([key, value]) => {
+              if (key.startsWith('_')) return;
+              cloudSignals[key] = value as PortfolioAiSignal;
+            });
+            setAiSignals(cloudSignals);
+            setSignalDataDate(cloudCache._date);
+            setQuantMeta(cloudCache._quantMeta || null);
+            setUsingSignalCache(true);
+            setSignalsLoading(false);
+            setLoadingProgress(0);
+            setCache(cacheKey, cloudCache, Math.min(PORTFOLIO_SIGNAL_TTL_MS, refreshSlot.ttlMs));
+            setPersistentCache(PORTFOLIO_PERSISTENT_CACHE_KEY, cloudCache, Math.min(PORTFOLIO_SIGNAL_TTL_MS, refreshSlot.ttlMs), refreshSlot.key);
+            return;
+          }
         }
       }
 
@@ -796,6 +836,7 @@ export default function Portfolio() {
       }
       
       const signals: Record<string, PortfolioAiSignal> = {};
+      const incompleteCodes: string[] = [];
       const forceFresh = refreshKey > 0;
       const quantMetas: StockQuantMeta[] = [];
 
@@ -860,6 +901,7 @@ export default function Portfolio() {
               cumRet: displayQuantData?.aiQuanBackDataComment?.cum_ret || fallbackCumRet,
               chipPts: Number.isFinite(chipPts) ? chipPts : undefined,
             };
+            if (!hasRichAiSignal(signals[h.stockCode])) incompleteCodes.push(h.stockCode);
             doneCount++;
             if (mounted) {
               const pct = 20 + Math.round((doneCount / holdings.length) * 70);
@@ -926,12 +968,14 @@ export default function Portfolio() {
         setUsingSignalCache(false);
         const cacheData: SignalCacheData = {
           ...signals,
+          _schema: PORTFOLIO_SIGNAL_CACHE_SCHEMA,
           _date: dateStr,
           _holdingKeys: holdingKeys,
           _refreshSlot: refreshSlot.key,
           _createdAt: createdAt,
           _quantMeta: latestQuantMeta || undefined,
           _dataVersion: dataVersion || undefined,
+          _incompleteCodes: incompleteCodes,
         };
         const ttlMs = Math.min(PORTFOLIO_SIGNAL_TTL_MS, refreshSlot.ttlMs);
         setCache(cacheKey, cacheData, ttlMs);

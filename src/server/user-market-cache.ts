@@ -3,6 +3,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 const TAIPEI_OFFSET_MS = 8 * 60 * 60 * 1000;
 const WATCHLIST_CACHE_VERSION = 'score-fallback-kline-v3';
+const PORTFOLIO_CACHE_VERSION = 'portfolio-signal-rich-v2';
 const AI_SYNC_LABEL = '08:00 自動檢查；可手動重新抓取';
 const AI_SYNC_SCHEDULE_LABEL = 'AI訊號每日 08:00 檢查 Simons 完成狀態；手動重新抓取可再檢查一次；價格資料獨立更新';
 
@@ -311,12 +312,21 @@ function buildWatchlistPayload(rows: WatchlistRow[], ctx: WarmContext, accessSco
   };
 }
 
+function hasCompletePortfolioQuantData(quant: StockQuantData | undefined): boolean {
+  if (!quant || quant.meta?.source === 'empty') return false;
+  if (quant.aiQuanBackDataComment?.remark || quant.aiQuanBackDataComment?.cum_ret) return true;
+  const chipPts = quant.chipStability?.pts;
+  return chipPts !== undefined && chipPts !== null && Number.isFinite(Number(chipPts));
+}
+
 function buildPortfolioPayload(rows: HoldingRow[], ctx: WarmContext) {
   const signals: Record<string, unknown> = {};
   const metas: NonNullable<StockQuantData['meta']>[] = [];
+  const incompleteCodes: string[] = [];
   for (const row of rows) {
     const code = row.stock_code;
     const quant = ctx.quantMap[code] || emptyQuantData();
+    if (!hasCompletePortfolioQuantData(ctx.quantMap[code])) incompleteCodes.push(code);
     if (quant.meta) metas.push(quant.meta);
     const signal = quant.currentSignal || 'neutral';
     const chipPtsRaw = quant.chipStability?.pts;
@@ -335,11 +345,13 @@ function buildPortfolioPayload(rows: HoldingRow[], ctx: WarmContext) {
   const latestMeta = metas.sort((a, b) => new Date(b.fetchedAt).getTime() - new Date(a.fetchedAt).getTime())[0];
   return {
     ...signals,
+    _schema: PORTFOLIO_CACHE_VERSION,
     _date: formatDateTime(ctx.generatedAt),
     _holdingKeys: stockListSignature(rows.map(row => row.stock_code)),
     _createdAt: new Date(ctx.generatedAt).getTime(),
     _quantMeta: latestMeta,
     _dataVersion: ctx.dataVersion,
+    _incompleteCodes: incompleteCodes,
   };
 }
 
@@ -492,16 +504,22 @@ export async function buildAndSaveUserMarketCaches(req: VercelRequest) {
 
     if (userHoldings.length > 0 && portfolioAccess) {
       const signature = stockListSignature(userHoldings.map(row => row.stock_code));
+      const portfolioPayload = buildPortfolioPayload(userHoldings, ctx);
+      const incompleteCodes = Array.isArray(portfolioPayload._incompleteCodes) ? portfolioPayload._incompleteCodes : [];
       rows.push({
         cache_date: ctx.today,
         user_id: user.id,
         surface: 'portfolio',
         signature,
-        payload: buildPortfolioPayload(userHoldings, ctx),
-        status: rowStatus,
+        payload: portfolioPayload,
+        status: ctx.simonsStatus === 'waiting-simons' ? 'waiting-simons' : incompleteCodes.length > 0 ? 'partial' : 'ready',
         data_date: ctx.simonsDataDate || null,
         generated_at: ctx.generatedAt,
-        stale_reason: ctx.simonsStatus === 'waiting-simons' ? 'Simons latest completed trading day data is not ready yet' : null,
+        stale_reason: ctx.simonsStatus === 'waiting-simons'
+          ? 'Simons latest completed trading day data is not ready yet'
+          : incompleteCodes.length > 0
+            ? `Missing complete quant data for ${incompleteCodes.length} portfolio holding(s)`
+            : null,
       });
     }
   }

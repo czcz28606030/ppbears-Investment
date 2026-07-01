@@ -1,9 +1,14 @@
 # 📦 PPBears Investment — 更新日誌
 
-> **目前版本：v1.24.93**（2026-06-30）
-> 最新更新：新增觀察名單與庫存的背景預載快取，讓使用者進頁優先讀取已準備好的每日資料。
+> **目前版本：v1.24.94**（2026-07-01）
+> 最新更新：修正看庫存返回頁面時可能誤用不完整背景快取，導致 AI 訊號退回中立簡版的問題。
 
 ---
+
+## [v1.24.94] - 2026-07-01
+### Fixed
+- Fixed Portfolio startup cache validation so partial or schema-mismatched user-market cache payloads fall back to live AI quant fetching instead of showing neutral-only cards.
+- Added Portfolio signal cache schema and incomplete-code markers to prevent old or incomplete AI payloads from being persisted and reused after returning from stock detail.
 
 ## [v1.24.93] - 2026-06-30
 ### Added
