@@ -1,9 +1,17 @@
 # 📦 PPBears Investment — 更新日誌
 
-> **目前版本：v1.24.97**（2026-07-03）
-> 最新更新：個股價格下方新增 AI推薦度，觀察名單加入出場後再進場篩選、觀察時間排序，並讓一鍵移除觀察只在 AI推薦度低度時提示。
+> **目前版本：v1.24.98**（2026-07-03）
+> 最新更新：移除科技順風指標，讓觀察、庫存與個股加碼判讀更聚焦在 AI、ETF、籌碼與推薦資料。
 
 ---
+
+## [v1.24.98] - 2026-07-03
+### Removed
+- Removed the `科技順風` indicator from Watchlist, Portfolio, and Stock Detail surfaces.
+- Removed the technology tailwind data module and stopped using its score inside add-priority calculations.
+
+### Changed
+- Updated Stock Detail add-priority explanation copy so the score sources now match the remaining active signals.
 
 ## [v1.24.97] - 2026-07-03
 ### Added

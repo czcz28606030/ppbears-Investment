@@ -1169,28 +1169,6 @@ button.holding-quant-chip:hover {
   color: #475569;
 }
 
-.holding-tailwind-chip {
-  min-width: 112px;
-  color: #0f172a;
-}
-
-.holding-tailwind-chip-core {
-  background: #dcfce7;
-  border-color: #86efac;
-  color: #14532d;
-}
-
-.holding-tailwind-chip-strong {
-  background: #ecfeff;
-  border-color: #67e8f9;
-  color: #155e75;
-}
-
-.holding-tailwind-chip-watch {
-  background: #f5f3ff;
-  border-color: #c4b5fd;
-  color: #5b21b6;
-}
 
 .holding-add-priority-chip {
   min-width: 104px;

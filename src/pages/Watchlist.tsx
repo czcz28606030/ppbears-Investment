@@ -8,7 +8,6 @@ import { getCache, setCache, clearCache, getVersionedCache, getPersistentCache, 
 import MarketBadge from '../components/MarketBadge';
 import IndustryIcon from '../components/IndustryIcon';
 import { canAutoRefreshPrices, formatPriceUpdateLabel, PRICE_AUTO_REFRESH_MS } from '../utils/priceAutoRefresh';
-import { getIndustryTailwind } from '../utils/industryTailwinds';
 import './Watchlist.css';
 
 const WATCHLIST_FILTER_STORAGE_KEY = 'ppbears_watchlist_filters_v2';
@@ -1167,35 +1166,6 @@ export default function Watchlist() {
     );
   }
 
-  function renderIndustryTailwindChip(stockCode: string, stockName: string) {
-    const tailwind = getIndustryTailwind(stockCode);
-    if (!tailwind) return null;
-    return (
-      <button
-        type="button"
-        className={`wl-quant-chip wl-tailwind-chip wl-tailwind-chip-${tailwind.level}`}
-        title="點擊查看科技順風說明"
-        onClick={(e) => {
-          e.stopPropagation();
-          setSmallChipDialog({
-            title: `${stockName} ${stockCode}`,
-            subtitle: `科技順風 ${tailwind.score}/10`,
-            text: '科技順風是從台積電法說會、年報與 AI/HPC 產業鏈整理出的產業受惠分數。',
-            details: [
-              `主題：${tailwind.theme}`,
-              `受惠理由：${tailwind.reason}`,
-              `主要風險：${tailwind.risk}`,
-              `來源：${tailwind.source}（${tailwind.sourceDate}）`,
-            ],
-            note: '科技順風代表產業方向有利，不代表短線一定適合追價，仍要搭配 AI 進場訊號與股票本質。',
-          });
-        }}
-      >
-        科技順風 {tailwind.score}/10
-      </button>
-    );
-  }
-
   function getActiveEtfActionLabel(action: ActiveEtfRadarItem['etfs'][number]['action']): string {
     switch (action) {
       case 'added': return '新進';
@@ -1954,7 +1924,6 @@ export default function Watchlist() {
                       </div>
                     )}
                     <div className="wl-small-tag-grid">
-                      {renderIndustryTailwindChip(w.stockCode, w.stockName)}
                       {renderActiveEtfRadarChip(w.stockCode, w.stockName)}
                       {renderAiQuantChips(w.stockCode, w.stockName)}
                     </div>

@@ -588,28 +588,6 @@ button.wl-quant-chip:hover {
 .wl-quant-pts-mid { background: #E0E7FF; color: #4338CA; border-color: #C7D2FE; }
 .wl-quant-pts-low { background: #F3F4F6; color: #4B5563; border-color: #D1D5DB; }
 
-.wl-tailwind-chip {
-  border: 1px solid transparent;
-  color: #0f172a;
-}
-
-.wl-tailwind-chip-core {
-  background: #dcfce7;
-  border-color: #86efac;
-  color: #14532d;
-}
-
-.wl-tailwind-chip-strong {
-  background: #ecfeff;
-  border-color: #67e8f9;
-  color: #155e75;
-}
-
-.wl-tailwind-chip-watch {
-  background: #f5f3ff;
-  border-color: #c4b5fd;
-  color: #5b21b6;
-}
 
 .wl-active-etf-chip {
   border: 1px solid transparent;

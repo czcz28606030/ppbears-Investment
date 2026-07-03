@@ -9,7 +9,6 @@ import MarketBadge from '../components/MarketBadge';
 import IndustryIcon from '../components/IndustryIcon';
 import StockTradeModal from '../components/StockTradeModal';
 import { canAutoRefreshPrices, formatPriceUpdateLabel, PRICE_AUTO_REFRESH_MS } from '../utils/priceAutoRefresh';
-import { getIndustryTailwind, getIndustryTailwindScore } from '../utils/industryTailwinds';
 import { calculateAddPriority } from '../utils/addPriority';
 import './Portfolio.css';
 
@@ -649,19 +648,6 @@ export default function Portfolio() {
     );
   }
 
-  function renderIndustryTailwindChip(stockCode: string) {
-    const tailwind = getIndustryTailwind(stockCode);
-    if (!tailwind) return null;
-    return (
-      <span
-        className={`holding-quant-chip holding-tailwind-chip holding-tailwind-chip-${tailwind.level}`}
-        title={`${tailwind.source}：${tailwind.reason} 風險：${tailwind.risk}`}
-      >
-        科技順風 {tailwind.score}/10
-      </span>
-    );
-  }
-
   function getActiveEtfActionLabel(action: ActiveEtfRadarItem['etfs'][number]['action']): string {
     switch (action) {
       case 'added': return '新進';
@@ -703,7 +689,6 @@ export default function Portfolio() {
     const cumRetPct = parseReturnPct(signal?.cumRet);
     const priority = calculateAddPriority({
       aiSignal: signal?.primaryType ?? null,
-      techTailwindScore: getIndustryTailwindScore(stockCode),
       activeEtfScore: activeEtfMap[stockCode]?.score ?? null,
       activeEtfSignal: activeEtfMap[stockCode]?.signal ?? null,
       recommendationCount: recommendationCounts[stockCode] || 0,
@@ -1319,7 +1304,6 @@ export default function Portfolio() {
                         </div>
                         <div className={`holding-rec-line${hasAiFeature ? ' holding-rec-line-quant' : ''}`}>
                           {renderAddPriorityChip(h.stockCode, signal)}
-                          {renderIndustryTailwindChip(h.stockCode)}
                           {renderActiveEtfRadarChip(h.stockCode, h.stockName)}
                           {memberQuantChips}
                           {!hasAiFeature && renderRecommendationCountBadge(h.stockCode)}

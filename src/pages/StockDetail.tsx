@@ -11,7 +11,6 @@ import IndustryIcon from '../components/IndustryIcon';
 import StockTradeModal from '../components/StockTradeModal';
 import { invalidateDailyMarketDataCaches } from '../cache';
 import { calculateAddPriority } from '../utils/addPriority';
-import { getIndustryTailwind, getIndustryTailwindScore } from '../utils/industryTailwinds';
 import './StockDetail.css';
 
 type ChipHistoryDays = 30 | 60;
@@ -938,12 +937,9 @@ export default function StockDetail() {
   const aiRecommendationStatus = aiRecommendationLevel || (quantLoading ? '同步中' : '尚無資料');
   const chipPtsValue = quantData?.chipStability ? parseFloat(quantData.chipStability.pts) : null;
   const cumRetPct = parsePercentValue(quantData?.aiQuanBackDataComment?.cum_ret);
-  const tailwind = code ? getIndustryTailwind(code) : null;
-  const tailwindScore = code ? getIndustryTailwindScore(code) : null;
   const addPriority = calculateAddPriority({
     simonsScore: recommendation?.score ?? null,
     aiSignal: currentAiSignal,
-    techTailwindScore: tailwindScore,
     activeEtfScore: activeEtfRadar?.score ?? null,
     activeEtfSignal: activeEtfRadar?.signal ?? null,
     recommendationCount,
@@ -966,13 +962,6 @@ export default function StockDetail() {
       value: recommendation?.score ?? null,
       display: recommendation ? `${recommendation.score}分` : '尚無資料',
       note: 'Simons量化評分',
-    },
-    {
-      key: 'tailwind',
-      label: '科技順風',
-      value: tailwindScore !== null ? tailwindScore * 10 : null,
-      display: tailwindScore !== null ? `${tailwindScore}/10` : '未列入',
-      note: tailwind?.label || '產業受惠鏈',
     },
     {
       key: 'activeEtf',
@@ -1338,7 +1327,7 @@ export default function StockDetail() {
             <div className="add-decision-detail-block">
               <div className="add-decision-detail-title">加碼時機怎麼算</div>
               <p>
-                分數會綜合股票本質、科技順風、ETF支撐、籌碼穩定、推薦次數與累積報酬，再依 AI 進出場與 ETF 多空訊號加減分。
+                分數會綜合股票本質、ETF支撐、籌碼穩定、推薦次數與累積報酬，再依 AI 進出場與 ETF 多空訊號加減分。
               </p>
               <p>
                 這個分數用來回答「現在是否值得優先研究加碼」，不等於自動買進；真正下單前仍需看部位大小、平均成本與停損設定。

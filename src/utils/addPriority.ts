@@ -3,7 +3,6 @@ export type AddPriorityLevel = 'strong' | 'normal' | 'watch' | 'avoid';
 export interface AddPriorityInput {
   simonsScore?: number | null;
   aiSignal?: 'buy' | 'sell' | 'neutral' | null;
-  techTailwindScore?: number | null;
   activeEtfScore?: number | null;
   activeEtfSignal?: 'bullish' | 'watch' | 'neutral' | 'bearish' | null;
   recommendationCount?: number | null;
@@ -44,9 +43,6 @@ export function calculateAddPriority(input: AddPriorityInput): AddPriorityResult
   if (input.simonsScore !== null && input.simonsScore !== undefined) {
     components.push({ value: clamp(input.simonsScore, 0, 100), weight: 0.34 });
   }
-  if (input.techTailwindScore !== null && input.techTailwindScore !== undefined) {
-    components.push({ value: clamp(input.techTailwindScore, 0, 10) * 10, weight: 0.20 });
-  }
   if (input.activeEtfScore !== null && input.activeEtfScore !== undefined) {
     components.push({ value: clamp(input.activeEtfScore, 0, 100), weight: 0.20 });
   }
@@ -78,7 +74,6 @@ export function calculateAddPriority(input: AddPriorityInput): AddPriorityResult
   const reasons: string[] = [];
   if (input.aiSignal === 'buy') reasons.push('AI 進場');
   if (input.aiSignal === 'sell') reasons.push('AI 出場扣分');
-  if ((input.techTailwindScore || 0) >= 7) reasons.push('科技順風強');
   if (input.activeEtfSignal === 'bullish') reasons.push('ETF 支撐增加');
   if (input.activeEtfSignal === 'bearish') reasons.push('ETF 支撐減少');
   if ((input.recommendationCount || 0) >= 2) reasons.push(`推薦重複 ${input.recommendationCount} 次`);
