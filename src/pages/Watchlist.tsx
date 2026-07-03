@@ -13,10 +13,10 @@ import './Watchlist.css';
 
 const WATCHLIST_FILTER_STORAGE_KEY = 'ppbears_watchlist_filters_v2';
 const WATCHLIST_PERSISTENT_CACHE_KEY = 'ppbears_watchlist_full_v4';
-const WATCHLIST_CACHE_VERSION = 'score-fallback-kline-v3';
-type WatchlistAiFilter = 'all' | 'buy' | 'neutral' | 'sell';
+const WATCHLIST_CACHE_VERSION = 'score-fallback-kline-v4';
+type WatchlistAiFilter = 'all' | 'buy' | 'neutral' | 'sell' | 'reentry';
 type WatchlistRemarkFilter = 'all' | 'ultra' | 'high' | 'mid' | 'low';
-type WatchlistSortKey = 'simonsScore' | 'recommendationCount' | 'cumRet' | 'chipPts';
+type WatchlistSortKey = 'simonsScore' | 'recommendationCount' | 'cumRet' | 'chipPts' | 'createdAt';
 type WatchlistSortDirection = 'desc' | 'asc';
 type WatchlistFilterState = {
   warnOnly: boolean;
@@ -177,7 +177,7 @@ function readSavedWatchlistFilters(): WatchlistFilterState {
     if (!raw) return fallback;
     const parsed = JSON.parse(raw) as Partial<WatchlistFilterState>;
     const aiSignal: WatchlistAiFilter =
-      parsed.aiSignal === 'buy' || parsed.aiSignal === 'neutral' || parsed.aiSignal === 'sell'
+      parsed.aiSignal === 'buy' || parsed.aiSignal === 'neutral' || parsed.aiSignal === 'sell' || parsed.aiSignal === 'reentry'
         ? parsed.aiSignal
         : 'all';
     const aiRemark: WatchlistRemarkFilter =
@@ -188,7 +188,7 @@ function readSavedWatchlistFilters(): WatchlistFilterState {
       warnOnly: Boolean(parsed.warnOnly),
       aiSignal,
       aiRemark,
-      sortKey: parsed.sortKey === 'simonsScore' || parsed.sortKey === 'recommendationCount' || parsed.sortKey === 'cumRet' || parsed.sortKey === 'chipPts'
+      sortKey: parsed.sortKey === 'simonsScore' || parsed.sortKey === 'recommendationCount' || parsed.sortKey === 'cumRet' || parsed.sortKey === 'chipPts' || parsed.sortKey === 'createdAt'
         ? parsed.sortKey
         : DEFAULT_WATCHLIST_SORT_KEY,
       sortDirection: parsed.sortDirection === 'asc' ? 'asc' : 'desc',
@@ -1022,6 +1022,21 @@ export default function Watchlist() {
     return quantDataMap[stockCode]?.currentSignal ?? 'neutral';
   }
 
+  function hasReentryAfterExit(stockCode: string): boolean {
+    if (!hasAiFeature) return false;
+    return Boolean(quantDataMap[stockCode]?.reentryAfterExit?.hasReentry);
+  }
+
+  function getAiSignalFilterLabel(filter: WatchlistAiFilter): string {
+    switch (filter) {
+      case 'buy': return 'AI進場';
+      case 'sell': return 'AI出場';
+      case 'neutral': return 'AI中立';
+      case 'reentry': return '出場後再進場';
+      default: return '全部';
+    }
+  }
+
   function getScoreStars(score: number): string {
     if (score >= 80) return '⭐⭐⭐⭐⭐';
     if (score >= 65) return '⭐⭐⭐⭐';
@@ -1064,35 +1079,17 @@ export default function Watchlist() {
     );
   }
 
-  function getWatchlistCleanupAlert(stockCode: string): { type: 'exit' | 'low' | 'mixed'; title: string; desc: string } | null {
+  function getWatchlistCleanupAlert(stockCode: string): { type: 'low'; title: string; desc: string } | null {
     if (!hasAiFeature) return null;
-    const aiSignal = getAiSignalForStock(stockCode);
     const remark = quantDataMap[stockCode]?.aiQuanBackDataComment?.remark || '';
-    const isAiExit = aiSignal === 'sell';
     const isLowRank = getRemarkFilterFromRemark(remark) === 'low';
 
-    if (isAiExit && isLowRank) {
-      return {
-        type: 'mixed',
-        title: 'AI出場 / 低度觀察清理',
-        desc: '模型已轉為出場，推薦等級也偏低，可直接從觀察名單移除。',
-      };
-    }
-    if (isAiExit) {
-      return {
-        type: 'exit',
-        title: 'AI出場觀察清理',
-        desc: '模型已轉為出場訊號，可直接從觀察名單移除。',
-      };
-    }
-    if (isLowRank) {
-      return {
-        type: 'low',
-        title: 'AI低度觀察清理',
-        desc: '目前推薦等級偏低，若沒有其他理由追蹤，可直接移除觀察。',
-      };
-    }
-    return null;
+    if (!isLowRank) return null;
+    return {
+      type: 'low',
+      title: 'AI低度觀察清理',
+      desc: '目前推薦等級降到低度，若沒有其他理由追蹤，可直接移除觀察。',
+    };
   }
 
   function getChipStyle(pts: number): string {
@@ -1408,12 +1405,19 @@ export default function Watchlist() {
     return Number.isFinite(score) ? score : null;
   }
 
+  function getCreatedAtValue(stockCode: string): number | null {
+    const item = watchlist.find(w => w.stockCode === stockCode);
+    const value = item?.createdAt ? new Date(item.createdAt).getTime() : NaN;
+    return Number.isFinite(value) ? value : null;
+  }
+
   function getSortValue(stockCode: string): number | null {
     const activeSortKey = hasAiFeature ? sortKey : DEFAULT_WATCHLIST_SORT_KEY;
     switch (activeSortKey) {
       case 'recommendationCount': return recommendationCounts[stockCode] || 0;
       case 'cumRet': return getCumRetValue(stockCode);
       case 'chipPts': return getChipPtsValue(stockCode);
+      case 'createdAt': return getCreatedAtValue(stockCode);
       case 'simonsScore': return getSimonsScoreValue(stockCode);
       default: return null;
     }
@@ -1424,6 +1428,7 @@ export default function Watchlist() {
       case 'recommendationCount': return '推薦次數';
       case 'cumRet': return '累計報酬';
       case 'chipPts': return '籌碼分數';
+      case 'createdAt': return '觀察時間';
       case 'simonsScore': return '股票本質';
       default: return '股票本質';
     }
@@ -1509,7 +1514,8 @@ export default function Watchlist() {
         if (!code.includes(normalizedWatchlistSearch) && !name.includes(normalizedWatchlistSearch)) return false;
       }
       if (filterWarnOnly)   return getWarningForStock(w.stockCode)?.level === 'remove';
-      if (hasAiFeature && filterAiSignal !== 'all' && getAiSignalForStock(w.stockCode) !== filterAiSignal) return false;
+      if (hasAiFeature && filterAiSignal === 'reentry' && !hasReentryAfterExit(w.stockCode)) return false;
+      if (hasAiFeature && filterAiSignal !== 'all' && filterAiSignal !== 'reentry' && getAiSignalForStock(w.stockCode) !== filterAiSignal) return false;
       if (hasAiFeature && filterAiRemark !== 'all' && getRemarkFilterForStock(w.stockCode) !== filterAiRemark) return false;
       return true;
     });
@@ -1522,6 +1528,7 @@ export default function Watchlist() {
     acc[sig] = (acc[sig] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
+  const reentryAfterExitCount = watchlist.reduce((count, w) => count + (hasReentryAfterExit(w.stockCode) ? 1 : 0), 0);
   const hasAnyQuantData = Object.keys(quantDataMap).length > 0;
   const latestQuantMeta = getLatestQuantMeta(quantDataMap);
   const activeEtfRadarCount = Object.keys(activeEtfMap).length;
@@ -1760,6 +1767,16 @@ export default function Watchlist() {
                 <div className="wl-ai-fcard-label">AI出場</div>
                 <div className="wl-ai-fcard-count">{aiSignalCounts['sell'] || 0} 檔</div>
               </button>
+              <button
+                className={`wl-ai-filter-card wl-ai-fcard-reentry${filterAiSignal === 'reentry' ? ' active' : ''}`}
+                onClick={() => { setFilterAiSignal(filterAiSignal === 'reentry' ? 'all' : 'reentry'); setFilterWarnOnly(false); }}
+              >
+                <div className="wl-ai-fcard-icon wl-ai-ficon-reentry">
+                  <span aria-hidden="true">↗</span>
+                </div>
+                <div className="wl-ai-fcard-label">出場後再進場</div>
+                <div className="wl-ai-fcard-count">{reentryAfterExitCount} 檔</div>
+              </button>
             </div>
           </div>
 
@@ -1785,7 +1802,7 @@ export default function Watchlist() {
           <div className="wl-combo-filter-section wl-sort-filter-section">
             <div className="wl-combo-filter-label">排序方式</div>
             <div className="wl-combo-filter-pills">
-              {(['simonsScore', 'cumRet', 'chipPts', 'recommendationCount'] as WatchlistSortKey[]).map(key => (
+              {(['simonsScore', 'createdAt', 'cumRet', 'chipPts', 'recommendationCount'] as WatchlistSortKey[]).map(key => (
                 <button
                   key={key}
                   className={`wl-combo-pill wl-sort-pill${sortKey === key ? ' active' : ''}`}
@@ -1803,7 +1820,7 @@ export default function Watchlist() {
                 type="button"
               >
                 遞減排序
-                <span>高→低</span>
+                <span>{sortKey === 'createdAt' ? '新→舊' : '高→低'}</span>
               </button>
               <button
                 className={`wl-combo-pill wl-sort-direction-pill${sortDirection === 'asc' ? ' active' : ''}`}
@@ -1811,7 +1828,7 @@ export default function Watchlist() {
                 type="button"
               >
                 遞增排序
-                <span>低→高</span>
+                <span>{sortKey === 'createdAt' ? '舊→新' : '低→高'}</span>
               </button>
             </div>
           </div>
@@ -1819,7 +1836,7 @@ export default function Watchlist() {
           {activeCompositeFilterCount > 0 && (
             <div className="wl-ai-filter-active-hint">
               篩選中：
-              {filterAiSignal !== 'all' && <span>{filterAiSignal === 'buy' ? 'AI進場' : filterAiSignal === 'sell' ? 'AI出場' : 'AI中立'}</span>}
+              {filterAiSignal !== 'all' && <span>{getAiSignalFilterLabel(filterAiSignal)}</span>}
               {filterAiRemark !== 'all' && <span>{getRemarkFilterLabel(filterAiRemark)}</span>}
               {(sortKey !== DEFAULT_WATCHLIST_SORT_KEY || sortDirection !== 'desc') && <span>排序：{getSortLabel(sortKey)}・{getSortDirectionLabel(sortDirection)}</span>}
               {normalizedWatchlistSearch && <span>搜尋：{watchlistSearch.trim()}</span>}

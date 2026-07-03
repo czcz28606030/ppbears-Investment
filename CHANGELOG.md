@@ -1,9 +1,18 @@
 # 📦 PPBears Investment — 更新日誌
 
-> **目前版本：v1.24.96**（2026-07-01）
-> 最新更新：修正出金審核成功後等待重新同步太久，改為審核成功即時更新畫面並在背景補同步。
+> **目前版本：v1.24.97**（2026-07-03）
+> 最新更新：個股價格下方新增 AI推薦度，觀察名單加入出場後再進場篩選、觀察時間排序，並讓一鍵移除觀察只在 AI推薦度低度時提示。
 
 ---
+
+## [v1.24.97] - 2026-07-03
+### Added
+- Added AI recommendation-level display beneath the stock-detail price area.
+- Added a Watchlist filter for stocks that showed an AI exit signal and later showed an AI entry signal again.
+- Added Watchlist sorting by observation time, supporting newest-to-oldest and oldest-to-newest order.
+
+### Changed
+- Changed Watchlist one-click observation-removal prompts so they only appear when the AI recommendation level drops to low, not when an AI exit signal appears.
 
 ## [v1.24.96] - 2026-07-01
 ### Fixed

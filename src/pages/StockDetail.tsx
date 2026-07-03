@@ -34,6 +34,14 @@ function formatDetailHoldingShares(shares: number): string {
   return `${shares.toLocaleString('zh-TW')} 股`;
 }
 
+function getAiRecommendationLevelClass(remark: string): string {
+  if (remark.includes('超高')) return 'stock-ai-recommendation-ultra';
+  if (remark.includes('高度')) return 'stock-ai-recommendation-high';
+  if (remark.includes('中度')) return 'stock-ai-recommendation-mid';
+  if (remark.includes('低度')) return 'stock-ai-recommendation-low';
+  return 'stock-ai-recommendation-muted';
+}
+
 function ChipStabilityTrendChart({
   points,
   days,
@@ -923,6 +931,11 @@ export default function StockDetail() {
   const activeEtfTone = activeEtfRadar?.signal ?? 'neutral';
   const currentAiSignal = hasAiFeature ? quantData?.currentSignal ?? 'neutral' : 'neutral';
   const currentAiSignalLabel = currentAiSignal === 'buy' ? 'AI進場' : currentAiSignal === 'sell' ? 'AI出場' : 'AI中立';
+  const aiRecommendationLevel = hasAiFeature ? quantData?.aiQuanBackDataComment?.remark?.trim() || '' : '';
+  const aiRecommendationClass = aiRecommendationLevel
+    ? getAiRecommendationLevelClass(aiRecommendationLevel)
+    : 'stock-ai-recommendation-muted';
+  const aiRecommendationStatus = aiRecommendationLevel || (quantLoading ? '同步中' : '尚無資料');
   const chipPtsValue = quantData?.chipStability ? parseFloat(quantData.chipStability.pts) : null;
   const cumRetPct = parsePercentValue(quantData?.aiQuanBackDataComment?.cum_ret);
   const tailwind = code ? getIndustryTailwind(code) : null;
@@ -1098,6 +1111,12 @@ export default function StockDetail() {
           <span>{code} {stockDisplayName}</span>
         </div>
         <div className="price-main">NT$ {formatPrice(price)}</div>
+        {hasAiFeature ? (
+          <div className={`stock-ai-recommendation ${aiRecommendationClass}`} aria-label={`AI推薦度 ${aiRecommendationStatus}`}>
+            <span className="stock-ai-recommendation-label">AI推薦度</span>
+            <strong>{aiRecommendationStatus}</strong>
+          </div>
+        ) : null}
         <div className={`price-change ${isUp ? 'text-profit' : 'text-loss'}`}>
           {isUp ? '▲' : '▼'} {Math.abs(change).toFixed(2)}%
           {changeAbsolute !== null && (
@@ -2134,4 +2153,3 @@ export default function StockDetail() {
     </div>
   );
 }
-

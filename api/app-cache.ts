@@ -34,6 +34,7 @@ type StockQuantData = {
   stockInfo: { gvi: number; mediangvi: string } | null;
   currentSignal: 'buy' | 'sell' | 'neutral';
   signalStreak: { signal: 'buy' | 'sell' | null; count: number };
+  reentryAfterExit: { hasReentry: boolean; exitDate: string; entryDate: string } | null;
   meta?: StockQuantMeta;
 };
 
@@ -576,9 +577,7 @@ function getCurrentSignalForDataDate(tradingList: any[], dataDate: string): Stoc
   return 'neutral';
 }
 
-function calculateSignalStreak(tradingList: any[], sinceDate?: string): StockQuantData['signalStreak'] {
-  let activeSignal: 'buy' | 'sell' | null = null;
-  let count = 0;
+function buildSignalEventMap(tradingList: any[], sinceDate?: string): Map<string, 'buy' | 'sell' | 'neutral'> {
   const today = todayTaipei();
   const eventMap = new Map<string, 'buy' | 'sell' | 'neutral'>();
   const setEvent = (eventDate: string, signal: 'buy' | 'sell' | 'neutral') => {
@@ -588,17 +587,29 @@ function calculateSignalStreak(tradingList: any[], sinceDate?: string): StockQua
   };
 
   for (const item of tradingList) {
-    const outDate = normalizeSignalText(item?.out_date);
-    const inDate = normalizeSignalText(item?.in_date);
+    const outDateRaw = normalizeSignalText(item?.out_date);
+    const inDateRaw = normalizeSignalText(item?.in_date);
+    const outDate = normalizeSignalDate(outDateRaw);
+    const inDate = normalizeSignalDate(inDateRaw);
     const sig = normalizeSignalText(item?.sell_sig);
-    const hasOpenPosition = isOpenOutDate(outDate, inDate, today);
+    const hasOpenPosition = isOpenOutDate(outDateRaw, inDateRaw, today);
     setEvent(inDate, 'buy');
     if (!hasOpenPosition) setEvent(outDate || inDate, sig === '中立' ? 'neutral' : 'sell');
   }
 
-  const signalEvents = [...eventMap.entries()]
+  return eventMap;
+}
+
+function getSortedSignalEvents(tradingList: any[], sinceDate?: string) {
+  return [...buildSignalEventMap(tradingList, sinceDate).entries()]
     .map(([eventDate, signal]) => ({ eventDate, signal }))
     .sort((a, b) => a.eventDate.localeCompare(b.eventDate));
+}
+
+function calculateSignalStreak(tradingList: any[], sinceDate?: string): StockQuantData['signalStreak'] {
+  let activeSignal: 'buy' | 'sell' | null = null;
+  let count = 0;
+  const signalEvents = getSortedSignalEvents(tradingList, sinceDate);
 
   for (const { signal } of signalEvents) {
     if (signal === 'neutral') continue;
@@ -611,6 +622,23 @@ function calculateSignalStreak(tradingList: any[], sinceDate?: string): StockQua
   return { signal: activeSignal, count };
 }
 
+function calculateReentryAfterExit(tradingList: any[], sinceDate?: string): StockQuantData['reentryAfterExit'] {
+  let previousSignal: 'buy' | 'sell' | null = null;
+  let previousDate = '';
+  let latestReentry: StockQuantData['reentryAfterExit'] = null;
+
+  for (const { eventDate, signal } of getSortedSignalEvents(tradingList, sinceDate)) {
+    if (signal === 'neutral') continue;
+    if (signal === 'buy' && previousSignal === 'sell' && previousDate && eventDate > previousDate) {
+      latestReentry = { hasReentry: true, exitDate: previousDate, entryDate: eventDate };
+    }
+    previousSignal = signal;
+    previousDate = eventDate;
+  }
+
+  return previousSignal === 'buy' && latestReentry?.entryDate === previousDate ? latestReentry : null;
+}
+
 function emptyQuantData(): StockQuantData {
   return {
     aiQuanBackDataComment: null,
@@ -618,6 +646,7 @@ function emptyQuantData(): StockQuantData {
     stockInfo: null,
     currentSignal: 'neutral',
     signalStreak: { signal: null, count: 0 },
+    reentryAfterExit: null,
     meta: {
       source: 'empty',
       dataDate: todayTaipei(),
@@ -648,6 +677,7 @@ function buildQuantMeta(
 function parseQuantData(stock: any, sinceDate?: string, dataDate = todayTaipei()): StockQuantData {
   const tradingList: any[] = stock?.aiQuanBackDataTradingList || [];
   const signalStreak = calculateSignalStreak(tradingList, sinceDate);
+  const reentryAfterExit = calculateReentryAfterExit(tradingList, sinceDate);
   const currentSignal = getCurrentSignalForDataDate(tradingList, dataDate);
 
   return {
@@ -656,6 +686,7 @@ function parseQuantData(stock: any, sinceDate?: string, dataDate = todayTaipei()
     stockInfo: stock?.position?.stockInfo ?? null,
     currentSignal,
     signalStreak,
+    reentryAfterExit,
   };
 }
 
@@ -757,6 +788,7 @@ function mapStockQuantSnapshotToData(row: any): StockQuantData {
       : null,
     currentSignal: normalizedSignal,
     signalStreak: { signal: normalizedSignal === 'neutral' ? null : normalizedSignal, count: normalizedSignal === 'neutral' ? 0 : 1 },
+    reentryAfterExit: null,
     meta: buildQuantMeta(
       'shared-cache',
       String(row.snapshot_date || todayTaipei()),

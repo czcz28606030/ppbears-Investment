@@ -91,7 +91,7 @@ export function getTTLRemaining(key: string): number {
 
 // 量化訊號快取 TTL：30 分鐘（盤中最多延遲 30 分鐘，避免錯過買賣訊號）
 const QUANT_SIGNAL_TTL_MS = 30 * 60 * 1000;
-const QUANT_SIGNAL_CACHE_VERSION = 'v4';
+const QUANT_SIGNAL_CACHE_VERSION = 'v5';
 // Simons 每日推薦由雲端每日 08:00 預抓；本機保存到隔天早上 10 點，手動刷新可再檢查一次。
 const getSimonsDataTtlMs = () => getMillisecondsUntilNextTaipeiHour(10);
 const OFFICIAL_PRICE_MAP_CACHE_KEY = 'ppbears_official_price_map_daily_7am_v2';
@@ -904,6 +904,11 @@ export interface StockQuantData {
     signal: 'buy' | 'sell' | null;
     count: number;
   };
+  reentryAfterExit: {
+    hasReentry: boolean;
+    exitDate: string;
+    entryDate: string;
+  } | null;
   meta?: StockQuantMeta;
 }
 
@@ -1146,9 +1151,7 @@ function getCurrentSignalForDataDate(tradingList: any[], dataDate: string): Stoc
   return 'neutral';
 }
 
-function calculateSignalStreak(tradingList: any[], sinceDate?: string): StockQuantData['signalStreak'] {
-  let activeSignal: 'buy' | 'sell' | null = null;
-  let count = 0;
+function buildSignalEventMap(tradingList: any[], sinceDate?: string): Map<string, 'buy' | 'sell' | 'neutral'> {
   const today = _todayStr();
   const eventMap = new Map<string, 'buy' | 'sell' | 'neutral'>();
 
@@ -1163,10 +1166,12 @@ function calculateSignalStreak(tradingList: any[], sinceDate?: string): StockQua
   };
 
   for (const item of tradingList) {
-    const outDate = normalizeSignalText(item?.out_date);
-    const inDate = normalizeSignalText(item?.in_date);
+    const outDateRaw = normalizeSignalText(item?.out_date);
+    const inDateRaw = normalizeSignalText(item?.in_date);
+    const outDate = normalizeSignalDate(outDateRaw);
+    const inDate = normalizeSignalDate(inDateRaw);
     const sig = normalizeSignalText(item?.sell_sig);
-    const hasOpenPosition = isOpenOutDate(outDate, inDate, today);
+    const hasOpenPosition = isOpenOutDate(outDateRaw, inDateRaw, today);
 
     setEvent(inDate, 'buy');
 
@@ -1176,9 +1181,19 @@ function calculateSignalStreak(tradingList: any[], sinceDate?: string): StockQua
     }
   }
 
-  const signalEvents = [...eventMap.entries()]
+  return eventMap;
+}
+
+function getSortedSignalEvents(tradingList: any[], sinceDate?: string) {
+  return [...buildSignalEventMap(tradingList, sinceDate).entries()]
     .map(([eventDate, signal]) => ({ eventDate, signal }))
     .sort((a, b) => a.eventDate.localeCompare(b.eventDate));
+}
+
+function calculateSignalStreak(tradingList: any[], sinceDate?: string): StockQuantData['signalStreak'] {
+  let activeSignal: 'buy' | 'sell' | null = null;
+  let count = 0;
+  const signalEvents = getSortedSignalEvents(tradingList, sinceDate);
 
   for (const { signal } of signalEvents) {
     if (signal === 'neutral') continue;
@@ -1192,6 +1207,23 @@ function calculateSignalStreak(tradingList: any[], sinceDate?: string): StockQua
   return { signal: activeSignal, count };
 }
 
+function calculateReentryAfterExit(tradingList: any[], sinceDate?: string): StockQuantData['reentryAfterExit'] {
+  let previousSignal: 'buy' | 'sell' | null = null;
+  let previousDate = '';
+  let latestReentry: StockQuantData['reentryAfterExit'] = null;
+
+  for (const { eventDate, signal } of getSortedSignalEvents(tradingList, sinceDate)) {
+    if (signal === 'neutral') continue;
+    if (signal === 'buy' && previousSignal === 'sell' && previousDate && eventDate > previousDate) {
+      latestReentry = { hasReentry: true, exitDate: previousDate, entryDate: eventDate };
+    }
+    previousSignal = signal;
+    previousDate = eventDate;
+  }
+
+  return previousSignal === 'buy' && latestReentry?.entryDate === previousDate ? latestReentry : null;
+}
+
 export async function fetchStockQuantData(coid: string, sinceDate?: string, options: { forceFresh?: boolean } = {}): Promise<StockQuantData> {
   const empty: StockQuantData = {
     aiQuanBackDataComment: null,
@@ -1199,6 +1231,7 @@ export async function fetchStockQuantData(coid: string, sinceDate?: string, opti
     stockInfo: null,
     currentSignal: 'neutral',
     signalStreak: { signal: null, count: 0 },
+    reentryAfterExit: null,
     meta: {
       source: 'empty',
       dataDate: _todayStr(),
@@ -1253,6 +1286,7 @@ export async function fetchStockQuantData(coid: string, sinceDate?: string, opti
 
     const tradingList: any[] = stock.aiQuanBackDataTradingList || [];
     const signalStreak = calculateSignalStreak(tradingList, sinceDate);
+    const reentryAfterExit = calculateReentryAfterExit(tradingList, sinceDate);
     const dataDate = String(pos?.chipStability?.mdate || _todayStr());
     const currentSignal = getCurrentSignalForDataDate(tradingList, dataDate);
 
@@ -1263,6 +1297,7 @@ export async function fetchStockQuantData(coid: string, sinceDate?: string, opti
       stockInfo: pos?.stockInfo ?? null,
       currentSignal,
       signalStreak,
+      reentryAfterExit,
       meta: {
         source: 'ifalgo-live',
         dataDate,
