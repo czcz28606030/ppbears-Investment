@@ -13,6 +13,7 @@ import './Watchlist.css';
 const WATCHLIST_FILTER_STORAGE_KEY = 'ppbears_watchlist_filters_v2';
 const WATCHLIST_PERSISTENT_CACHE_KEY = 'ppbears_watchlist_full_v4';
 const WATCHLIST_CACHE_VERSION = 'score-fallback-kline-v4';
+const COMPATIBLE_WATCHLIST_CACHE_VERSIONS = new Set([WATCHLIST_CACHE_VERSION, 'score-fallback-kline-v3']);
 type WatchlistAiFilter = 'all' | 'buy' | 'neutral' | 'sell' | 'reentry';
 type WatchlistRemarkFilter = 'all' | 'ultra' | 'high' | 'mid' | 'low';
 type WatchlistSortKey = 'simonsScore' | 'recommendationCount' | 'cumRet' | 'chipPts' | 'createdAt';
@@ -126,6 +127,10 @@ function cacheCoversWatchlist(cacheKeys: string | undefined, stockCodes: string[
 
 function getMissingKlineCodes(klineMap: Record<string, StockPrice[]> | undefined, stockCodes: string[]): string[] {
   return stockCodes.filter(code => (klineMap?.[code] || []).length < 12);
+}
+
+function isCompatibleWatchlistCacheVersion(version?: string): boolean {
+  return Boolean(version && COMPATIBLE_WATCHLIST_CACHE_VERSIONS.has(version));
 }
 
 function hasUsableWatchlistCache(
@@ -510,6 +515,7 @@ export default function Watchlist() {
         simonsRecMap: mergedRec,
         latestKlineDate,
         watchlistKeys,
+        cacheVersion: WATCHLIST_CACHE_VERSION,
         refreshSlot: refreshSlot.key,
         _dataVersion: dataVersion || baseCache._dataVersion,
       };
@@ -530,7 +536,7 @@ export default function Watchlist() {
       cached &&
       cacheCoversWatchlist(cached.watchlistKeys, watchlistCodes) &&
       cached.analyzedDate === getTodayString() &&
-      cached.cacheVersion === WATCHLIST_CACHE_VERSION &&
+      isCompatibleWatchlistCacheVersion(cached.cacheVersion) &&
       cached.accessScope === (hasAiFeature ? 'ai' : 'basic') &&
       cached.refreshSlot === refreshSlot.key &&
       hasUsableWatchlistCache(cached, watchlistCodes, hasAiFeature)
@@ -538,6 +544,7 @@ export default function Watchlist() {
       const normalizedCache: WatchlistCacheData = {
         ...cached,
         watchlistKeys,
+        cacheVersion: WATCHLIST_CACHE_VERSION,
         refreshSlot: refreshSlot.key,
         _dataVersion: dataVersion || cached._dataVersion,
       };
@@ -559,7 +566,7 @@ export default function Watchlist() {
         !cacheCoversWatchlist(cloud.signature, watchlistCodes) ||
         !cacheCoversWatchlist(payload.watchlistKeys, watchlistCodes) ||
         payload.analyzedDate !== getTodayString() ||
-        payload.cacheVersion !== WATCHLIST_CACHE_VERSION ||
+        !isCompatibleWatchlistCacheVersion(payload.cacheVersion) ||
         payload.accessScope !== (hasAiFeature ? 'ai' : 'basic') ||
         !hasUsableWatchlistCache(payload, watchlistCodes, hasAiFeature)
       ) {
@@ -569,6 +576,7 @@ export default function Watchlist() {
       const cloudCache: WatchlistCacheData = {
         ...payload,
         watchlistKeys,
+        cacheVersion: WATCHLIST_CACHE_VERSION,
         refreshSlot: refreshSlot.key,
         _dataVersion: dataVersion || payload._dataVersion,
       };

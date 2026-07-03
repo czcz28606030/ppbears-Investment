@@ -1,9 +1,14 @@
 # 📦 PPBears Investment — 更新日誌
 
-> **目前版本：v1.24.98**（2026-07-03）
-> 最新更新：移除科技順風指標，讓觀察、庫存與個股加碼判讀更聚焦在 AI、ETF、籌碼與推薦資料。
+> **目前版本：v1.24.99**（2026-07-03）
+> 最新更新：修正觀察名單雲端快取版本不一致，避免每次進入觀察頁都退回 51 檔完整重抓。
 
 ---
+
+## [v1.24.99] - 2026-07-03
+### Fixed
+- Fixed Watchlist cloud cache version mismatch between the frontend reader and user-market warmup writer.
+- Allowed compatible Watchlist cache payloads to render immediately and normalize to the current cache version locally.
 
 ## [v1.24.98] - 2026-07-03
 ### Removed
