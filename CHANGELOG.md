@@ -1,9 +1,19 @@
 # 📦 PPBears Investment — 更新日誌
 
-> **目前版本：v1.24.100**（2026-07-07）
-> 最新更新：看庫存卡片新增趨勢狀態，區分 AI 出場後的趨勢結束、盤整震盪、轉弱觀察與趨勢延續。
+> **目前版本：v1.24.101**（2026-07-07）
+> 最新更新：觀察頁改為 stale-first 首屏，先顯示可用本機快取，再背景校正每日版本與雲端快取。
 
 ---
+
+## [v1.24.101] - 2026-07-07
+### Fixed
+- Changed Watchlist startup to render any compatible last-known local cache first, even while the daily AI cache version is still being checked.
+- Added a short cloud-cache timeout so `/api/app-cache?type=user-market-cache&surface=watchlist` cannot block the first visible Watchlist render for too long.
+- Changed daily AI cache version changes to trigger background reconciliation instead of clearing the visible Watchlist and forcing a full reload.
+- Fixed the 08:00 refresh-slot calculation so post-08:00 local Watchlist cache is keyed to the current day instead of falling back to the previous day.
+
+### Changed
+- Reduced duplicate Watchlist DB fetches by letting the page skip its own initial fetch when the global user data load already supplied the watchlist.
 
 ## [v1.24.100] - 2026-07-07
 ### Added

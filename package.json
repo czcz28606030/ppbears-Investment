@@ -1,7 +1,7 @@
 {
   "name": "ppbears-investment",
   "private": true,
-  "version": "1.24.100",
+  "version": "1.24.101",
   "type": "module",
   "scripts": {
     "dev": "vite",

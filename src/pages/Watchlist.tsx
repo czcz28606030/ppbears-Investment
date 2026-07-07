@@ -4,7 +4,7 @@ import { useStore, formatPrice } from '../store';
 import { fetchOfficialClosePrice, fetchOfficialPriceMap, fetchSimonsData, fetchStockData, fetchStockQuantData, toRecommendation, fetchSimonsRecommendationCounts, refreshDailyAiCache, clearQuantSignalTTLCache, clearSimonsDataTTLCache, fetchDailyAiCacheVersion, getKnownDailyAiCacheVersion, rememberDailyAiCacheVersion, ensureDailyAiCacheVersion, fetchActiveEtfRadarMap, fetchUserMarketDailyCache } from '../api';
 import type { ActiveEtfRadarItem, OfficialClosePrice, OfficialPriceMapEntry, StockQuantData, StockQuantMeta } from '../api';
 import type { SimonsItem, StockData, StockPrice, StockRecommendation, WatchlistSignal, WatchlistWarning } from '../types';
-import { getCache, setCache, clearCache, getVersionedCache, getPersistentCache, getVersionedPersistentCache, setPersistentCache, invalidateDailyMarketDataCaches, CACHE_KEYS } from '../cache';
+import { getCache, setCache, clearCache, getPersistentCache, setPersistentCache, invalidateDailyMarketDataCaches, CACHE_KEYS } from '../cache';
 import MarketBadge from '../components/MarketBadge';
 import IndustryIcon from '../components/IndustryIcon';
 import { canAutoRefreshPrices, formatPriceUpdateLabel, PRICE_AUTO_REFRESH_MS } from '../utils/priceAutoRefresh';
@@ -47,6 +47,8 @@ type SmallChipInfoDialog = {
 };
 
 const WATCHLIST_FULL_TTL_MS = 18 * 60 * 60 * 1000;
+const WATCHLIST_STALE_FIRST_TTL_MS = 3 * 60 * 1000;
+const WATCHLIST_CLOUD_CACHE_TIMEOUT_MS = 900;
 const DEFAULT_WATCHLIST_SORT_KEY: WatchlistSortKey = 'simonsScore';
 const DAILY_AI_CACHE_POLL_MS = 90 * 1000;
 const DATA_REFRESH_SCHEDULE = [
@@ -68,18 +70,23 @@ function formatAnalyzeTimestamp(): string {
 function getRefreshSlotInfo() {
   const now = new Date();
   const minutesNow = now.getHours() * 60 + now.getMinutes();
-  let currentIndex = DATA_REFRESH_SCHEDULE.findIndex(slot => minutesNow < slot.minutes) - 1;
-  let slotDate = new Date(now);
-  if (currentIndex < 0) {
+  const nextFutureIndex = DATA_REFRESH_SCHEDULE.findIndex(slot => minutesNow < slot.minutes);
+  let currentIndex = DATA_REFRESH_SCHEDULE.length - 1;
+  const slotDate = new Date(now);
+  if (nextFutureIndex === 0) {
     currentIndex = DATA_REFRESH_SCHEDULE.length - 1;
     slotDate.setDate(slotDate.getDate() - 1);
+  } else if (nextFutureIndex > 0) {
+    currentIndex = nextFutureIndex - 1;
   }
   const currentSlot = DATA_REFRESH_SCHEDULE[currentIndex];
   const nextSlot = DATA_REFRESH_SCHEDULE[(currentIndex + 1) % DATA_REFRESH_SCHEDULE.length];
   slotDate.setHours(Math.floor(currentSlot.minutes / 60), currentSlot.minutes % 60, 0, 0);
-  const nextDate = new Date(now);
+  const nextDate = new Date(slotDate);
+  if ((currentIndex + 1) % DATA_REFRESH_SCHEDULE.length <= currentIndex) {
+    nextDate.setDate(nextDate.getDate() + 1);
+  }
   nextDate.setHours(Math.floor(nextSlot.minutes / 60), nextSlot.minutes % 60, 0, 0);
-  if (nextSlot.minutes <= minutesNow) nextDate.setDate(nextDate.getDate() + 1);
   const pad = (n: number) => String(n).padStart(2, '0');
   const dateKey = `${slotDate.getFullYear()}-${pad(slotDate.getMonth() + 1)}-${pad(slotDate.getDate())}`;
   return {
@@ -207,7 +214,7 @@ export default function Watchlist() {
   const navigate = useNavigate();
   const {
     watchlist, watchlistSignals, watchlistWarnings, watchlistSignalsLoading,
-    holdings, removeFromWatchlist, checkWatchlistSignals, fetchWatchlist, hasFeature,
+    holdings, removeFromWatchlist, checkWatchlistSignals, fetchWatchlist, hasFeature, dataReady,
   } = useStore();
   const hasAiFeature = hasFeature('ai_stock_picking');
   const savedFilters = readSavedWatchlistFilters();
@@ -242,13 +249,11 @@ export default function Watchlist() {
   const [priceUpdatedLabel, setPriceUpdatedLabel] = useState('');
   const [dailyDataVersion, setDailyDataVersion] = useState(() => getKnownDailyAiCacheVersion('watchlist') || '');
 
-  // 進入頁面時抓取即時報價 + 訊號分析
+  // 全域登入資料載入後若還沒有觀察名單，再補一次 DB 同步；避免進頁時重複查詢。
   useEffect(() => {
-    async function loadData() {
-      await fetchWatchlist();
-    }
-    loadData();
-  }, []);
+    if (!dataReady || watchlist.length > 0) return;
+    fetchWatchlist();
+  }, [dataReady, watchlist.length, fetchWatchlist]);
 
   useEffect(() => {
     sessionStorage.setItem(WATCHLIST_FILTER_STORAGE_KEY, JSON.stringify({
@@ -358,15 +363,6 @@ export default function Watchlist() {
       if (latest.version !== known) {
         rememberDailyAiCacheVersion(latest.version, 'watchlist');
         setDailyDataVersion(latest.version);
-        invalidateDailyMarketDataCaches();
-        setLastAnalyzedAt(null);
-        setUsingWatchlistCache(false);
-        setLiveQuotes({});
-        setPriceUpdatedLabel('');
-        setKlineMap({});
-        setQuantDataMap({});
-        setSimonsRecMap({});
-        setRefreshKey(k => k + 1);
       }
     }
 
@@ -416,11 +412,32 @@ export default function Watchlist() {
       ensureDailyAiCacheVersion('watchlist', true).then(version => {
         setDailyDataVersion(version || 'unversioned');
       });
-      return;
     }
-    const cached = refreshKey === 0
-      ? getVersionedCache<WatchlistCacheData>(cacheKey, dataVersion) || getVersionedPersistentCache<WatchlistCacheData>(WATCHLIST_PERSISTENT_CACHE_KEY, refreshSlot.key, dataVersion)
-      : null;
+
+    const cacheCandidates = refreshKey === 0
+      ? [
+          getCache<WatchlistCacheData>(cacheKey),
+          getPersistentCache<WatchlistCacheData>(WATCHLIST_PERSISTENT_CACHE_KEY, refreshSlot.key),
+          getPersistentCache<WatchlistCacheData>(WATCHLIST_PERSISTENT_CACHE_KEY),
+        ].filter((cache, index, list): cache is WatchlistCacheData => Boolean(cache) && list.indexOf(cache) === index)
+      : [];
+
+    function isRenderableWatchlistCache(cache: WatchlistCacheData): boolean {
+      return cacheCoversWatchlist(cache.watchlistKeys, watchlistCodes) &&
+        isCompatibleWatchlistCacheVersion(cache.cacheVersion) &&
+        cache.accessScope === (hasAiFeature ? 'ai' : 'basic') &&
+        hasUsableWatchlistCache(cache, watchlistCodes, hasAiFeature);
+    }
+
+    function isFreshWatchlistCache(cache: WatchlistCacheData): boolean {
+      return isRenderableWatchlistCache(cache) &&
+        cache.analyzedDate === getTodayString() &&
+        cache.refreshSlot === refreshSlot.key &&
+        (!dataVersion || cache._dataVersion === dataVersion);
+    }
+
+    const cached = cacheCandidates.find(isFreshWatchlistCache) || cacheCandidates.find(isRenderableWatchlistCache) || null;
+    const cachedIsFresh = cached ? isFreshWatchlistCache(cached) : false;
 
     function applyWatchlistCache(cache: WatchlistCacheData) {
       setLiveQuotes(cache.quotes || {});
@@ -531,33 +548,12 @@ export default function Watchlist() {
         checkWatchlistSignals(stockDataMap).catch(() => {});
       }
     }
-    if (
-      refreshKey === 0 &&
-      cached &&
-      cacheCoversWatchlist(cached.watchlistKeys, watchlistCodes) &&
-      cached.analyzedDate === getTodayString() &&
-      isCompatibleWatchlistCacheVersion(cached.cacheVersion) &&
-      cached.accessScope === (hasAiFeature ? 'ai' : 'basic') &&
-      cached.refreshSlot === refreshSlot.key &&
-      hasUsableWatchlistCache(cached, watchlistCodes, hasAiFeature)
-    ) {
-      const normalizedCache: WatchlistCacheData = {
-        ...cached,
-        watchlistKeys,
-        cacheVersion: WATCHLIST_CACHE_VERSION,
-        refreshSlot: refreshSlot.key,
-        _dataVersion: dataVersion || cached._dataVersion,
-      };
-      applyWatchlistCache(normalizedCache);
-      setCache(cacheKey, normalizedCache, refreshSlot.ttlMs);
-      setPersistentCache(WATCHLIST_PERSISTENT_CACHE_KEY, normalizedCache, refreshSlot.ttlMs, refreshSlot.key);
-      refreshMissingCacheData(normalizedCache).catch(() => {});
-      return;
-    }
-
     async function tryLoadCloudCache(): Promise<boolean> {
       if (refreshKey !== 0) return false;
-      const cloud = await fetchUserMarketDailyCache<WatchlistCacheData>('watchlist');
+      const cloud = await withTimeout(
+        fetchUserMarketDailyCache<WatchlistCacheData>('watchlist'),
+        WATCHLIST_CLOUD_CACHE_TIMEOUT_MS
+      );
       if (!cloud?.payload) return false;
       const payload = cloud.payload;
       if (
@@ -585,6 +581,38 @@ export default function Watchlist() {
       setPersistentCache<WatchlistCacheData>(WATCHLIST_PERSISTENT_CACHE_KEY, cloudCache, Math.min(WATCHLIST_FULL_TTL_MS, refreshSlot.ttlMs), refreshSlot.key);
       refreshMissingCacheData(cloudCache).catch(() => {});
       return true;
+    }
+
+    if (cached) {
+      const normalizedCache: WatchlistCacheData = {
+        ...cached,
+        watchlistKeys,
+        cacheVersion: WATCHLIST_CACHE_VERSION,
+        ...(cachedIsFresh
+          ? {
+              refreshSlot: refreshSlot.key,
+              _dataVersion: dataVersion || cached._dataVersion,
+            }
+          : {}),
+      };
+      applyWatchlistCache(normalizedCache);
+
+      if (cachedIsFresh) {
+        setCache(cacheKey, normalizedCache, refreshSlot.ttlMs);
+        setPersistentCache(WATCHLIST_PERSISTENT_CACHE_KEY, normalizedCache, refreshSlot.ttlMs, refreshSlot.key);
+        refreshMissingCacheData(normalizedCache).catch(() => {});
+        return;
+      }
+
+      setCache(cacheKey, normalizedCache, Math.min(WATCHLIST_STALE_FIRST_TTL_MS, refreshSlot.ttlMs));
+      tryLoadCloudCache()
+        .then((loaded) => {
+          if (!loaded) refreshMissingCacheData(normalizedCache).catch(() => {});
+        })
+        .catch(() => {
+          refreshMissingCacheData(normalizedCache).catch(() => {});
+        });
+      return;
     }
 
     async function fetchQuotesAndSignals() {
