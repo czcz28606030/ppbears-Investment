@@ -135,6 +135,7 @@ export function invalidateDailyMarketDataCaches(): void {
   store.delete('watchlist_full');
   store.delete('portfolio_signals_v7');
   store.delete('portfolio_signals_v8');
+  store.delete('portfolio_signals_v9');
   try {
     const localPrefixes = [
       'ppbears_quant30_',
@@ -144,16 +145,21 @@ export function invalidateDailyMarketDataCaches(): void {
       'ppbears_watchlist_full_v4',
       'ppbears_portfolio_signals_v7',
       'ppbears_portfolio_signals_v8',
+      'ppbears_portfolio_signals_v9',
     ];
     Object.keys(localStorage).forEach(key => {
       if (exactLocalKeys.includes(key) || localPrefixes.some(prefix => key.startsWith(prefix))) {
         localStorage.removeItem(key);
       }
     });
-  } catch {}
+  } catch {
+    // localStorage can be unavailable in restricted browser contexts.
+  }
   try {
     sessionStorage.removeItem('explore_stock_list');
-  } catch {}
+  } catch {
+    // sessionStorage can be unavailable in restricted browser contexts.
+  }
 }
 
 /** 取得快取剩餘時間（毫秒），-1 表示不存在 */
@@ -170,5 +176,5 @@ export const CACHE_KEYS = {
   QUANT_DATA:      (code: string) => `quant_${code}`,
   WATCHLIST_QUOTES:'watchlist_quotes',
   WATCHLIST_FULL:  'watchlist_full',      // quotes + quant + simons
-  PORTFOLIO_SIGNALS: 'portfolio_signals_v8',
+  PORTFOLIO_SIGNALS: 'portfolio_signals_v9',
 } as const;

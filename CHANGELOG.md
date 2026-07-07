@@ -1,9 +1,17 @@
 # 📦 PPBears Investment — 更新日誌
 
-> **目前版本：v1.24.99**（2026-07-03）
-> 最新更新：修正觀察名單雲端快取版本不一致，避免每次進入觀察頁都退回 51 檔完整重抓。
+> **目前版本：v1.24.100**（2026-07-07）
+> 最新更新：看庫存卡片新增趨勢狀態，區分 AI 出場後的趨勢結束、盤整震盪、轉弱觀察與趨勢延續。
 
 ---
+
+## [v1.24.100] - 2026-07-07
+### Added
+- Added a Portfolio trend-status chip that separates clean post-rally AI exits from repeated AI entry/exit whipsaws.
+- Added conservative MA5/MA20, IFAlgo signal-history, profit/loss, and chip-score logic for `趨勢結束`, `盤整震盪`, `轉弱觀察`, and `趨勢延續` labels.
+
+### Changed
+- Bumped the Portfolio signal cache key so holdings reload the richer trend-status payload instead of reusing old signal-only cards.
 
 ## [v1.24.99] - 2026-07-03
 ### Fixed

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent, t
 import { useNavigate } from 'react-router-dom';
 import { useStore, formatMoney, formatPrice } from '../store';
 import type { Holding, StockTradingSignal, Trade } from '../types';
-import { fetchOfficialPriceMap, fetchStockQuantData, fetchStockTradingSignals, fetchSimonsRecommendationCounts, clearOfficialPriceMapCache, refreshDailyAiCache, clearQuantSignalTTLCache, fetchDailyAiCacheVersion, getKnownDailyAiCacheVersion, rememberDailyAiCacheVersion, ensureDailyAiCacheVersion, fetchActiveEtfRadarMap, fetchUserMarketDailyCache } from '../api';
+import { fetchOfficialPriceMap, fetchStockData, fetchStockQuantData, fetchStockTradingSignals, fetchSimonsRecommendationCounts, clearOfficialPriceMapCache, refreshDailyAiCache, clearQuantSignalTTLCache, fetchDailyAiCacheVersion, getKnownDailyAiCacheVersion, rememberDailyAiCacheVersion, ensureDailyAiCacheVersion, fetchActiveEtfRadarMap, fetchUserMarketDailyCache } from '../api';
 import type { ActiveEtfRadarItem, OfficialPriceMapEntry, StockQuantData, StockQuantMeta } from '../api';
 import { getCache, setCache, clearCache, getVersionedCache, getVersionedPersistentCache, setPersistentCache, clearPersistentCache, invalidateDailyMarketDataCaches, CACHE_KEYS } from '../cache';
 import MarketBadge from '../components/MarketBadge';
@@ -10,6 +10,7 @@ import IndustryIcon from '../components/IndustryIcon';
 import StockTradeModal from '../components/StockTradeModal';
 import { canAutoRefreshPrices, formatPriceUpdateLabel, PRICE_AUTO_REFRESH_MS } from '../utils/priceAutoRefresh';
 import { calculateAddPriority } from '../utils/addPriority';
+import { calculateTrendStatus, type TrendStatusResult } from '../utils/trendStatus';
 import './Portfolio.css';
 
 type PortfolioAiSignal = {
@@ -20,6 +21,7 @@ type PortfolioAiSignal = {
   aiRemark?: string;
   cumRet?: string;
   chipPts?: number;
+  trendStatus?: TrendStatusResult;
 };
 type ActiveEtfInfoDialog = {
   stockCode: string;
@@ -127,8 +129,8 @@ type FinMindPriceRow = {
 };
 
 const PORTFOLIO_SIGNAL_TTL_MS = 18 * 60 * 60 * 1000;
-const PORTFOLIO_SIGNAL_CACHE_SCHEMA = 'portfolio-signal-rich-v2';
-const PORTFOLIO_PERSISTENT_CACHE_KEY = 'ppbears_portfolio_signals_v8';
+const PORTFOLIO_SIGNAL_CACHE_SCHEMA = 'portfolio-signal-rich-v3';
+const PORTFOLIO_PERSISTENT_CACHE_KEY = 'ppbears_portfolio_signals_v9';
 const DAILY_AI_CACHE_POLL_MS = 90 * 1000;
 const DATA_REFRESH_SCHEDULE = [
   { label: '08:00', minutes: 8 * 60 },
@@ -157,7 +159,7 @@ function getRefreshSlotInfo() {
   const now = new Date();
   const minutesNow = now.getHours() * 60 + now.getMinutes();
   let currentIndex = DATA_REFRESH_SCHEDULE.findIndex(slot => minutesNow < slot.minutes) - 1;
-  let slotDate = new Date(now);
+  const slotDate = new Date(now);
   if (currentIndex < 0) {
     currentIndex = DATA_REFRESH_SCHEDULE.length - 1;
     slotDate.setDate(slotDate.getDate() - 1);
@@ -245,6 +247,7 @@ function isPortfolioSignal(value: unknown): value is PortfolioAiSignal {
 
 function hasRichAiSignal(signal: PortfolioAiSignal | undefined): boolean {
   if (!signal) return false;
+  if (!signal.trendStatus) return false;
   if (signal.aiRemark || signal.cumRet) return true;
   return signal.chipPts !== undefined && Number.isFinite(signal.chipPts);
 }
@@ -705,6 +708,18 @@ export default function Portfolio() {
     );
   }
 
+  function renderTrendStatusChip(signal?: PortfolioAiSignal) {
+    if (!signal?.trendStatus) return null;
+    return (
+      <span
+        className={`holding-quant-chip holding-trend-status-chip holding-trend-status-${signal.trendStatus.level}`}
+        title={`趨勢狀態：${signal.trendStatus.label}｜${signal.trendStatus.reason}`}
+      >
+        {signal.trendStatus.label}
+      </span>
+    );
+  }
+
   function renderProfitLossLevelBadge(profitLossPct: number, signal?: PortfolioAiSignal) {
     if (!Number.isFinite(profitLossPct)) return null;
     if (profitLossPct <= -20) {
@@ -836,6 +851,8 @@ export default function Portfolio() {
 
           let doneCount = 0;
           await Promise.all(holdings.map(async (h) => {
+            const tradingSignalsPromise = withTimeout(fetchStockTradingSignals(h.stockCode), 8000).catch(() => null);
+            const stockDataPromise = withTimeout(fetchStockData(h.stockCode), 9000).catch(() => null);
             const quantData = await withTimeout(
               fetchStockQuantData(h.stockCode, holdingStartDates[h.stockCode], { forceFresh }),
               12000
@@ -852,11 +869,10 @@ export default function Portfolio() {
                 displayQuantData = liveQuantData;
               }
             }
+            const tradingSignals = (await tradingSignalsPromise)?.signals || [];
             const fallbackCumRet = displayQuantData?.aiQuanBackDataComment?.cum_ret
               ? undefined
-              : calculateSignalCumRet(
-                  (await withTimeout(fetchStockTradingSignals(h.stockCode), 8000).catch(() => null))?.signals
-                );
+              : calculateSignalCumRet(tradingSignals);
 
             // ── 主訊號：使用 fetchStockQuantData 裡已解析的 currentSignal ──
             let primaryLabel: string;
@@ -877,6 +893,14 @@ export default function Portfolio() {
             const streakCount = sig !== 'neutral' && streak?.signal === sig ? streak.count : 0;
             const chipPtsRaw = signalSource?.chipStability?.pts;
             const chipPts = chipPtsRaw !== undefined && chipPtsRaw !== null ? parseFloat(String(chipPtsRaw)) : undefined;
+            const stockData = await stockDataPromise;
+            const trendStatus = calculateTrendStatus({
+              aiSignal: primaryType,
+              prices: stockData?.prices,
+              tradingSignals,
+              profitLossPct: h.avgCost > 0 ? ((h.currentPrice - h.avgCost) / h.avgCost) * 100 : null,
+              chipPts: Number.isFinite(chipPts) ? chipPts : null,
+            });
             signals[h.stockCode] = {
               primaryLabel,
               primaryType,
@@ -885,6 +909,7 @@ export default function Portfolio() {
               aiRemark: displayQuantData?.aiQuanBackDataComment?.remark,
               cumRet: displayQuantData?.aiQuanBackDataComment?.cum_ret || fallbackCumRet,
               chipPts: Number.isFinite(chipPts) ? chipPts : undefined,
+              trendStatus,
             };
             if (!hasRichAiSignal(signals[h.stockCode])) incompleteCodes.push(h.stockCode);
             doneCount++;
@@ -1304,6 +1329,7 @@ export default function Portfolio() {
                         </div>
                         <div className={`holding-rec-line${hasAiFeature ? ' holding-rec-line-quant' : ''}`}>
                           {renderAddPriorityChip(h.stockCode, signal)}
+                          {renderTrendStatusChip(signal)}
                           {renderActiveEtfRadarChip(h.stockCode, h.stockName)}
                           {memberQuantChips}
                           {!hasAiFeature && renderRecommendationCountBadge(h.stockCode)}

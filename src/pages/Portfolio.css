@@ -1226,6 +1226,34 @@ button.holding-quant-chip:hover {
   color: #b91c1c;
 }
 
+.holding-trend-status-chip {
+  min-width: 104px;
+}
+
+.holding-trend-status-continuing {
+  background: #ecfdf5;
+  border-color: #86efac;
+  color: #166534;
+}
+
+.holding-trend-status-sideways {
+  background: #eef2ff;
+  border-color: #c4b5fd;
+  color: #5b21b6;
+}
+
+.holding-trend-status-weakening {
+  background: #fff7ed;
+  border-color: #fdba74;
+  color: #9a3412;
+}
+
+.holding-trend-status-ended {
+  background: #fef2f2;
+  border-color: #fca5a5;
+  color: #991b1b;
+}
+
 .pf-etf-info-overlay {
   position: fixed;
   inset: 0;
