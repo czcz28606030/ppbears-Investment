@@ -1,9 +1,19 @@
 # 📦 PPBears Investment — 更新日誌
 
-> **目前版本：v1.24.101**（2026-07-07）
-> 最新更新：觀察頁改為 stale-first 首屏，先顯示可用本機快取，再背景校正每日版本與雲端快取。
+> **目前版本：v1.24.102**（2026-07-07）
+> 最新更新：看庫存也改為 stale-first 首屏，先顯示可用本機快取，再背景校正每日版本、雲端快取與 live 分析。
 
 ---
+
+## [v1.24.102] - 2026-07-07
+### Fixed
+- Changed Portfolio startup to render compatible same-day local signal cache first, even when daily AI cache version validation is still in progress.
+- Added a short cloud-cache timeout so `/api/app-cache?type=user-market-cache&surface=portfolio` cannot block the first visible Portfolio signal render.
+- Changed Portfolio daily AI cache version changes to reconcile in the background instead of clearing visible holding signals and forcing a full reload.
+- Fixed the Portfolio 08:00 refresh-slot calculation so post-08:00 cache is keyed to the current day.
+
+### Changed
+- Portfolio stale-first rendering now accepts same-day rich signal cache for the current holding stock codes, then refreshes exact holding-key data in the background when needed.
 
 ## [v1.24.101] - 2026-07-07
 ### Fixed
