@@ -206,6 +206,7 @@ export interface SystemSettings {
   free_max_holdings: number;
   free_max_daily_trades: number;
   newsletter_send_hour: number; // 電子報資料更新時段（台灣時間 0-23），預設 8
+  trade_attachment_retention_months: number; // 交易附件保留月份，0 = 永久保留，預設 24
 }
 
 // ── Learning Module ──────────────────────────────────────

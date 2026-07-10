@@ -955,6 +955,26 @@ export default function StockDetail() {
         : addPriority.level === 'avoid'
           ? '目前條件不夠集中，系統判斷偏向暫緩，先觀察比急著加碼更合理。'
           : '目前條件有部分支持，但還不是全數集中，適合小心評估而不是一次把部位拉大。';
+  const snapshotChipLabel = chipPtsValue === null || !Number.isFinite(chipPtsValue)
+    ? '尚無資料'
+    : chipPtsValue >= 9
+      ? '最乾淨'
+      : chipPtsValue >= 7
+        ? '非常穩定'
+        : chipPtsValue >= 5
+          ? '穩定'
+          : chipPtsValue >= 3
+            ? '普通'
+            : '凌亂';
+  const snapshotCautionLabel = currentAiSignal === 'sell'
+    ? '暫緩加碼'
+    : cumRetPct !== null && cumRetPct > 35
+      ? '小心加碼'
+      : addPriority.level === 'strong'
+        ? '順勢加碼'
+        : addPriority.level === 'avoid'
+          ? '暫緩加碼'
+          : '小心加碼';
   const addPriorityMetrics = [
     {
       key: 'simons',
@@ -2146,8 +2166,14 @@ export default function StockDetail() {
             volume: twseQuote?.TradeVolume ?? tpexQuote?.TradingShares ?? latestPrice?.volume,
             priceDate,
             aiRecommendation: hasAiFeature ? aiRecommendationStatus : null,
-            stockEssenceScore: quantData?.chipStability?.pts ?? null,
+            aiSignalLabel: hasAiFeature ? currentAiSignalLabel : 'AI中立',
+            addPriorityScore: hasAiFeature ? addPriority.score : null,
+            addPriorityLabel: hasAiFeature ? addPriority.label : null,
+            stockEssenceScore: hasAiFeature ? recommendation?.score ?? null : null,
             cumulativeReturn: quantData?.aiQuanBackDataComment?.cum_ret ?? null,
+            chipScore: chipPtsValue,
+            chipLabel: snapshotChipLabel,
+            cautionLabel: snapshotCautionLabel,
             chartPrices,
           }}
           onClose={() => setTradeMode(null)}

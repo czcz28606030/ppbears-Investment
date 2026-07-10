@@ -149,3 +149,86 @@
 }
 
 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+/* Trade attachment storage */
+.admin-attachment-storage-card { margin-bottom: 16px; }
+.admin-attachment-storage-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.admin-attachment-storage-title { font-weight: 900; font-size: 15px; color: var(--text-primary); }
+.admin-attachment-storage-subtitle { margin-top: 4px; font-size: 12px; line-height: 1.45; color: var(--text-tertiary); }
+.admin-attachment-storage-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin: 12px 0;
+}
+.admin-attachment-storage-grid > div,
+.admin-attachment-storage-footer > div:first-child {
+  background: #fafafa;
+  border: 1px solid rgba(0,0,0,0.06);
+  border-radius: 10px;
+  padding: 10px;
+}
+.admin-attachment-storage-grid span,
+.admin-attachment-storage-footer span {
+  display: block;
+  color: var(--text-tertiary);
+  font-size: 11px;
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+.admin-attachment-storage-grid strong,
+.admin-attachment-storage-footer strong {
+  display: block;
+  color: var(--text-primary);
+  font-size: 15px;
+  font-weight: 900;
+}
+.admin-attachment-storage-grid small,
+.admin-attachment-storage-footer small {
+  display: block;
+  margin-top: 4px;
+  color: var(--text-tertiary);
+  font-size: 11px;
+  font-weight: 700;
+}
+.admin-attachment-storage-footer {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: stretch;
+}
+.admin-attachment-storage-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  justify-content: center;
+}
+.admin-attachment-storage-actions .admin-btn:disabled,
+.admin-attachment-storage-head .admin-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+}
+.admin-attachment-storage-message {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(255, 160, 0, 0.1);
+  color: #9a5b00;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+@media (max-width: 520px) {
+  .admin-attachment-storage-head,
+  .admin-attachment-storage-footer { grid-template-columns: 1fr; flex-direction: column; }
+  .admin-attachment-storage-grid { grid-template-columns: 1fr; }
+  .admin-attachment-storage-actions { flex-direction: row; flex-wrap: wrap; }
+}

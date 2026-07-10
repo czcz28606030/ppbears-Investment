@@ -1,10 +1,19 @@
 # 📦 PPBears Investment — 更新日誌
 
-> **目前版本：v1.24.103**（2026-07-11）
-> 最新更新：交易紀錄新增 WEBP 自動重點快照、手動附件、庫存歸零清理與管理員只讀查看。
+> **目前版本：v1.24.104**（2026-07-11）
+> 最新更新：交易快照改為資訊小卡，交易附件改由保留期限與容量管理控管。
 
 ---
 
+## [v1.24.104] - 2026-07-11
+### Added
+- Added an Admin trade attachment storage card showing total attachment usage, auto snapshot usage, manual attachment usage, oldest attachment date, and expired attachment cleanup estimates.
+- Added configurable `trade_attachment_retention_months` system setting with a 24-month default and `0` for permanent retention.
+- Added Supabase policies for admin cleanup of expired trade attachment rows and storage objects.
+
+### Changed
+- Changed automatic trade snapshots to remove the old trade summary section and show Stock Detail-style information cards for market, industry, AI signal, add-priority score, stock essence score, cumulative return, chip status, risk reminder, and holding status.
+- Changed full-sell behavior so stock trade records, note text, automatic snapshots, and manual attachments remain available after inventory reaches zero.
 ## [v1.24.103] - 2026-07-11
 ### Added
 - Added private Supabase trade attachments storage and schema for automatic trade snapshots and manual JPG/PNG/PDF note attachments.
@@ -14,7 +23,7 @@
 
 ### Changed
 - Trade History now links stock rows to the in-app Stock Detail page instead of opening the old Yahoo technical-chart link.
-- Full-sell flows now automatically clean manual attachments for that stock while preserving automatic trade snapshots as historical evidence.
+- Added the original full-sell manual attachment cleanup behavior, later superseded by v1.24.104 retention-based attachment management.
 
 ## [v1.24.102] - 2026-07-07
 ### Fixed

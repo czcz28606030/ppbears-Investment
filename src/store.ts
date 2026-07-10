@@ -195,7 +195,6 @@ interface InvestmentStore {
   executeSell: (stockCode: string, quantity: number, price: number, reason?: string) => Promise<{ success: boolean; message: string; trade?: Trade }>;
   uploadTradeAttachments: (tradeId: string, stockCode: string, files: Array<File | Blob>, kind?: TradeAttachmentKind, snapshotMeta?: Record<string, unknown>) => Promise<{ attachments: TradeAttachment[]; error: string | null }>;
   deleteTradeAttachment: (attachmentId: string) => Promise<{ error: string | null }>;
-  cleanupManualTradeAttachmentsForStock: (stockCode: string) => Promise<{ deletedCount: number; error: string | null }>;
 
   // Profile
   updateProfile: (displayName: string, avatarUrl: string) => Promise<{ error: string | null }>;
@@ -432,7 +431,7 @@ export const useStore = create<InvestmentStore>((set, get) => ({
   dividendPayments: [],
   withdrawalRequests: [],
   featureOverrides: [],
-  systemSettings: { free_max_child_accounts: 2, free_max_holdings: 5, free_max_daily_trades: 10, newsletter_send_hour: 8 },
+  systemSettings: { free_max_child_accounts: 2, free_max_holdings: 5, free_max_daily_trades: 10, newsletter_send_hour: 8, trade_attachment_retention_months: 24 },
   allUsers: [],
   loading: false,
   authLoading: true,
@@ -1951,37 +1950,6 @@ export const useStore = create<InvestmentStore>((set, get) => ({
     return { error: null };
   },
 
-  cleanupManualTradeAttachmentsForStock: async (stockCode) => {
-    const { user } = get();
-    if (!user || !supabase) return { deletedCount: 0, error: '尚未登入' };
-    const { data, error: selectError } = await supabase
-      .from('trade_attachments')
-      .select('*')
-      .eq('user_id', user.id)
-      .eq('stock_code', stockCode)
-      .eq('kind', 'manual');
-    if (selectError) return { deletedCount: 0, error: selectError.message };
-    const rows = (data || []) as Record<string, unknown>[];
-    const paths = rows.map(row => row.storage_path as string).filter(Boolean);
-    if (paths.length > 0) {
-      await supabase.storage.from(TRADE_ATTACHMENT_BUCKET).remove(paths);
-    }
-    if (rows.length > 0) {
-      const { error: deleteError } = await supabase
-        .from('trade_attachments')
-        .delete()
-        .eq('user_id', user.id)
-        .eq('stock_code', stockCode)
-        .eq('kind', 'manual');
-      if (deleteError) return { deletedCount: 0, error: deleteError.message };
-    }
-    set(state => ({
-      trades: state.trades.map(t => t.stockCode === stockCode
-        ? { ...t, attachments: (t.attachments || []).filter(a => a.kind !== 'manual') }
-        : t),
-    }));
-    return { deletedCount: rows.length, error: null };
-  },
   // ─── Trading ───────────────────────────────
   executeBuy: async (stockCode, stockName, quantity, price, industry, reason) => {
     const { user, holdings, trades, watchlist } = get();
@@ -2135,10 +2103,7 @@ export const useStore = create<InvestmentStore>((set, get) => ({
           watchlistReturnMessage = '\n賣出已完成，但自動放回觀察名單失敗，稍後可手動加入。';
         }
 
-        const cleanupResult = await get().cleanupManualTradeAttachmentsForStock(stockCode);
-        if (cleanupResult.error) {
-          console.warn('cleanup manual trade attachments after full sell failed:', cleanupResult.error);
-        }
+
       }
 
       const emoji = profit >= 0 ? '📈' : '📉';

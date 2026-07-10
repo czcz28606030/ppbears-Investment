@@ -250,6 +250,7 @@ export default function StockTradeModal({
           totalAmount: result.trade.totalAmount,
           reason: tradeReason.trim(),
           timestamp: result.trade.timestamp,
+          industry: industry || null,
           ...snapshotContext,
           holdingSharesAfter: latestHolding?.totalShares ?? 0,
           avgCostAfter: latestHolding?.avgCost ?? null,

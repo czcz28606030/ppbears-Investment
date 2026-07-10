@@ -12,6 +12,49 @@ const FEATURE_KEYS = [
   { key: 'daily_newsletter', label: '📧 每日電子報', desc: '控制此帳號是否列入每日自動電子報寄送名單' },
 ];
 
+const TRADE_ATTACHMENT_BUCKET = 'trade-attachments';
+
+type AttachmentStorageRow = {
+  id: string;
+  kind: 'auto_snapshot' | 'manual';
+  storage_path: string;
+  mime_type: string;
+  file_size: number;
+  created_at: string;
+};
+
+type AttachmentStorageSummary = {
+  rows: AttachmentStorageRow[];
+  expiredRows: AttachmentStorageRow[];
+  totalCount: number;
+  totalBytes: number;
+  autoCount: number;
+  autoBytes: number;
+  manualCount: number;
+  manualBytes: number;
+  expiredBytes: number;
+  oldestCreatedAt: string | null;
+};
+
+function getAttachmentCutoff(retentionMonths: number): Date | null {
+  if (!Number.isFinite(retentionMonths) || retentionMonths <= 0) return null;
+  const cutoff = new Date();
+  cutoff.setMonth(cutoff.getMonth() - retentionMonths);
+  return cutoff;
+}
+
+function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) return '0 MB';
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
+}
+
+function chunkList<T>(items: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < items.length; i += size) chunks.push(items.slice(i, i + size));
+  return chunks;
+}
+
 export default function AdminDashboard() {
   const navigate = useNavigate();
   const { user, allUsers, loadAllUsers, adminSetUserTier, adminDeleteUser, adminSetUserBalance,
@@ -43,6 +86,106 @@ export default function AdminDashboard() {
   const [newsletterResult, setNewsletterResult] = useState<{ success: boolean; message: string } | null>(null);
 
   const [pricesLoading, setPricesLoading] = useState(false);
+  const [attachmentSummary, setAttachmentSummary] = useState<AttachmentStorageSummary | null>(null);
+  const [attachmentSummaryLoading, setAttachmentSummaryLoading] = useState(false);
+  const [attachmentCleanupLoading, setAttachmentCleanupLoading] = useState(false);
+  const [attachmentCleanupMessage, setAttachmentCleanupMessage] = useState('');
+
+  const attachmentRetentionMonths = systemSettings.trade_attachment_retention_months ?? 24;
+
+  const buildAttachmentSummary = useCallback((rows: AttachmentStorageRow[]): AttachmentStorageSummary => {
+    const cutoff = getAttachmentCutoff(attachmentRetentionMonths);
+    const expiredRows = cutoff
+      ? rows.filter(row => new Date(row.created_at).getTime() < cutoff.getTime())
+      : [];
+    return rows.reduce<AttachmentStorageSummary>((summary, row) => {
+      const fileSize = Number(row.file_size) || 0;
+      summary.totalCount += 1;
+      summary.totalBytes += fileSize;
+      if (row.kind === 'auto_snapshot') {
+        summary.autoCount += 1;
+        summary.autoBytes += fileSize;
+      } else {
+        summary.manualCount += 1;
+        summary.manualBytes += fileSize;
+      }
+      if (!summary.oldestCreatedAt || new Date(row.created_at) < new Date(summary.oldestCreatedAt)) {
+        summary.oldestCreatedAt = row.created_at;
+      }
+      return summary;
+    }, {
+      rows,
+      expiredRows,
+      totalCount: 0,
+      totalBytes: 0,
+      autoCount: 0,
+      autoBytes: 0,
+      manualCount: 0,
+      manualBytes: 0,
+      expiredBytes: expiredRows.reduce((sum, row) => sum + (Number(row.file_size) || 0), 0),
+      oldestCreatedAt: null,
+    });
+  }, [attachmentRetentionMonths]);
+
+  const loadAttachmentStorageSummary = useCallback(async () => {
+    if (!user?.isAdmin || !supabase) return;
+    setAttachmentSummaryLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('trade_attachments')
+        .select('id, kind, storage_path, mime_type, file_size, created_at')
+        .order('created_at', { ascending: true });
+      if (error) throw error;
+      const rows: AttachmentStorageRow[] = (data || []).map((row: any) => ({
+        id: row.id,
+        kind: row.kind,
+        storage_path: row.storage_path,
+        mime_type: row.mime_type,
+        file_size: Number(row.file_size) || 0,
+        created_at: row.created_at,
+      }));
+      setAttachmentSummary(buildAttachmentSummary(rows));
+    } catch (err) {
+      console.warn('load trade attachment storage summary failed:', err);
+      setAttachmentCleanupMessage(`附件容量讀取失敗：${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setAttachmentSummaryLoading(false);
+    }
+  }, [buildAttachmentSummary, user?.isAdmin]);
+
+  const handleCleanupExpiredAttachments = useCallback(async () => {
+    if (!supabase || !attachmentSummary) return;
+    if (attachmentRetentionMonths <= 0) {
+      setAttachmentCleanupMessage('目前設定為永久保留，沒有過期附件需要清理。');
+      return;
+    }
+    const expiredRows = attachmentSummary.expiredRows;
+    if (expiredRows.length === 0) {
+      setAttachmentCleanupMessage('目前沒有超過保留期限的附件。');
+      return;
+    }
+    if (!confirm(`確定清理 ${expiredRows.length} 個超過 ${attachmentRetentionMonths} 個月的附件嗎？交易紀錄與文字筆記會保留。`)) return;
+
+    setAttachmentCleanupLoading(true);
+    setAttachmentCleanupMessage('正在清理過期附件...');
+    try {
+      const storagePaths = expiredRows.map(row => row.storage_path).filter(Boolean);
+      for (const paths of chunkList(storagePaths, 100)) {
+        const { error } = await supabase.storage.from(TRADE_ATTACHMENT_BUCKET).remove(paths);
+        if (error) throw error;
+      }
+      for (const ids of chunkList(expiredRows.map(row => row.id), 100)) {
+        const { error } = await supabase.from('trade_attachments').delete().in('id', ids);
+        if (error) throw error;
+      }
+      setAttachmentCleanupMessage(`已清理 ${expiredRows.length} 個附件，釋放約 ${formatBytes(attachmentSummary.expiredBytes)}。`);
+      await loadAttachmentStorageSummary();
+    } catch (err) {
+      setAttachmentCleanupMessage(`清理失敗：${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setAttachmentCleanupLoading(false);
+    }
+  }, [attachmentRetentionMonths, attachmentSummary, loadAttachmentStorageSummary]);
 
   useEffect(() => {
     if (!user?.isAdmin) return;
@@ -85,6 +228,9 @@ export default function AdminDashboard() {
       .finally(() => setPricesLoading(false));
   }, [user]);
 
+  useEffect(() => {
+    void loadAttachmentStorageSummary();
+  }, [loadAttachmentStorageSummary]);
 
   // 用 useMemo 快取每個用戶的未平倉損益計算結果，避免每次渲染都重新計算
   const pnlMap = useMemo(() => {
@@ -395,6 +541,61 @@ export default function AdminDashboard() {
           <div className="admin-stat-value" style={{ color: '#FFA000' }}>{stats.premium}</div>
           <div className="admin-stat-label">Premium</div>
         </div>
+      </div>
+
+      {/* 交易附件容量 */}
+      <div className="admin-user-card admin-attachment-storage-card">
+        <div className="admin-attachment-storage-head">
+          <div>
+            <div className="admin-attachment-storage-title">📦 交易附件容量</div>
+            <div className="admin-attachment-storage-subtitle">
+              交易紀錄與文字筆記永久保留；這裡只管理 WEBP 快照與手動附件檔案。
+            </div>
+          </div>
+          <button className="admin-btn admin-btn-feature" onClick={loadAttachmentStorageSummary} disabled={attachmentSummaryLoading}>
+            {attachmentSummaryLoading ? '讀取中...' : '重新整理'}
+          </button>
+        </div>
+
+        <div className="admin-attachment-storage-grid">
+          <div>
+            <span>目前總容量</span>
+            <strong>{attachmentSummaryLoading && !attachmentSummary ? '讀取中...' : formatBytes(attachmentSummary?.totalBytes || 0)}</strong>
+            <small>{attachmentSummary?.totalCount || 0} 個附件</small>
+          </div>
+          <div>
+            <span>自動快照</span>
+            <strong>{formatBytes(attachmentSummary?.autoBytes || 0)}</strong>
+            <small>{attachmentSummary?.autoCount || 0} 個 WEBP</small>
+          </div>
+          <div>
+            <span>手動附件</span>
+            <strong>{formatBytes(attachmentSummary?.manualBytes || 0)}</strong>
+            <small>{attachmentSummary?.manualCount || 0} 個 JPG/PNG/PDF</small>
+          </div>
+          <div>
+            <span>可清理容量</span>
+            <strong>{formatBytes(attachmentSummary?.expiredBytes || 0)}</strong>
+            <small>{attachmentRetentionMonths <= 0 ? '永久保留' : `${attachmentSummary?.expiredRows.length || 0} 個超過 ${attachmentRetentionMonths} 個月`}</small>
+          </div>
+        </div>
+
+        <div className="admin-attachment-storage-footer">
+          <div>
+            <span>保留期限</span>
+            <strong>{attachmentRetentionMonths <= 0 ? '永久保留' : `${attachmentRetentionMonths} 個月`}</strong>
+            <small>最舊附件：{attachmentSummary?.oldestCreatedAt ? new Date(attachmentSummary.oldestCreatedAt).toLocaleDateString('zh-TW') : '--'}</small>
+          </div>
+          <div className="admin-attachment-storage-actions">
+            <button className="admin-btn admin-btn-balance" onClick={() => { setSettingModal({ key: 'trade_attachment_retention_months', label: '交易附件保留期限', value: attachmentRetentionMonths }); setSettingInput(String(attachmentRetentionMonths)); }}>
+              ✏️ 調整月份
+            </button>
+            <button className="admin-btn admin-btn-delete" onClick={handleCleanupExpiredAttachments} disabled={attachmentCleanupLoading || attachmentRetentionMonths <= 0 || !attachmentSummary?.expiredRows.length}>
+              {attachmentCleanupLoading ? '清理中...' : '清理過期附件'}
+            </button>
+          </div>
+        </div>
+        {attachmentCleanupMessage && <div className="admin-attachment-storage-message">{attachmentCleanupMessage}</div>}
       </div>
 
       {/* 功能對照表 */}
@@ -856,7 +1057,9 @@ export default function AdminDashboard() {
         <div className="admin-modal-overlay" onClick={() => setSettingModal(null)}>
           <div className="admin-modal" onClick={e => e.stopPropagation()}>
             <h3>✏️ 調整 {settingModal.label}</h3>
-            <div style={{ fontSize: 13, color: '#888', marginBottom: 8 }}>免費帳號的{settingModal.label}</div>
+            <div style={{ fontSize: 13, color: '#888', marginBottom: 8 }}>
+              {settingModal.key === 'trade_attachment_retention_months' ? '0 = 永久保留；大於 0 會清理超過指定月份的附件檔案。' : '免費帳號的' + settingModal.label}
+            </div>
             <input type="number" value={settingInput} onChange={e => setSettingInput(e.target.value)} placeholder="輸入新數值" />
             <div className="admin-modal-btns">
               <button className="btn-cancel" onClick={() => setSettingModal(null)}>取消</button>
