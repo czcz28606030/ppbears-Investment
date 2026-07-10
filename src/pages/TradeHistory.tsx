@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore, formatMoney } from '../store';
+import type { Trade, TradeAttachment } from '../types';
 import './TradeHistory.css';
 
 type RangeKey = '1W' | '1M' | '3M' | '6M' | '1Y' | 'ALL' | 'CUSTOM';
@@ -17,7 +18,7 @@ function getRangeStart(key: RangeKey): Date | null {
 
 export default function TradeHistory() {
   const navigate = useNavigate();
-  const { trades, updateTradeNote } = useStore();
+  const { trades, updateTradeNote, uploadTradeAttachments, deleteTradeAttachment } = useStore();
   const [search, setSearch] = useState('');
   const [rangeKey, setRangeKey] = useState<RangeKey>('ALL');
   const [customFrom, setCustomFrom] = useState('');
@@ -27,6 +28,8 @@ export default function TradeHistory() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState('');
   const [saving, setSaving] = useState(false);
+  const [previewAttachment, setPreviewAttachment] = useState<TradeAttachment | null>(null);
+  const [uploadingTradeId, setUploadingTradeId] = useState<string | null>(null);
 
   // 計算篩選後的交易
   const filteredTrades = useMemo(() => {
@@ -74,9 +77,6 @@ export default function TradeHistory() {
     return { netProfit, winCount, lossCount };
   }, [filteredTrades]);
 
-  const openYahooChart = (stockCode: string) => {
-    window.open(`https://tw.stock.yahoo.com/quote/${stockCode}.TW/technical-analysis`, '_blank');
-  };
 
   const startEdit = (tradeId: string, currentNote: string | undefined) => {
     setEditingId(tradeId);
@@ -90,6 +90,21 @@ export default function TradeHistory() {
     await updateTradeNote(tradeId, editText.trim());
     setSaving(false);
     setEditingId(null);
+  };
+
+  const handleUploadAttachments = async (trade: Trade, fileList: FileList | null) => {
+    const files = Array.from(fileList || []);
+    if (files.length === 0) return;
+    setUploadingTradeId(trade.id);
+    const result = await uploadTradeAttachments(trade.id, trade.stockCode, files, 'manual');
+    setUploadingTradeId(null);
+    if (result.error) alert(result.error);
+  };
+
+  const handleDeleteAttachment = async (attachment: TradeAttachment) => {
+    if (!confirm(`確定刪除附件「${attachment.fileName}」嗎？`)) return;
+    const result = await deleteTradeAttachment(attachment.id);
+    if (result.error) alert(result.error);
   };
 
   const RANGE_LABELS: { key: RangeKey; label: string }[] = [
@@ -175,7 +190,7 @@ export default function TradeHistory() {
                     {t.tradeType === 'withdraw' && '出金'}
                   </div>
                   <div className="trade-item-stock">
-                    <span className="trade-item-stock-name">{t.stockName} <span style={{ opacity: 0.5, fontSize: '13px' }}>{t.stockCode}</span></span>
+                    <button className="trade-item-stock-link" onClick={() => navigate(`/stock/${t.stockCode}`)}>{t.stockName} <span>{t.stockCode}</span></button>
                     <span className="trade-item-date">{new Date(t.timestamp).toLocaleString()}</span>
                   </div>
                 </div>
@@ -219,15 +234,62 @@ export default function TradeHistory() {
                 </div>
               )}
 
+              {(t.attachments || []).length > 0 && (
+                <div className="trade-attachments-grid">
+                  {(t.attachments || []).map(att => (
+                    <div key={att.id} className={`trade-attachment-card ${att.kind}`}>
+                      {att.mimeType.startsWith('image/') ? (
+                        <button type="button" className="trade-attachment-thumb" onClick={() => setPreviewAttachment(att)}>
+                          {att.signedUrl ? <img src={att.signedUrl} alt={att.fileName} /> : <span>圖片</span>}
+                        </button>
+                      ) : (
+                        <a className="trade-attachment-pdf" href={att.signedUrl} target="_blank" rel="noreferrer">
+                          <span>PDF</span>
+                          <strong>{att.fileName}</strong>
+                        </a>
+                      )}
+                      <div className="trade-attachment-meta">
+                        <span>{att.kind === 'auto_snapshot' ? '自動快照' : '補充附件'}</span>
+                        {att.kind === 'manual' && (
+                          <button type="button" onClick={() => handleDeleteAttachment(att)}>刪除</button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               {(t.tradeType === 'buy' || t.tradeType === 'sell') && (
                 <div className="trade-action-bar">
-                  <button className="btn-yahoo-chart" onClick={() => openYahooChart(t.stockCode)}>
-                    📈 查看當時技術線圖
+                  <button className="btn-stock-detail" onClick={() => navigate(`/stock/${t.stockCode}`)}>
+                    📊 查看個股內容
                   </button>
+                  <label className="btn-attach-upload">
+                    {uploadingTradeId === t.id ? '上傳中...' : '＋ 補充附件'}
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,application/pdf"
+                      multiple
+                      disabled={uploadingTradeId === t.id}
+                      onChange={e => {
+                        handleUploadAttachments(t, e.target.files);
+                        e.currentTarget.value = '';
+                      }}
+                    />
+                  </label>
                 </div>
               )}
             </div>
           ))}
+        </div>
+      )}
+      {previewAttachment && (
+        <div className="trade-attachment-lightbox" onClick={() => setPreviewAttachment(null)}>
+          <div className="trade-attachment-lightbox-inner" onClick={e => e.stopPropagation()}>
+            <button type="button" className="trade-attachment-lightbox-close" onClick={() => setPreviewAttachment(null)}>×</button>
+            {previewAttachment.signedUrl && <img src={previewAttachment.signedUrl} alt={previewAttachment.fileName} />}
+            <div>{previewAttachment.fileName}</div>
+          </div>
         </div>
       )}
     </div>

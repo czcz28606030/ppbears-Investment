@@ -2136,6 +2136,20 @@ export default function StockDetail() {
           stockName={stockDisplayName || code}
           price={price}
           industry={stockData?.subindustry || holding?.industry || ''}
+          snapshotContext={{
+            market: marketBadge ?? undefined,
+            changePercent: change,
+            changeAmount: changeAbsolute,
+            open: twseQuote?.OpeningPrice ?? tpexQuote?.Open ?? latestPrice?.open_d,
+            high: twseQuote?.HighestPrice ?? tpexQuote?.High ?? latestPrice?.high_d,
+            low: twseQuote?.LowestPrice ?? tpexQuote?.Low ?? latestPrice?.low_d,
+            volume: twseQuote?.TradeVolume ?? tpexQuote?.TradingShares ?? latestPrice?.volume,
+            priceDate,
+            aiRecommendation: hasAiFeature ? aiRecommendationStatus : null,
+            stockEssenceScore: quantData?.chipStability?.pts ?? null,
+            cumulativeReturn: quantData?.aiQuanBackDataComment?.cum_ret ?? null,
+            chartPrices,
+          }}
           onClose={() => setTradeMode(null)}
         />
       )}

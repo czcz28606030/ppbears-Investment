@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useStore, formatMoney, formatPrice } from '../store';
 import { supabase } from '../supabase';
 import { fetchTWSEAllStocks, type TWSTEStockQuote } from '../api';
-import type { UserAccount, FeatureOverride, Trade } from '../types';
+import type { UserAccount, FeatureOverride, Trade, TradeAttachment } from '../types';
 import './AdminDashboard.css';
 
 const FEATURE_KEYS = [
@@ -197,13 +197,47 @@ export default function AdminDashboard() {
 
     const { data } = await supabase.from('trades').select('*').eq('user_id', u.id).order('timestamp', { ascending: false });
     if (data) {
+      const tradeIds = data.map((t: any) => t.id).filter(Boolean);
+      let attachmentsByTrade: Record<string, TradeAttachment[]> = {};
+      if (tradeIds.length > 0) {
+        const { data: attachmentRows, error: attachmentError } = await supabase
+          .from('trade_attachments')
+          .select('*')
+          .in('trade_id', tradeIds)
+          .order('created_at', { ascending: true });
+        if (!attachmentError && attachmentRows) {
+          const signedAttachments = await Promise.all(attachmentRows.map(async (row: any) => {
+            const { data: signed } = await supabase!.storage.from('trade-attachments').createSignedUrl(row.storage_path, 60 * 60);
+            return {
+              id: row.id,
+              tradeId: row.trade_id,
+              userId: row.user_id,
+              stockCode: row.stock_code,
+              kind: row.kind,
+              storagePath: row.storage_path,
+              fileName: row.file_name,
+              mimeType: row.mime_type,
+              fileSize: Number(row.file_size) || 0,
+              snapshotMeta: row.snapshot_meta || undefined,
+              createdAt: row.created_at,
+              signedUrl: signed?.signedUrl,
+            } as TradeAttachment;
+          }));
+          attachmentsByTrade = signedAttachments.reduce<Record<string, TradeAttachment[]>>((acc, attachment) => {
+            acc[attachment.tradeId] = acc[attachment.tradeId] || [];
+            acc[attachment.tradeId].push(attachment);
+            return acc;
+          }, {});
+        }
+      }
       const formattedTrades: Trade[] = data.map(t => ({
         id: t.id, stockCode: t.stock_code, stockName: t.stock_name,
         tradeType: t.trade_type as any, quantity: Number(t.quantity),
         price: Number(t.price), totalAmount: Number(t.total_amount),
         profit: t.profit != null ? Number(t.profit) : undefined,
-        timestamp: new Date(t.timestamp).getTime(),
-        reason: t.reason
+        timestamp: Number(t.timestamp),
+        reason: t.reason,
+        attachments: attachmentsByTrade[t.id] || [],
       }));
       setUserTrades(formattedTrades);
     }
@@ -572,6 +606,27 @@ export default function AdminDashboard() {
                        <div style={{ fontSize: 11, color: '#888', marginTop: 4 }}>
                          {new Date(trade.timestamp).toLocaleString('zh-TW')}
                        </div>
+                       {trade.reason && (
+                         <div style={{ fontSize: 12, color: '#555', marginTop: 8, lineHeight: 1.5, background: '#fff', borderRadius: 8, padding: 8 }}>
+                           🐻 投資筆記：{trade.reason}
+                         </div>
+                       )}
+                       {(trade.attachments || []).length > 0 && (
+                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+                           {(trade.attachments || []).map(att => (
+                             <a
+                               key={att.id}
+                               href={att.signedUrl}
+                               target="_blank"
+                               rel="noreferrer"
+                               style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 8px', borderRadius: 8, background: att.kind === 'auto_snapshot' ? 'rgba(123,44,191,0.1)' : 'rgba(255,170,0,0.12)', color: att.kind === 'auto_snapshot' ? '#6d28d9' : '#b45309', fontSize: 12, fontWeight: 800, textDecoration: 'none' }}
+                             >
+                               {att.kind === 'auto_snapshot' ? '快照' : att.mimeType === 'application/pdf' ? 'PDF' : '附件'}
+                               <span style={{ maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{att.fileName}</span>
+                             </a>
+                           ))}
+                         </div>
+                       )}
                      </div>
                      <div style={{ textAlign: 'right', fontWeight: 700 }}>
                        <div style={{ color: '#333' }}>NT$ {formatMoney(trade.totalAmount)}</div>

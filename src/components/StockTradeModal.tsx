@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { formatMoney, formatPrice, useStore } from '../store';
+import { createTradeSnapshotWebp, type TradeSnapshotPayload } from '../utils/tradeSnapshot';
 import './StockTradeModal.css';
 
 type TradeMode = 'buy' | 'sell';
@@ -20,6 +21,7 @@ type StockTradeModalProps = {
   stockName: string;
   price: number;
   industry?: string;
+  snapshotContext?: Partial<TradeSnapshotPayload>;
   onClose: () => void;
 };
 
@@ -30,6 +32,7 @@ export default function StockTradeModal({
   stockName,
   price,
   industry,
+  snapshotContext,
   onClose,
 }: StockTradeModalProps) {
   const { user, holdings, dataReady, executeBuy, executeSell, getPortfolioSummary } = useStore();
@@ -41,6 +44,8 @@ export default function StockTradeModal({
   const [tradeReason, setTradeReason] = useState('');
   const [tradeResult, setTradeResult] = useState<{ success: boolean; message: string } | null>(null);
   const [isTrading, setIsTrading] = useState(false);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [attachmentError, setAttachmentError] = useState('');
   const [pendingWarnings, setPendingWarnings] = useState<RiskWarning[]>([]);
   const [showWarningModal, setShowWarningModal] = useState(false);
 
@@ -52,6 +57,8 @@ export default function StockTradeModal({
     setTradeReason('');
     setTradeResult(null);
     setIsTrading(false);
+    setSelectedFiles([]);
+    setAttachmentError('');
     setPendingWarnings([]);
     setShowWarningModal(false);
   }, [isOpen, mode, stockCode]);
@@ -228,11 +235,56 @@ export default function StockTradeModal({
       const result = tradeMode === 'buy'
         ? await executeBuy(stockCode, stockName || stockCode, qty, price, industry || holding?.industry || '', tradeReason.trim())
         : await executeSell(stockCode, qty, price, tradeReason.trim());
-      setTradeResult(result);
+      let finalMessage = result.message;
+
+      if (result.success && result.trade) {
+        const latestState = useStore.getState();
+        const latestHolding = latestState.holdings.find(h => h.stockCode === stockCode);
+        const latestUser = latestState.user;
+        const snapshotPayload: TradeSnapshotPayload = {
+          stockCode,
+          stockName: stockName || stockCode,
+          tradeType: tradeMode,
+          quantity: qty,
+          price,
+          totalAmount: result.trade.totalAmount,
+          reason: tradeReason.trim(),
+          timestamp: result.trade.timestamp,
+          ...snapshotContext,
+          holdingSharesAfter: latestHolding?.totalShares ?? 0,
+          avgCostAfter: latestHolding?.avgCost ?? null,
+          balanceAfter: latestUser?.availableBalance ?? null,
+        };
+        try {
+          const snapshotBlob = await createTradeSnapshotWebp(snapshotPayload);
+          const { chartPrices: _chartPrices, ...snapshotMeta } = snapshotPayload;
+          void _chartPrices;
+          const uploadResult = await latestState.uploadTradeAttachments(
+            result.trade.id,
+            stockCode,
+            [snapshotBlob],
+            'auto_snapshot',
+            snapshotMeta as unknown as Record<string, unknown>
+          );
+          if (uploadResult.error) finalMessage += `\n⚠️ 自動快照保存失敗：${uploadResult.error}`;
+        } catch (snapshotErr) {
+          console.warn('create trade snapshot failed:', snapshotErr);
+          finalMessage += '\n⚠️ 自動快照保存失敗，可稍後在交易紀錄補充附件。';
+        }
+
+        if (selectedFiles.length > 0) {
+          const manualResult = await latestState.uploadTradeAttachments(result.trade.id, stockCode, selectedFiles, 'manual');
+          if (manualResult.error) finalMessage += `\n⚠️ 手動附件保存失敗：${manualResult.error}`;
+        }
+      }
+
+      setTradeResult({ success: result.success, message: finalMessage });
       if (result.success) {
         setQuantity('');
         setTradeUnit('share');
         setTradeReason('');
+        setSelectedFiles([]);
+        setAttachmentError('');
       }
     } catch (err) {
       console.error('doExecuteTrade error:', err);
@@ -327,6 +379,34 @@ export default function StockTradeModal({
                   value={tradeReason}
                   onChange={(e) => setTradeReason(e.target.value)}
                 />
+              </div>
+
+              <div className="input-group stock-trade-attachment-group">
+                <label className="input-label">補充附件（可選 JPG / PNG / PDF）</label>
+                <input
+                  className="stock-trade-file-input"
+                  type="file"
+                  accept="image/jpeg,image/png,application/pdf"
+                  multiple
+                  onChange={(e) => {
+                    const files = Array.from(e.target.files || []);
+                    const allowed = files.filter(file => ['image/jpeg', 'image/png', 'application/pdf'].includes(file.type) && file.size <= 10 * 1024 * 1024);
+                    setAttachmentError(allowed.length !== files.length ? '部分檔案格式不支援或超過 10MB，已自動略過。' : '');
+                    setSelectedFiles(allowed.slice(0, 6));
+                  }}
+                />
+                {selectedFiles.length > 0 && (
+                  <div className="stock-trade-file-list">
+                    {selectedFiles.map((file, idx) => (
+                      <div key={`${file.name}-${idx}`} className="stock-trade-file-chip">
+                        <span>{file.type === 'application/pdf' ? 'PDF' : 'IMG'}</span>
+                        <strong>{file.name}</strong>
+                        <button type="button" onClick={() => setSelectedFiles(files => files.filter((_, fileIdx) => fileIdx !== idx))}>移除</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {attachmentError && <div className="stock-trade-attachment-error">{attachmentError}</div>}
               </div>
 
               {quantity && tradeShares > 0 && (() => {

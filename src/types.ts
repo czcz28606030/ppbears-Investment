@@ -61,9 +61,25 @@ export interface SimonsItem {
 }
 
 export type TradeType = 'buy' | 'sell' | 'deposit' | 'withdraw';
+export type TradeAttachmentKind = 'auto_snapshot' | 'manual';
 export type AccountRole = 'parent' | 'child';
 export type AIAdvice = 'buy' | 'hold' | 'sell';
 export type WithdrawalStatus = 'pending' | 'approved' | 'rejected';
+
+export interface TradeAttachment {
+  id: string;
+  tradeId: string;
+  userId: string;
+  stockCode: string;
+  kind: TradeAttachmentKind;
+  storagePath: string;
+  fileName: string;
+  mimeType: string;
+  fileSize: number;
+  snapshotMeta?: Record<string, unknown>;
+  createdAt: string;
+  signedUrl?: string;
+}
 
 export interface Trade {
   id: string;
@@ -76,6 +92,7 @@ export interface Trade {
   reason?: string;
   profit?: number;
   timestamp: number;
+  attachments?: TradeAttachment[];
 }
 
 export interface Holding {

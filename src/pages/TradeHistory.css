@@ -313,3 +313,198 @@
   cursor: pointer;
   color: var(--text-secondary);
 }
+
+.trade-item-stock-link {
+  appearance: none;
+  border: none;
+  background: transparent;
+  padding: 0;
+  color: var(--text-primary);
+  font: inherit;
+  font-weight: 900;
+  font-size: 16px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.trade-item-stock-link span {
+  opacity: 0.5;
+  font-size: 13px;
+  margin-left: 4px;
+}
+
+.trade-item-stock-link:hover {
+  color: #7b2cbf;
+}
+
+.trade-attachments-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+  gap: 10px;
+}
+
+.trade-attachment-card {
+  min-width: 0;
+  border: 1px solid rgba(0, 0, 0, 0.07);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.72);
+  overflow: hidden;
+}
+
+.trade-attachment-card.auto_snapshot {
+  border-color: rgba(123, 44, 191, 0.28);
+}
+
+.trade-attachment-thumb,
+.trade-attachment-pdf {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: #f8f5ee;
+  cursor: pointer;
+  padding: 0;
+  color: inherit;
+  text-decoration: none;
+  overflow: hidden;
+}
+
+.trade-attachment-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.trade-attachment-pdf {
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  box-sizing: border-box;
+}
+
+.trade-attachment-pdf span {
+  width: 44px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: rgba(255, 89, 94, 0.14);
+  color: #c62828;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.trade-attachment-pdf strong {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.trade-attachment-meta {
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 7px 8px;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--text-secondary);
+}
+
+.trade-attachment-meta button {
+  border: none;
+  border-radius: 7px;
+  background: rgba(255, 89, 94, 0.12);
+  color: #c62828;
+  font-size: 11px;
+  font-weight: 900;
+  padding: 4px 7px;
+  cursor: pointer;
+}
+
+.btn-stock-detail,
+.btn-attach-upload {
+  background: transparent;
+  border: 1px solid #7B2CBF;
+  color: #7B2CBF;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-weight: 800;
+  font-size: 13px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: var(--transition-fast);
+}
+
+.btn-attach-upload {
+  position: relative;
+  overflow: hidden;
+  border-color: rgba(255, 170, 0, 0.75);
+  color: #b45309;
+}
+
+.btn-attach-upload input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.trade-action-bar {
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.trade-attachment-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.72);
+}
+
+.trade-attachment-lightbox-inner {
+  position: relative;
+  max-width: min(920px, 96vw);
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+  color: #fff;
+  font-weight: 800;
+}
+
+.trade-attachment-lightbox-inner img {
+  max-width: 100%;
+  max-height: calc(90vh - 60px);
+  object-fit: contain;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.trade-attachment-lightbox-close {
+  position: absolute;
+  top: -18px;
+  right: -18px;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 50%;
+  background: #fff;
+  color: #111;
+  font-size: 24px;
+  font-weight: 900;
+  cursor: pointer;
+}

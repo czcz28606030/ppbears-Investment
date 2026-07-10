@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { supabase } from './supabase';
 import type { Session } from '@supabase/supabase-js';
-import type { UserAccount, Trade, Holding, WithdrawalRequest, FeatureOverride, SystemSettings, LessonResult, RewardRule, RewardTriggerType, WalletTransaction, RewardShopItem, RedemptionRequest, WatchlistItem, WatchlistSignal, WatchlistWarning, DividendPayment, StockData } from './types';
+import type { UserAccount, Trade, TradeAttachment, TradeAttachmentKind, Holding, WithdrawalRequest, FeatureOverride, SystemSettings, LessonResult, RewardRule, RewardTriggerType, WalletTransaction, RewardShopItem, RedemptionRequest, WatchlistItem, WatchlistSignal, WatchlistWarning, DividendPayment, StockData } from './types';
 import { fetchStockData, fetchOfficialPriceMap, fetchOfficialClosePrice } from './api';
 import type { OfficialClosePrice, OfficialPriceMap } from './api';
 
@@ -191,8 +191,11 @@ interface InvestmentStore {
   requestWithdrawal: (amount: number, reason: string) => Promise<{ error: string | null }>;
 
   // Trading
-  executeBuy: (stockCode: string, stockName: string, quantity: number, price: number, industry?: string, reason?: string) => Promise<{ success: boolean; message: string }>;
-  executeSell: (stockCode: string, quantity: number, price: number, reason?: string) => Promise<{ success: boolean; message: string }>;
+  executeBuy: (stockCode: string, stockName: string, quantity: number, price: number, industry?: string, reason?: string) => Promise<{ success: boolean; message: string; trade?: Trade }>;
+  executeSell: (stockCode: string, quantity: number, price: number, reason?: string) => Promise<{ success: boolean; message: string; trade?: Trade }>;
+  uploadTradeAttachments: (tradeId: string, stockCode: string, files: Array<File | Blob>, kind?: TradeAttachmentKind, snapshotMeta?: Record<string, unknown>) => Promise<{ attachments: TradeAttachment[]; error: string | null }>;
+  deleteTradeAttachment: (attachmentId: string) => Promise<{ error: string | null }>;
+  cleanupManualTradeAttachmentsForStock: (stockCode: string) => Promise<{ deletedCount: number; error: string | null }>;
 
   // Profile
   updateProfile: (displayName: string, avatarUrl: string) => Promise<{ error: string | null }>;
@@ -307,6 +310,66 @@ function rowToDividendPayment(row: Record<string, unknown>): DividendPayment {
     source: (row.source as string) || 'yahoo',
     createdAt: row.created_at as string,
   };
+}
+const TRADE_ATTACHMENT_BUCKET = 'trade-attachments';
+const MANUAL_ATTACHMENT_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'application/pdf']);
+const MAX_MANUAL_ATTACHMENTS_PER_TRADE = 6;
+const MAX_TRADE_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+
+function rowToTradeAttachment(row: Record<string, unknown>, signedUrl?: string): TradeAttachment {
+  return {
+    id: row.id as string,
+    tradeId: row.trade_id as string,
+    userId: row.user_id as string,
+    stockCode: row.stock_code as string,
+    kind: row.kind as TradeAttachmentKind,
+    storagePath: row.storage_path as string,
+    fileName: row.file_name as string,
+    mimeType: row.mime_type as string,
+    fileSize: Number(row.file_size) || 0,
+    snapshotMeta: (row.snapshot_meta as Record<string, unknown> | null) || undefined,
+    createdAt: row.created_at as string,
+    signedUrl,
+  };
+}
+
+function extensionForMime(mimeType: string, fallbackName?: string): string {
+  if (mimeType === 'image/webp') return 'webp';
+  if (mimeType === 'image/jpeg') return 'jpg';
+  if (mimeType === 'image/png') return 'png';
+  if (mimeType === 'application/pdf') return 'pdf';
+  const ext = fallbackName?.split('.').pop()?.toLowerCase().replace(/[^a-z0-9]/g, '');
+  return ext || 'bin';
+}
+
+function safeFileName(name: string): string {
+  return name
+    .normalize('NFKC')
+    .replace(/[\\/:*?"<>|]+/g, '-')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 96) || 'attachment';
+}
+
+async function signTradeAttachment(row: Record<string, unknown>): Promise<TradeAttachment> {
+  if (!supabase) return rowToTradeAttachment(row);
+  const path = row.storage_path as string;
+  const { data } = await supabase.storage
+    .from(TRADE_ATTACHMENT_BUCKET)
+    .createSignedUrl(path, 60 * 60);
+  return rowToTradeAttachment(row, data?.signedUrl);
+}
+
+async function signTradeAttachments(rows: Record<string, unknown>[]): Promise<TradeAttachment[]> {
+  return Promise.all(rows.map(row => signTradeAttachment(row)));
+}
+
+function groupAttachmentsByTrade(attachments: TradeAttachment[]): Record<string, TradeAttachment[]> {
+  return attachments.reduce<Record<string, TradeAttachment[]>>((acc, attachment) => {
+    acc[attachment.tradeId] = acc[attachment.tradeId] || [];
+    acc[attachment.tradeId].push(attachment);
+    return acc;
+  }, {});
 }
 
 import type { RewardRule as _RR } from './types';
@@ -1325,6 +1388,24 @@ export const useStore = create<InvestmentStore>((set, get) => ({
           );
           if (res.error) { console.warn('loadUserData trades failed:', res.error.message); return; }
           const rows = (res.data || []) as Record<string, any>[];
+          let attachmentsByTrade: Record<string, TradeAttachment[]> = {};
+          const tradeIds = rows.map(t => t.id as string).filter(Boolean);
+          if (tradeIds.length > 0) {
+            const attRes = await withTimeout(
+              supabase
+                .from('trade_attachments')
+                .select('*')
+                .in('trade_id', tradeIds)
+                .order('created_at', { ascending: true }),
+              10000,
+              { data: null, error: { message: 'trade attachments timeout' } } as any
+            );
+            if (attRes.error) {
+              console.warn('loadUserData trade attachments failed:', attRes.error.message);
+            } else {
+              attachmentsByTrade = groupAttachmentsByTrade(await signTradeAttachments((attRes.data || []) as Record<string, unknown>[]));
+            }
+          }
           const trades: Trade[] = rows.map(t => ({
             id: t.id, stockCode: t.stock_code, stockName: t.stock_name,
             tradeType: t.trade_type as 'buy' | 'sell',
@@ -1332,6 +1413,7 @@ export const useStore = create<InvestmentStore>((set, get) => ({
             totalAmount: Number(t.total_amount), reason: t.reason as string | undefined,
             profit: t.profit != null ? Number(t.profit) : undefined,
             timestamp: Number(t.timestamp),
+            attachments: attachmentsByTrade[t.id as string] || [],
           }));
           set({ trades });
         })(),
@@ -1756,6 +1838,150 @@ export const useStore = create<InvestmentStore>((set, get) => ({
     return { error: null };
   },
 
+  uploadTradeAttachments: async (tradeId, stockCode, files, kind = 'manual', snapshotMeta) => {
+    const { user, trades } = get();
+    if (!user || !supabase) return { attachments: [], error: '尚未登入' };
+    if (!files.length) return { attachments: [], error: null };
+
+    const trade = trades.find(t => t.id === tradeId);
+    const existingManualCount = trade?.attachments?.filter(a => a.kind === 'manual').length || 0;
+    if (kind === 'manual' && existingManualCount + files.length > MAX_MANUAL_ATTACHMENTS_PER_TRADE) {
+      return { attachments: [], error: `每筆交易最多只能保留 ${MAX_MANUAL_ATTACHMENTS_PER_TRADE} 個手動附件` };
+    }
+
+    const uploaded: TradeAttachment[] = [];
+    for (const file of files) {
+      const mimeType = file.type || (kind === 'auto_snapshot' ? 'image/webp' : '');
+      const originalName = file instanceof File ? file.name : `${stockCode}-交易快照.webp`;
+      if (file.size > MAX_TRADE_ATTACHMENT_BYTES) {
+        return { attachments: uploaded, error: `${safeFileName(originalName)} 超過 10MB 限制` };
+      }
+      if (kind === 'auto_snapshot' && mimeType !== 'image/webp') {
+        return { attachments: uploaded, error: '自動快照必須是 WEBP 格式' };
+      }
+      if (kind === 'manual' && !MANUAL_ATTACHMENT_MIME_TYPES.has(mimeType)) {
+        return { attachments: uploaded, error: '手動附件僅支援 JPG、PNG、PDF' };
+      }
+
+      if (kind === 'auto_snapshot') {
+        const { data: existingRows } = await supabase
+          .from('trade_attachments')
+          .select('*')
+          .eq('trade_id', tradeId)
+          .eq('user_id', user.id)
+          .eq('kind', 'auto_snapshot');
+        const existingPaths = (existingRows || []).map(row => row.storage_path as string).filter(Boolean);
+        if (existingPaths.length > 0) {
+          await supabase.storage.from(TRADE_ATTACHMENT_BUCKET).remove(existingPaths);
+          await supabase
+            .from('trade_attachments')
+            .delete()
+            .eq('trade_id', tradeId)
+            .eq('user_id', user.id)
+            .eq('kind', 'auto_snapshot');
+        }
+      }
+
+      const ext = extensionForMime(mimeType, originalName);
+      const fileName = kind === 'auto_snapshot'
+        ? `${stockCode}-交易快照-${new Date().toISOString().slice(0, 10)}.webp`
+        : safeFileName(originalName);
+      const storagePath = `${user.id}/${tradeId}/${kind}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+      const { error: uploadError } = await supabase.storage
+        .from(TRADE_ATTACHMENT_BUCKET)
+        .upload(storagePath, file, { contentType: mimeType, upsert: false });
+      if (uploadError) return { attachments: uploaded, error: uploadError.message };
+
+      const { data: inserted, error: insertError } = await supabase
+        .from('trade_attachments')
+        .insert([{
+          trade_id: tradeId,
+          user_id: user.id,
+          stock_code: stockCode,
+          kind,
+          storage_path: storagePath,
+          file_name: fileName,
+          mime_type: mimeType,
+          file_size: file.size,
+          snapshot_meta: snapshotMeta || null,
+        }])
+        .select()
+        .single();
+      if (insertError || !inserted) {
+        await supabase.storage.from(TRADE_ATTACHMENT_BUCKET).remove([storagePath]);
+        return { attachments: uploaded, error: insertError?.message || '附件資料寫入失敗' };
+      }
+      uploaded.push(await signTradeAttachment(inserted as Record<string, unknown>));
+    }
+
+    set(state => ({
+      trades: state.trades.map(t => {
+        if (t.id !== tradeId) return t;
+        const kept = kind === 'auto_snapshot'
+          ? (t.attachments || []).filter(a => a.kind !== 'auto_snapshot')
+          : (t.attachments || []);
+        return { ...t, attachments: [...kept, ...uploaded] };
+      }),
+    }));
+
+    return { attachments: uploaded, error: null };
+  },
+
+  deleteTradeAttachment: async (attachmentId) => {
+    const { user, trades } = get();
+    if (!user || !supabase) return { error: '尚未登入' };
+    const attachment = trades.flatMap(t => t.attachments || []).find(a => a.id === attachmentId);
+    if (!attachment) return { error: '找不到附件' };
+    if (attachment.kind !== 'manual') return { error: '系統自動快照不可手動刪除' };
+
+    await supabase.storage.from(TRADE_ATTACHMENT_BUCKET).remove([attachment.storagePath]);
+    const { error } = await supabase
+      .from('trade_attachments')
+      .delete()
+      .eq('id', attachmentId)
+      .eq('user_id', user.id)
+      .eq('kind', 'manual');
+    if (error) return { error: error.message };
+    set(state => ({
+      trades: state.trades.map(t => ({
+        ...t,
+        attachments: (t.attachments || []).filter(a => a.id !== attachmentId),
+      })),
+    }));
+    return { error: null };
+  },
+
+  cleanupManualTradeAttachmentsForStock: async (stockCode) => {
+    const { user } = get();
+    if (!user || !supabase) return { deletedCount: 0, error: '尚未登入' };
+    const { data, error: selectError } = await supabase
+      .from('trade_attachments')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('stock_code', stockCode)
+      .eq('kind', 'manual');
+    if (selectError) return { deletedCount: 0, error: selectError.message };
+    const rows = (data || []) as Record<string, unknown>[];
+    const paths = rows.map(row => row.storage_path as string).filter(Boolean);
+    if (paths.length > 0) {
+      await supabase.storage.from(TRADE_ATTACHMENT_BUCKET).remove(paths);
+    }
+    if (rows.length > 0) {
+      const { error: deleteError } = await supabase
+        .from('trade_attachments')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('stock_code', stockCode)
+        .eq('kind', 'manual');
+      if (deleteError) return { deletedCount: 0, error: deleteError.message };
+    }
+    set(state => ({
+      trades: state.trades.map(t => t.stockCode === stockCode
+        ? { ...t, attachments: (t.attachments || []).filter(a => a.kind !== 'manual') }
+        : t),
+    }));
+    return { deletedCount: rows.length, error: null };
+  },
   // ─── Trading ───────────────────────────────
   executeBuy: async (stockCode, stockName, quantity, price, industry, reason) => {
     const { user, holdings, trades, watchlist } = get();
@@ -1793,6 +2019,7 @@ export const useStore = create<InvestmentStore>((set, get) => ({
         id: row.trade_id, stockCode, stockName, tradeType: 'buy',
         quantity, price, totalAmount: Number(row.total_cost),
         reason: reason || undefined, timestamp: Number(row.trade_timestamp),
+        attachments: [],
       };
       const newSharesNum = Number(row.new_shares);
       const newAvgCostNum = Number(row.new_avg_cost);
@@ -1822,7 +2049,7 @@ export const useStore = create<InvestmentStore>((set, get) => ({
         });
       }
 
-      return { success: true, message: `成功買入 ${stockName} ${quantity} 股 🎉` };
+      return { success: true, message: `成功買入 ${stockName} ${quantity} 股 🎉`, trade: newTrade };
     } catch (err) {
       console.error('executeBuy error:', err);
       const raw = err instanceof Error ? err.message : String(err);
@@ -1882,6 +2109,7 @@ export const useStore = create<InvestmentStore>((set, get) => ({
         reason: reason || undefined,
         profit,
         timestamp: Number(row.trade_timestamp),
+        attachments: [],
       };
 
       const newHoldings: Holding[] = remaining <= 0
@@ -1906,12 +2134,18 @@ export const useStore = create<InvestmentStore>((set, get) => ({
           console.warn('auto add watchlist after full sell failed:', result.error);
           watchlistReturnMessage = '\n賣出已完成，但自動放回觀察名單失敗，稍後可手動加入。';
         }
+
+        const cleanupResult = await get().cleanupManualTradeAttachmentsForStock(stockCode);
+        if (cleanupResult.error) {
+          console.warn('cleanup manual trade attachments after full sell failed:', cleanupResult.error);
+        }
       }
 
       const emoji = profit >= 0 ? '📈' : '📉';
       return {
         success: true,
         message: `成功賣出 ${holding.stockName} ${quantity} 股 ${emoji}\n${profit >= 0 ? '賺了' : '虧了'} NT$${Math.abs(profit).toFixed(0)}${watchlistReturnMessage}`,
+        trade: newTrade,
       };
     } catch (err) {
       console.error('executeSell error:', err);

@@ -1,9 +1,20 @@
 # 📦 PPBears Investment — 更新日誌
 
-> **目前版本：v1.24.102**（2026-07-07）
-> 最新更新：看庫存也改為 stale-first 首屏，先顯示可用本機快取，再背景校正每日版本、雲端快取與 live 分析。
+> **目前版本：v1.24.103**（2026-07-11）
+> 最新更新：交易紀錄新增 WEBP 自動重點快照、手動附件、庫存歸零清理與管理員只讀查看。
 
 ---
+
+## [v1.24.103] - 2026-07-11
+### Added
+- Added private Supabase trade attachments storage and schema for automatic trade snapshots and manual JPG/PNG/PDF note attachments.
+- Added WEBP automatic trade snapshot generation after buy/sell orders, capturing trade date, buy/sell details, price, change, OHLC volume, AI recommendation, technical chart, holding summary, stock essence score, and cumulative return.
+- Added manual attachment upload from the trade modal and Trade History, with image thumbnails, PDF cards, image lightbox preview, and manual attachment deletion.
+- Added admin read-only viewing of every user's trade notes, automatic snapshots, and attachments from the Admin trade history modal.
+
+### Changed
+- Trade History now links stock rows to the in-app Stock Detail page instead of opening the old Yahoo technical-chart link.
+- Full-sell flows now automatically clean manual attachments for that stock while preserving automatic trade snapshots as historical evidence.
 
 ## [v1.24.102] - 2026-07-07
 ### Fixed
