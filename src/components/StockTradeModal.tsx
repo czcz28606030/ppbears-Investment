@@ -22,6 +22,7 @@ type StockTradeModalProps = {
   price: number;
   industry?: string;
   snapshotContext?: Partial<TradeSnapshotPayload>;
+  prepareSnapshotContext?: (basePayload: TradeSnapshotPayload) => Promise<Partial<TradeSnapshotPayload>>;
   onClose: () => void;
 };
 
@@ -33,6 +34,7 @@ export default function StockTradeModal({
   price,
   industry,
   snapshotContext,
+  prepareSnapshotContext,
   onClose,
 }: StockTradeModalProps) {
   const { user, holdings, dataReady, executeBuy, executeSell, getPortfolioSummary } = useStore();
@@ -238,48 +240,71 @@ export default function StockTradeModal({
       let finalMessage = result.message;
 
       if (result.success && result.trade) {
-        const latestState = useStore.getState();
-        const latestHolding = latestState.holdings.find(h => h.stockCode === stockCode);
-        const latestUser = latestState.user;
-        const snapshotPayload: TradeSnapshotPayload = {
-          stockCode,
-          stockName: stockName || stockCode,
-          tradeType: tradeMode,
-          quantity: qty,
-          price,
-          totalAmount: result.trade.totalAmount,
-          reason: tradeReason.trim(),
-          timestamp: result.trade.timestamp,
-          industry: industry || null,
-          ...snapshotContext,
-          holdingSharesAfter: latestHolding?.totalShares ?? 0,
-          avgCostAfter: latestHolding?.avgCost ?? null,
-          balanceAfter: latestUser?.availableBalance ?? null,
-        };
-        try {
-          const snapshotBlob = await createTradeSnapshotWebp(snapshotPayload);
-          const { chartPrices: _chartPrices, ...snapshotMeta } = snapshotPayload;
-          void _chartPrices;
-          const uploadResult = await latestState.uploadTradeAttachments(
-            result.trade.id,
+        finalMessage += '\n📸 交易快照與附件正在背景保存。';
+        setTradeResult({ success: true, message: finalMessage });
+        const capturedTrade = result.trade;
+        const capturedTradeMode = tradeMode;
+        const capturedReason = tradeReason.trim();
+        const capturedFiles = [...selectedFiles];
+        const baseSnapshotContext = snapshotContext || {};
+
+        void (async () => {
+          const latestState = useStore.getState();
+          const latestHolding = latestState.holdings.find(h => h.stockCode === stockCode);
+          const latestUser = latestState.user;
+          const basePayload: TradeSnapshotPayload = {
             stockCode,
-            [snapshotBlob],
-            'auto_snapshot',
-            snapshotMeta as unknown as Record<string, unknown>
-          );
-          if (uploadResult.error) finalMessage += `\n⚠️ 自動快照保存失敗：${uploadResult.error}`;
-        } catch (snapshotErr) {
-          console.warn('create trade snapshot failed:', snapshotErr);
-          finalMessage += '\n⚠️ 自動快照保存失敗，可稍後在交易紀錄補充附件。';
-        }
+            stockName: stockName || stockCode,
+            tradeType: capturedTradeMode,
+            quantity: qty,
+            price,
+            totalAmount: capturedTrade.totalAmount,
+            reason: capturedReason,
+            timestamp: capturedTrade.timestamp,
+            industry: industry || null,
+            ...baseSnapshotContext,
+            holdingSharesAfter: latestHolding?.totalShares ?? 0,
+            avgCostAfter: latestHolding?.avgCost ?? null,
+            balanceAfter: latestUser?.availableBalance ?? null,
+          };
 
-        if (selectedFiles.length > 0) {
-          const manualResult = await latestState.uploadTradeAttachments(result.trade.id, stockCode, selectedFiles, 'manual');
-          if (manualResult.error) finalMessage += `\n⚠️ 手動附件保存失敗：${manualResult.error}`;
-        }
+          try {
+            const preparedContext = prepareSnapshotContext ? await prepareSnapshotContext(basePayload) : {};
+            const snapshotPayload: TradeSnapshotPayload = {
+              ...basePayload,
+              ...preparedContext,
+              holdingSharesAfter: basePayload.holdingSharesAfter,
+              avgCostAfter: basePayload.avgCostAfter,
+              balanceAfter: basePayload.balanceAfter,
+            };
+            const snapshotBlob = await createTradeSnapshotWebp(snapshotPayload);
+            const { chartPrices: _chartPrices, ...snapshotMeta } = snapshotPayload;
+            void _chartPrices;
+            const uploadResult = await latestState.uploadTradeAttachments(
+              capturedTrade.id,
+              stockCode,
+              [snapshotBlob],
+              'auto_snapshot',
+              snapshotMeta as unknown as Record<string, unknown>
+            );
+            if (uploadResult.error) {
+              setTradeResult(current => current?.success ? { ...current, message: `${current.message}\n⚠️ 自動快照保存失敗：${uploadResult.error}` } : current);
+            }
+          } catch (snapshotErr) {
+            console.warn('create trade snapshot failed:', snapshotErr);
+            setTradeResult(current => current?.success ? { ...current, message: `${current.message}\n⚠️ 自動快照保存失敗，可稍後補充附件。` } : current);
+          }
+
+          if (capturedFiles.length > 0) {
+            const manualResult = await latestState.uploadTradeAttachments(capturedTrade.id, stockCode, capturedFiles, 'manual');
+            if (manualResult.error) {
+              setTradeResult(current => current?.success ? { ...current, message: `${current.message}\n⚠️ 手動附件保存失敗：${manualResult.error}` } : current);
+            }
+          }
+        })();
+      } else {
+        setTradeResult({ success: result.success, message: finalMessage });
       }
-
-      setTradeResult({ success: result.success, message: finalMessage });
       if (result.success) {
         setQuantity('');
         setTradeUnit('share');

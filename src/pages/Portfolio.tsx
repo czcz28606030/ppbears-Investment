@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent, type WheelEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore, formatMoney, formatPrice } from '../store';
-import type { Holding, StockTradingSignal, Trade } from '../types';
+import type { Holding, StockPrice, StockTradingSignal, Trade } from '../types';
 import { fetchOfficialPriceMap, fetchStockData, fetchStockQuantData, fetchStockTradingSignals, fetchSimonsRecommendationCounts, clearOfficialPriceMapCache, refreshDailyAiCache, clearQuantSignalTTLCache, fetchDailyAiCacheVersion, getKnownDailyAiCacheVersion, rememberDailyAiCacheVersion, ensureDailyAiCacheVersion, fetchActiveEtfRadarMap, fetchUserMarketDailyCache } from '../api';
 import type { ActiveEtfRadarItem, OfficialPriceMapEntry, StockQuantData, StockQuantMeta } from '../api';
 import { getCache, setCache, clearCache, getPersistentCache, setPersistentCache, clearPersistentCache, invalidateDailyMarketDataCaches, CACHE_KEYS } from '../cache';
 import MarketBadge from '../components/MarketBadge';
 import IndustryIcon from '../components/IndustryIcon';
 import StockTradeModal from '../components/StockTradeModal';
+import type { TradeSnapshotPayload } from '../utils/tradeSnapshot';
 import { canAutoRefreshPrices, formatPriceUpdateLabel, PRICE_AUTO_REFRESH_MS } from '../utils/priceAutoRefresh';
 import { calculateAddPriority } from '../utils/addPriority';
 import { calculateTrendStatus, type TrendStatusResult } from '../utils/trendStatus';
@@ -688,9 +689,9 @@ export default function Portfolio() {
     );
   }
 
-  function renderAddPriorityChip(stockCode: string, signal?: PortfolioAiSignal) {
+  function getPortfolioAddPriority(stockCode: string, signal?: PortfolioAiSignal) {
     const cumRetPct = parseReturnPct(signal?.cumRet);
-    const priority = calculateAddPriority({
+    return calculateAddPriority({
       aiSignal: signal?.primaryType ?? null,
       activeEtfScore: activeEtfMap[stockCode]?.score ?? null,
       activeEtfSignal: activeEtfMap[stockCode]?.signal ?? null,
@@ -698,6 +699,94 @@ export default function Portfolio() {
       chipPts: signal?.chipPts ?? null,
       cumRetPct,
     });
+  }
+
+  function getPortfolioCautionLabel(signal?: PortfolioAiSignal) {
+    const cumRetPct = parseReturnPct(signal?.cumRet);
+    if (signal?.primaryType === 'sell') return '暫緩加碼';
+    if (cumRetPct !== null && cumRetPct > 35) return '小心加碼';
+    if (signal?.primaryType === 'buy') return '順勢加碼';
+    return '小心加碼';
+  }
+
+  function getSnapshotContextForHolding(h: Holding): Partial<TradeSnapshotPayload> {
+    const signal = aiSignals[h.stockCode];
+    const priority = getPortfolioAddPriority(h.stockCode, signal);
+    const marketInfo = marketMap[h.stockCode];
+    const rawChangeAmount = marketInfo?.change !== undefined && marketInfo?.change !== null
+      ? Number(marketInfo.change)
+      : null;
+    const changeAmount = Number.isFinite(rawChangeAmount) ? rawChangeAmount : null;
+    const currentPrice = h.currentPrice;
+    const prevPrice = changeAmount !== null && changeAmount !== undefined ? currentPrice - Number(changeAmount) : null;
+    const changePercent = prevPrice && prevPrice > 0 ? (Number(changeAmount) / prevPrice) * 100 : null;
+    return {
+      market: marketInfo?.market,
+      industry: h.industry || null,
+      changeAmount,
+      changePercent,
+      volume: marketInfo?.volume ?? null,
+      priceDate: marketInfo?.date,
+      aiRecommendation: signal?.aiRemark || null,
+      aiSignalLabel: signal?.primaryLabel || null,
+      addPriorityScore: priority.score,
+      addPriorityLabel: priority.label,
+      stockEssenceScore: signal?.chipPts ?? null,
+      cumulativeReturn: signal?.cumRet || null,
+      chipScore: signal?.chipPts ?? null,
+      chipLabel: getChipLabel(signal?.chipPts),
+      cautionLabel: getPortfolioCautionLabel(signal),
+    };
+  }
+
+  async function preparePortfolioSnapshotContext(h: Holding, basePayload: TradeSnapshotPayload): Promise<Partial<TradeSnapshotPayload>> {
+    const signal = aiSignals[h.stockCode];
+    let stockData = null as Awaited<ReturnType<typeof fetchStockData>>;
+    if (!basePayload.chartPrices?.length || basePayload.open === null || basePayload.open === undefined) {
+      stockData = await withTimeout(fetchStockData(h.stockCode), 9000).catch(() => null);
+    }
+
+    let quantData: StockQuantData | null = null;
+    if (!signal?.aiRemark || !signal?.cumRet || signal?.chipPts === undefined) {
+      quantData = await withTimeout(
+        fetchStockQuantData(h.stockCode, holdingStartDates[h.stockCode]),
+        10000
+      ).catch(() => null);
+    }
+
+    const latestPrice = stockData?.prices?.[stockData.prices.length - 1];
+    const quantChipPts = quantData?.chipStability?.pts !== undefined ? parseFloat(String(quantData.chipStability.pts)) : undefined;
+    const mergedSignal: PortfolioAiSignal = {
+      primaryLabel: signal?.primaryLabel || (quantData?.currentSignal === 'buy' ? 'AI 加碼' : quantData?.currentSignal === 'sell' ? 'AI 出場' : 'AI 中立'),
+      primaryType: signal?.primaryType || quantData?.currentSignal || 'neutral',
+      primaryIcon: signal?.primaryIcon || '⚖️',
+      aiRemark: signal?.aiRemark || quantData?.aiQuanBackDataComment?.remark,
+      cumRet: signal?.cumRet || quantData?.aiQuanBackDataComment?.cum_ret,
+      chipPts: signal?.chipPts ?? (Number.isFinite(quantChipPts) ? quantChipPts : undefined),
+      trendStatus: signal?.trendStatus,
+    };
+    const priority = getPortfolioAddPriority(h.stockCode, mergedSignal);
+
+    return {
+      chartPrices: stockData?.prices as StockPrice[] | undefined,
+      open: basePayload.open ?? latestPrice?.open_d ?? null,
+      high: basePayload.high ?? latestPrice?.high_d ?? null,
+      low: basePayload.low ?? latestPrice?.low_d ?? null,
+      volume: basePayload.volume ?? latestPrice?.volume ?? null,
+      priceDate: basePayload.priceDate || latestPrice?.mdate,
+      aiRecommendation: basePayload.aiRecommendation || mergedSignal.aiRemark || null,
+      aiSignalLabel: basePayload.aiSignalLabel || mergedSignal.primaryLabel,
+      addPriorityScore: priority.score,
+      addPriorityLabel: priority.label,
+      stockEssenceScore: basePayload.stockEssenceScore ?? mergedSignal.chipPts ?? null,
+      cumulativeReturn: basePayload.cumulativeReturn || mergedSignal.cumRet || null,
+      chipScore: basePayload.chipScore ?? mergedSignal.chipPts ?? null,
+      chipLabel: basePayload.chipLabel || getChipLabel(mergedSignal.chipPts),
+      cautionLabel: basePayload.cautionLabel || getPortfolioCautionLabel(mergedSignal),
+    };
+  }
+  function renderAddPriorityChip(stockCode: string, signal?: PortfolioAiSignal) {
+    const priority = getPortfolioAddPriority(stockCode, signal);
     return (
       <span
         className={`holding-quant-chip holding-add-priority-chip holding-add-priority-chip-${priority.level}`}
@@ -1430,10 +1519,11 @@ export default function Portfolio() {
           stockName={selectedTrade.holding.stockName}
           price={selectedTrade.holding.currentPrice}
           industry={selectedTrade.holding.industry || ''}
+          snapshotContext={getSnapshotContextForHolding(selectedTrade.holding)}
+          prepareSnapshotContext={(basePayload) => preparePortfolioSnapshotContext(selectedTrade.holding, basePayload)}
           onClose={() => setSelectedTrade(null)}
         />
       )}
     </div>
   );
 }
-

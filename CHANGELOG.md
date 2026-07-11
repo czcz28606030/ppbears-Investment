@@ -1,9 +1,20 @@
 # 📦 PPBears Investment — 更新日誌
 
-> **目前版本：v1.24.104**（2026-07-11）
-> 最新更新：交易快照改為資訊小卡，交易附件改由保留期限與容量管理控管。
+> **目前版本：v1.24.105**（2026-07-11）
+> 最新更新：交易紀錄改為個股資料夾式歷程，Portfolio 快速下單也會背景補齊完整交易快照。
 
 ---
+
+## [v1.24.105] - 2026-07-11
+### Added
+- Added stock-folder style Trade History grouping so each stock shows buy/sell counts, latest trade time, attachment count, current holding status, cumulative P/L, and cumulative return.
+- Added per-stock expanded timelines that keep buy and sell notes, snapshots, and manual attachments together for later review.
+- Added Portfolio quick-trade snapshot enrichment using existing holding, market, AI signal, add-priority, recommendation, and quant fallback data.
+
+### Changed
+- Changed `/history` search and date filtering to decide which stock folders appear while expanded folders still show the stock's full trade history.
+- Changed StockTradeModal snapshot and manual attachment upload to run in the background after a successful trade so order success is not blocked by snapshot generation.
+- Kept deposit and withdrawal records separate from stock folders as independent cash records.
 
 ## [v1.24.104] - 2026-07-11
 ### Added
@@ -14,6 +25,7 @@
 ### Changed
 - Changed automatic trade snapshots to remove the old trade summary section and show Stock Detail-style information cards for market, industry, AI signal, add-priority score, stock essence score, cumulative return, chip status, risk reminder, and holding status.
 - Changed full-sell behavior so stock trade records, note text, automatic snapshots, and manual attachments remain available after inventory reaches zero.
+
 ## [v1.24.103] - 2026-07-11
 ### Added
 - Added private Supabase trade attachments storage and schema for automatic trade snapshots and manual JPG/PNG/PDF note attachments.
