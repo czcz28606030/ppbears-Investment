@@ -23,6 +23,35 @@
   border-radius: var(--radius-full);
 }
 
+.stock-trade-price-group {
+  margin-bottom: 16px;
+}
+
+.stock-trade-price-group .input-field {
+  min-height: 46px;
+}
+
+.stock-trade-price-group .input-field.input-error {
+  border-color: #ff595e;
+  background: #fff5f6;
+}
+
+.stock-trade-price-hint {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: #fff7df;
+  color: #7a4f00;
+  font-size: 13px;
+  line-height: 1.35;
+  font-weight: 800;
+}
+
+.stock-trade-price-hint.error {
+  background: #ffe8ea;
+  color: #c62828;
+}
+
 .trade-unit-header {
   display: flex;
   align-items: center;

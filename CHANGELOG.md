@@ -1,10 +1,17 @@
 # 📦 PPBears Investment — 更新日誌
 
-> **目前版本：v1.24.105**（2026-07-11）
-> 最新更新：交易紀錄改為個股資料夾式歷程，Portfolio 快速下單也會背景補齊完整交易快照。
+> **目前版本：v1.24.106**（2026-07-11）
+> 最新更新：交易視窗新增可選成交價格，留空使用收盤價，填寫後以自填價格記錄買入與賣出。
 
 ---
 
+## [v1.24.106] - 2026-07-11
+### Added
+- Added an optional trade price field to the buy/sell modal so users can enter the actual成交價格 when it differs from the close reference price.
+
+### Changed
+- Changed trade previews, risk warnings, Supabase buy/sell RPC calls, and automatic trade snapshots to use the final trade price: custom price when provided, otherwise the close reference price.
+- Added validation so invalid custom prices are rejected while an empty price field continues to use the close reference price.
 ## [v1.24.105] - 2026-07-11
 ### Added
 - Added stock-folder style Trade History grouping so each stock shows buy/sell counts, latest trade time, attachment count, current holding status, cumulative P/L, and cumulative return.

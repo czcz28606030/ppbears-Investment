@@ -43,6 +43,7 @@ export default function StockTradeModal({
   const [tradeMode, setTradeMode] = useState<TradeMode>(mode);
   const [quantity, setQuantity] = useState('');
   const [tradeUnit, setTradeUnit] = useState<'share' | 'lot'>('share');
+  const [customPrice, setCustomPrice] = useState('');
   const [tradeReason, setTradeReason] = useState('');
   const [tradeResult, setTradeResult] = useState<{ success: boolean; message: string } | null>(null);
   const [isTrading, setIsTrading] = useState(false);
@@ -56,6 +57,7 @@ export default function StockTradeModal({
     setTradeMode(mode);
     setQuantity('');
     setTradeUnit('share');
+    setCustomPrice('');
     setTradeReason('');
     setTradeResult(null);
     setIsTrading(false);
@@ -70,6 +72,12 @@ export default function StockTradeModal({
     ? quantityNumber * (tradeUnit === 'lot' ? 1000 : 1)
     : 0;
   const tradeUnitLabel = tradeUnit === 'lot' ? '張' : '股';
+  const customPriceNumber = Number(customPrice);
+  const hasCustomPrice = customPrice.trim() !== '';
+  const tradePrice = hasCustomPrice && Number.isFinite(customPriceNumber) && customPriceNumber > 0
+    ? customPriceNumber
+    : price;
+  const customPriceInvalid = hasCustomPrice && (!Number.isFinite(customPriceNumber) || customPriceNumber <= 0);
 
   const modalTitle = useMemo(() => (
     `${tradeMode === 'buy' ? '🛒 買入' : '💰 賣出'} ${stockName || stockCode}`
@@ -78,37 +86,37 @@ export default function StockTradeModal({
   if (!isOpen) return null;
 
   async function handleTrade() {
-    if (!stockCode || price <= 0) return;
+    if (!stockCode || tradePrice <= 0 || customPriceInvalid) return;
     const qty = tradeShares;
 
     if (tradeMode === 'buy') {
       const warnings: RiskWarning[] = [];
       const totalAssets = summary.totalAssets;
-      const buyAmount = qty * price;
+      const buyAmount = qty * tradePrice;
       const feeRate = user?.brokerFeeRate ?? 0.001425;
       const minFee = user?.brokerMinFee ?? 20;
       const estimatedFee = Math.max(minFee, Math.round(buyAmount * feeRate));
       const finalBuyCost = buyAmount + estimatedFee;
       const stopLossPct = Math.min(80, Math.max(1, user?.stopLossAlertPct ?? 20));
-      const stopLossPrice = price * (1 - stopLossPct / 100);
+      const stopLossPrice = tradePrice * (1 - stopLossPct / 100);
       const existingShares = holding?.totalShares ?? 0;
       const existingAvgCost = holding?.avgCost ?? 0;
       const existingCost = existingShares * existingAvgCost;
-      const existingMarketValue = existingShares * price;
+      const existingMarketValue = existingShares * tradePrice;
       const existingPnL = existingMarketValue - existingCost;
       const existingPnLPct = existingCost > 0 ? (existingPnL / existingCost) * 100 : 0;
       const newShares = existingShares + qty;
-      const newAvgCost = newShares > 0 ? (existingCost + buyAmount) / newShares : price;
-      const newPositionValue = newShares * price;
+      const newAvgCost = newShares > 0 ? (existingCost + buyAmount) / newShares : tradePrice;
+      const newPositionValue = newShares * tradePrice;
       const newPositionWeight = totalAssets > 0 ? (newPositionValue / totalAssets) * 100 : 0;
       const newPositionCost = existingCost + buyAmount;
       const balanceAfter = user ? user.availableBalance - finalBuyCost : null;
-      const addOnStopLossLoss = Math.round(Math.max(0, price - stopLossPrice) * qty);
+      const addOnStopLossLoss = Math.round(Math.max(0, tradePrice - stopLossPrice) * qty);
       const wholePositionStopLossPnL = Math.round((stopLossPrice - newAvgCost) * newShares);
       const addOnDetails: RiskWarning['details'] = holding ? [
         { label: '目前持股', value: `${existingShares.toLocaleString('zh-TW')} 股` },
         { label: '目前平均成本', value: `NT$ ${formatPrice(existingAvgCost)}` },
-        { label: '目前價格', value: `NT$ ${formatPrice(price)}` },
+        { label: hasCustomPrice ? '填寫成交價' : '收盤參考價', value: `NT$ ${formatPrice(tradePrice)}` },
         {
           label: '目前帳面損益',
           value: `${existingPnL >= 0 ? '+' : '-'}NT$ ${formatMoney(Math.abs(existingPnL))} (${existingPnLPct >= 0 ? '+' : ''}${existingPnLPct.toFixed(1)}%)`,
@@ -117,7 +125,7 @@ export default function StockTradeModal({
         { label: '這次買入', value: `${qty.toLocaleString('zh-TW')} 股 / NT$ ${formatMoney(buyAmount)}` },
         { label: '預估含手續費花費', value: `NT$ ${formatMoney(finalBuyCost)}`, tone: 'warning' },
         { label: '買後總持股', value: `${newShares.toLocaleString('zh-TW')} 股` },
-        { label: '買後平均成本', value: `NT$ ${formatPrice(newAvgCost)}`, tone: price < existingAvgCost ? 'warning' : 'normal' },
+        { label: '買後平均成本', value: `NT$ ${formatPrice(newAvgCost)}`, tone: tradePrice < existingAvgCost ? 'warning' : 'normal' },
         { label: '買後總投入成本', value: `NT$ ${formatMoney(newPositionCost)}` },
         { label: '買後部位市值', value: `NT$ ${formatMoney(newPositionValue)}（總資產 ${newPositionWeight.toFixed(1)}%）`, tone: newPositionWeight > 15 ? 'warning' : 'normal' },
         { label: `跌到 -${stopLossPct}% 參考價`, value: `NT$ ${formatPrice(stopLossPrice)}` },
@@ -147,8 +155,8 @@ export default function StockTradeModal({
       }
 
       if (holding) {
-        if (price > holding.avgCost) {
-          const profitRate = ((price - holding.avgCost) / holding.avgCost) * 100;
+        if (tradePrice > holding.avgCost) {
+          const profitRate = ((tradePrice - holding.avgCost) / holding.avgCost) * 100;
           warnings.push({
             icon: '📈',
             title: '獲利中加碼提醒',
@@ -157,8 +165,8 @@ export default function StockTradeModal({
             level: 'caution',
             details: addOnDetails,
           });
-        } else if (price < holding.avgCost) {
-          const lossRate = ((holding.avgCost - price) / holding.avgCost) * 100;
+        } else if (tradePrice < holding.avgCost) {
+          const lossRate = ((holding.avgCost - tradePrice) / holding.avgCost) * 100;
           const halfStopLossPct = stopLossPct / 2;
           const isOverStopLoss = lossRate >= stopLossPct;
           const isNearStopLoss = !isOverStopLoss && lossRate >= halfStopLossPct;
@@ -228,6 +236,10 @@ export default function StockTradeModal({
       setTradeResult({ success: false, message: '❌ 無法取得目前股價，請稍後重試或重新整理頁面。' });
       return;
     }
+    if (customPriceInvalid) {
+      setTradeResult({ success: false, message: '❌ 請輸入大於 0 的成交價格，或留空使用收盤價。' });
+      return;
+    }
     if (isTrading) return;
     setIsTrading(true);
     setShowWarningModal(false);
@@ -235,8 +247,8 @@ export default function StockTradeModal({
 
     try {
       const result = tradeMode === 'buy'
-        ? await executeBuy(stockCode, stockName || stockCode, qty, price, industry || holding?.industry || '', tradeReason.trim())
-        : await executeSell(stockCode, qty, price, tradeReason.trim());
+        ? await executeBuy(stockCode, stockName || stockCode, qty, tradePrice, industry || holding?.industry || '', tradeReason.trim())
+        : await executeSell(stockCode, qty, tradePrice, tradeReason.trim());
       let finalMessage = result.message;
 
       if (result.success && result.trade) {
@@ -257,7 +269,7 @@ export default function StockTradeModal({
             stockName: stockName || stockCode,
             tradeType: capturedTradeMode,
             quantity: qty,
-            price,
+            price: tradePrice,
             totalAmount: capturedTrade.totalAmount,
             reason: capturedReason,
             timestamp: capturedTrade.timestamp,
@@ -308,6 +320,7 @@ export default function StockTradeModal({
       if (result.success) {
         setQuantity('');
         setTradeUnit('share');
+    setCustomPrice('');
         setTradeReason('');
         setSelectedFiles([]);
         setAttachmentError('');
@@ -345,7 +358,28 @@ export default function StockTradeModal({
               <h3 className="trade-modal-title">{modalTitle}</h3>
 
               <div className="trade-modal-price">
-                以收盤價 <strong>NT$ {formatPrice(price)}</strong> 交易
+                收盤參考價 <strong>NT$ {formatPrice(price)}</strong>
+              </div>
+
+              <div className="input-group stock-trade-price-group">
+                <label className="input-label">成交價格（可選）</label>
+                <input
+                  className={`input-field${customPriceInvalid ? ' input-error' : ''}`}
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  inputMode="decimal"
+                  placeholder={`留空使用收盤價 NT$ ${formatPrice(price)}`}
+                  value={customPrice}
+                  onChange={(e) => setCustomPrice(e.target.value)}
+                />
+                <div className={`stock-trade-price-hint${customPriceInvalid ? ' error' : ''}`}>
+                  {customPriceInvalid
+                    ? '請輸入大於 0 的價格，或清空欄位改用收盤價。'
+                    : hasCustomPrice
+                      ? `將以填寫價格 NT$ ${formatPrice(tradePrice)} 記錄這筆${tradeMode === 'buy' ? '買入' : '賣出'}。`
+                      : `未填寫時，系統會以收盤價 NT$ ${formatPrice(price)} 記錄。`}
+                </div>
               </div>
 
               {tradeMode === 'buy' && user && (
@@ -437,7 +471,7 @@ export default function StockTradeModal({
 
               {quantity && tradeShares > 0 && (() => {
                 const q = tradeShares;
-                const baseValue = q * price;
+                const baseValue = q * tradePrice;
                 const feeRate = user?.brokerFeeRate ?? 0.001425;
                 const minFee = user?.brokerMinFee ?? 20;
                 const taxRate = user?.brokerTaxRate ?? 0.003;
@@ -445,8 +479,8 @@ export default function StockTradeModal({
                 const estTax = tradeMode === 'sell' ? Math.round(baseValue * taxRate) : 0;
                 const finalTotal = tradeMode === 'buy' ? baseValue + estFee : baseValue - estFee - estTax;
                 const stopLossPct = Math.min(80, Math.max(1, user?.stopLossAlertPct ?? 20));
-                const stopLossPrice = price * (1 - stopLossPct / 100);
-                const estimatedStopLossLoss = Math.round((price - stopLossPrice) * q);
+                const stopLossPrice = tradePrice * (1 - stopLossPct / 100);
+                const estimatedStopLossLoss = Math.round((tradePrice - stopLossPrice) * q);
                 const affordableLossPct = user?.availableBalance
                   ? (estimatedStopLossLoss / Math.max(user.availableBalance, 1)) * 100
                   : 0;
@@ -458,8 +492,12 @@ export default function StockTradeModal({
                       <span>{q.toLocaleString('zh-TW')} 股</span>
                     </div>
                     <div className="trade-preview-row">
-                      <span>股票市值</span>
+                      <span>{hasCustomPrice ? '成交金額' : '股票市值'}</span>
                       <span>NT$ {formatMoney(baseValue)}</span>
+                    </div>
+                    <div className="trade-preview-row">
+                      <span>計算價格</span>
+                      <span>NT$ {formatPrice(tradePrice)}{hasCustomPrice ? '（自行填寫）' : '（收盤價）'}</span>
                     </div>
                     <div className="trade-preview-row">
                       <span>券商手續費</span>
@@ -514,6 +552,10 @@ export default function StockTradeModal({
                   }
                   if (!quantity || tradeShares <= 0) {
                     alert(`⚠️ 請輸入大於 0 的正確交易${tradeUnitLabel}數！`);
+                    return;
+                  }
+                  if (customPriceInvalid) {
+                    alert('⚠️ 請輸入大於 0 的成交價格，或留空使用收盤價！');
                     return;
                   }
                   if (!tradeReason.trim()) {
