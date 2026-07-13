@@ -132,8 +132,8 @@ type FinMindPriceRow = {
 const PORTFOLIO_SIGNAL_TTL_MS = 18 * 60 * 60 * 1000;
 const PORTFOLIO_STALE_FIRST_TTL_MS = 3 * 60 * 1000;
 const PORTFOLIO_CLOUD_CACHE_TIMEOUT_MS = 900;
-const PORTFOLIO_SIGNAL_CACHE_SCHEMA = 'portfolio-signal-rich-v3';
-const PORTFOLIO_PERSISTENT_CACHE_KEY = 'ppbears_portfolio_signals_v9';
+const PORTFOLIO_SIGNAL_CACHE_SCHEMA = 'portfolio-signal-rich-v4';
+const PORTFOLIO_PERSISTENT_CACHE_KEY = 'ppbears_portfolio_signals_v10';
 const DAILY_AI_CACHE_POLL_MS = 90 * 1000;
 const DATA_REFRESH_SCHEDULE = [
   { label: '08:00', minutes: 8 * 60 },

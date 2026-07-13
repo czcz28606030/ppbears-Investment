@@ -1,6 +1,6 @@
 import type { StockPrice, StockTradingSignal } from '../types';
 
-export type TrendStatusLevel = 'continuing' | 'sideways' | 'weakening' | 'ended';
+export type TrendStatusLevel = 'continuing' | 'sideways' | 'weakening' | 'ended' | 'breakdown';
 
 export interface TrendStatusResult {
   level: TrendStatusLevel;
@@ -89,7 +89,8 @@ function countFlips(events: TradingEvent[]): number {
 }
 
 export function calculateTrendStatus(input: TrendStatusInput): TrendStatusResult {
-  const closes = (input.prices || [])
+  const closes = [...(input.prices || [])]
+    .sort((a, b) => normalizeDate(a.mdate).localeCompare(normalizeDate(b.mdate)))
     .map(price => parseNumber(price.close_d))
     .filter((value): value is number => value !== null && value > 0);
   const current = closes.at(-1) ?? null;
@@ -128,6 +129,57 @@ export function calculateTrendStatus(input: TrendStatusInput): TrendStatusResult
     (input.chipPts !== null && input.chipPts !== undefined && input.chipPts < 4) ||
     (return20 !== null && return20 <= -10 && belowMa20)
   );
+
+  const isConsolidationWindow = (values: number[]): boolean => {
+    if (values.length < 12) return false;
+    const floor = Math.min(...values);
+    const ceiling = Math.max(...values);
+    const rangePct = pctChange(floor, ceiling);
+    const windowReturn = pctChange(values[0] ?? null, values.at(-1) ?? null);
+    return Boolean(
+      rangePct !== null && rangePct <= 28 &&
+      windowReturn !== null && Math.abs(windowReturn) <= 14
+    );
+  };
+
+  const prior20 = closes.slice(-21, -1);
+  const prior20Floor = prior20.length >= 12 ? Math.min(...prior20) : null;
+  const twoDayBase = closes.slice(-22, -2);
+  const twoDayFloor = twoDayBase.length >= 12 ? Math.min(...twoDayBase) : null;
+  const previousClose = closes.at(-2) ?? null;
+  const confirmedTwoDayBreakdown = Boolean(
+    current && previousClose && twoDayFloor &&
+    isConsolidationWindow(twoDayBase) &&
+    previousClose < twoDayFloor && current < twoDayFloor
+  );
+  const confirmedDeepBreakdown = Boolean(
+    current && prior20Floor &&
+    isConsolidationWindow(prior20) &&
+    current <= prior20Floor * 0.97
+  );
+  const initialBreakdown = Boolean(
+    current && prior20Floor && belowMa20 &&
+    isConsolidationWindow(prior20) &&
+    current < prior20Floor
+  );
+
+  if (confirmedTwoDayBreakdown || confirmedDeepBreakdown) {
+    return {
+      level: 'breakdown',
+      label: '跌破盤整',
+      reason: confirmedTwoDayBreakdown
+        ? '收盤已連續兩個交易日跌破近期盤整下緣，視為盤整向下破位。'
+        : '最新收盤低於近期盤整下緣至少 3%，視為盤整向下破位。',
+    };
+  }
+
+  if (initialBreakdown) {
+    return {
+      level: 'weakening',
+      label: '轉弱觀察',
+      reason: '最新收盤首次跌破近期盤整下緣且位於 MA20 下方，等待下一個交易日確認。',
+    };
+  }
 
   if (whipsawSignals || (sidewaysPrice && recentFlips >= 2)) {
     return {

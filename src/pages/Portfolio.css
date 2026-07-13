@@ -1254,6 +1254,12 @@ button.holding-quant-chip:hover {
   color: #991b1b;
 }
 
+.holding-trend-status-breakdown {
+  background: #fee2e2;
+  border-color: #ef4444;
+  color: #7f1d1d;
+}
+
 .pf-etf-info-overlay {
   position: fixed;
   inset: 0;

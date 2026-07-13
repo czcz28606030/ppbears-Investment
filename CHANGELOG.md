@@ -1,9 +1,17 @@
 # 📦 PPBears Investment — 更新日誌
 
-> **目前版本：v1.24.106**（2026-07-11）
-> 最新更新：交易視窗新增可選成交價格，留空使用收盤價，填寫後以自填價格記錄買入與賣出。
+> **目前版本：v1.24.107**（2026-07-13）
+> 最新更新：持股趨勢加入盤整跌破確認，避免已破位股票仍顯示盤整震盪。
 
 ---
+
+## [v1.24.107] - 2026-07-13
+### Added
+- Added a confirmed `跌破盤整` Portfolio trend state after two closes below the recent consolidation floor or one close at least 3% below it.
+
+### Changed
+- Changed trend classification priority so confirmed price breakdown and first-day weakening override historical AI signal whipsaws.
+- Sorted incoming daily prices before calculating trend status and bumped the Portfolio signal cache schema to invalidate stale classifications.
 
 ## [v1.24.106] - 2026-07-11
 ### Added
