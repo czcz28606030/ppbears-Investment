@@ -8,6 +8,7 @@ import { getCache, setCache, clearCache, getPersistentCache, setPersistentCache,
 import MarketBadge from '../components/MarketBadge';
 import IndustryIcon from '../components/IndustryIcon';
 import { canAutoRefreshPrices, formatPriceUpdateLabel, PRICE_AUTO_REFRESH_MS } from '../utils/priceAutoRefresh';
+import { prioritizeWatchlistForQuantLoad } from '../utils/watchlistLoadPriority';
 import './Watchlist.css';
 
 const WATCHLIST_FILTER_STORAGE_KEY = 'ppbears_watchlist_filters_v2';
@@ -763,6 +764,9 @@ export default function Watchlist() {
       }
 
       setLoadingStep(`正在同步最新 AI 訊號 0/${watchlist.length}...`);
+      const priorityQuantDataMap = quantDataMap;
+      const queue = prioritizeWatchlistForQuantLoad(watchlist, priorityQuantDataMap);
+
       setDataLoading(true);
       setQuantDataMap({});
       setSimonsRecMap({});
@@ -770,7 +774,6 @@ export default function Watchlist() {
       setQuantSyncingCodes(new Set(watchlistCodes));
 
       let completed = 0;
-      const queue = [...watchlist];
       const workerCount = Math.min(4, queue.length);
       async function runWorker() {
         while (queue.length > 0) {

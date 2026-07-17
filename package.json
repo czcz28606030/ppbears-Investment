@@ -1,12 +1,13 @@
 {
   "name": "ppbears-investment",
   "private": true,
-  "version": "1.24.107",
+  "version": "1.24.108",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
     "test:trend": "node --test --test-isolation=none --experimental-strip-types src/utils/trendStatus.test.ts",
+    "test:watchlist-priority": "node --test --test-isolation=none --experimental-strip-types src/utils/watchlistLoadPriority.test.ts",
     "lint": "eslint .",
     "preview": "vite preview"
   },
