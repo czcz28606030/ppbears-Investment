@@ -104,6 +104,29 @@
 /* User balance display */
 .admin-user-balance { font-size: 13px; color: var(--text-secondary); margin-top: 2px; font-weight: 600; }
 
+.admin-user-realized {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 6px;
+  margin-top: 5px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.admin-user-realized-value { font-size: 13px; font-weight: 800; }
+.admin-user-realized-return { margin-left: 3px; }
+.admin-user-realized-detail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--text-tertiary);
+  font-weight: 600;
+}
+.admin-user-realized-detail strong { font-weight: 800; }
+.admin-user-realized-status { margin-top: 5px; font-size: 12px; font-weight: 700; color: var(--text-tertiary); }
+.admin-user-realized-status.error { color: var(--action-dark); }
+
 .admin-holdings-summary {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

@@ -4,6 +4,7 @@ import { useStore, formatMoney, formatPrice } from '../store';
 import { supabase } from '../supabase';
 import { fetchTWSEAllStocks, type TWSTEStockQuote } from '../api';
 import type { UserAccount, FeatureOverride, Trade, TradeAttachment } from '../types';
+import { calculateRealizedTradeStats, type RealizedTradeInput, type RealizedTradeStats } from '../utils/tradeRealizedStats';
 import './AdminDashboard.css';
 
 const FEATURE_KEYS = [
@@ -35,6 +36,12 @@ type AttachmentStorageSummary = {
   expiredBytes: number;
   oldestCreatedAt: string | null;
 };
+type AdminTradeStatRow = RealizedTradeInput & {
+  userId: string;
+};
+
+const ADMIN_TRADE_STATS_PAGE_SIZE = 1000;
+const EMPTY_REALIZED_TRADE_STATS = calculateRealizedTradeStats([]);
 
 function getAttachmentCutoff(retentionMonths: number): Date | null {
   if (!Number.isFinite(retentionMonths) || retentionMonths <= 0) return null;
@@ -55,6 +62,43 @@ function chunkList<T>(items: T[], size: number): T[][] {
   return chunks;
 }
 
+async function fetchAllAdminTradeStatRows(): Promise<AdminTradeStatRow[]> {
+  if (!supabase) throw new Error('Supabase client unavailable');
+  const rows: AdminTradeStatRow[] = [];
+
+  for (let from = 0; ; from += ADMIN_TRADE_STATS_PAGE_SIZE) {
+    const { data, error } = await supabase
+      .from('trades')
+      .select('id, user_id, stock_code, trade_type, total_amount, profit')
+      .order('id', { ascending: true })
+      .range(from, from + ADMIN_TRADE_STATS_PAGE_SIZE - 1);
+    if (error) throw error;
+
+    const page = data || [];
+    rows.push(...page.map(row => ({
+      userId: String(row.user_id || ''),
+      tradeType: String(row.trade_type || ''),
+      stockCode: String(row.stock_code || ''),
+      totalAmount: row.total_amount,
+      profit: row.profit,
+    })));
+    if (page.length < ADMIN_TRADE_STATS_PAGE_SIZE) break;
+  }
+
+  return rows.filter(row => row.userId);
+}
+
+function formatTradePercent(value: number | null, signed = false): string {
+  if (value === null || !Number.isFinite(value)) return '--';
+  const prefix = signed && value > 0 ? '+' : '';
+  return `${prefix}${value.toFixed(1)}%`;
+}
+
+function getProfitTextClass(value: number): string {
+  if (value > 0) return 'text-profit';
+  if (value < 0) return 'text-loss';
+  return '';
+}
 export default function AdminDashboard() {
   const navigate = useNavigate();
   const { user, allUsers, loadAllUsers, adminSetUserTier, adminDeleteUser, adminSetUserBalance,
@@ -64,6 +108,8 @@ export default function AdminDashboard() {
   const [allHoldings, setAllHoldings] = useState<any[]>([]);
   const [liveQuotes, setLiveQuotes] = useState<Record<string, TWSTEStockQuote>>({});
   const [adminLoading, setAdminLoading] = useState(true);
+  const [allTradeStatsRows, setAllTradeStatsRows] = useState<AdminTradeStatRow[]>([]);
+  const [tradeStatsStatus, setTradeStatsStatus] = useState<'loading' | 'success' | 'error'>('loading');
 
   const [search, setSearch] = useState('');
   const [balanceModal, setBalanceModal] = useState<{ userId: string; name: string; current: number } | null>(null);
@@ -226,6 +272,18 @@ export default function AdminDashboard() {
       })
       .catch(err => console.error('Failed to load admin prices:', err))
       .finally(() => setPricesLoading(false));
+
+    setTradeStatsStatus('loading');
+    void fetchAllAdminTradeStatRows()
+      .then(rows => {
+        setAllTradeStatsRows(rows);
+        setTradeStatsStatus('success');
+      })
+      .catch(err => {
+        console.error('Failed to load admin realized trade stats:', err);
+        setAllTradeStatsRows([]);
+        setTradeStatsStatus('error');
+      });
   }, [user]);
 
   useEffect(() => {
@@ -245,6 +303,18 @@ export default function AdminDashboard() {
     });
     return map;
   }, [allHoldings, liveQuotes]);
+
+  const realizedStatsByUser = useMemo(() => {
+    const grouped: Record<string, AdminTradeStatRow[]> = {};
+    allTradeStatsRows.forEach(row => {
+      grouped[row.userId] = grouped[row.userId] || [];
+      grouped[row.userId].push(row);
+    });
+    return Object.entries(grouped).reduce<Record<string, RealizedTradeStats>>((map, [userId, rows]) => {
+      map[userId] = calculateRealizedTradeStats(rows);
+      return map;
+    }, {});
+  }, [allTradeStatsRows]);
 
   const calculateUnrealizedPnL = useCallback((userId: string) => {
     return pnlMap[userId] || 0;
@@ -674,6 +744,7 @@ export default function AdminDashboard() {
           const parent = isChild ? allUsers.find(p => p.id === u.parentId) : null;
           const newsletterEnabled = isFeatureEnabled(u.id, 'daily_newsletter', u.tier);
           const holdingSummary = getHoldingSummary(u.id);
+          const realizedStats = realizedStatsByUser[u.id] || EMPTY_REALIZED_TRADE_STATS;
           
           return (
           <div key={u.id} className="admin-user-card" style={{ marginLeft: isChild ? 32 : 0, borderLeft: isChild ? '4px solid #FFA000' : 'none' }}>
@@ -704,6 +775,29 @@ export default function AdminDashboard() {
                     {holdingSummary.pnl >= 0 ? '+' : ''}{formatMoney(holdingSummary.pnl)}
                   </span>
                 </div>
+                {tradeStatsStatus === 'loading' && (
+                  <div className="admin-user-realized-status">📈 已實現統計讀取中...</div>
+                )}
+                {tradeStatsStatus === 'error' && (
+                  <div className="admin-user-realized-status error">⚠️ 已實現統計暫時無法讀取</div>
+                )}
+                {tradeStatsStatus === 'success' && (
+                  <>
+                    <div className="admin-user-realized">
+                      <span>📈 已實現：</span>
+                      <strong className={`admin-user-realized-value ${getProfitTextClass(realizedStats.realizedProfit)}`}>
+                        {realizedStats.realizedProfit > 0 ? '+' : ''}NT$ {formatMoney(realizedStats.realizedProfit)}
+                        <span className="admin-user-realized-return">（{formatTradePercent(realizedStats.realizedReturnPct, true)}）</span>
+                      </strong>
+                    </div>
+                    <div className="admin-user-realized-detail">
+                      <span>🏆 勝 <strong className={realizedStats.winCount > 0 ? 'text-profit' : ''}>{realizedStats.winCount}</strong></span>
+                      <span>敗 <strong className={realizedStats.lossCount > 0 ? 'text-loss' : ''}>{realizedStats.lossCount}</strong></span>
+                      <span>勝率 <strong>{formatTradePercent(realizedStats.winRatePct)}</strong></span>
+                      <span>{realizedStats.stockCount} 檔／{realizedStats.tradeCount} 筆</span>
+                    </div>
+                  </>
+                )}
                 <div className="admin-user-badges">
                   <span className={`admin-badge ${u.role === 'parent' ? 'badge-parent' : 'badge-child'}`}>
                     {u.role === 'parent' ? '👨‍👩‍👧主帳號' : '👶副帳號'}
