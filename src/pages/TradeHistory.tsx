@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore, formatMoney, formatPrice } from '../store';
 import type { Holding, Trade, TradeAttachment } from '../types';
+import { calculateRealizedTradeStats } from '../utils/tradeRealizedStats';
 import './TradeHistory.css';
 
 type RangeKey = '1W' | '1M' | '3M' | '6M' | '1Y' | 'ALL' | 'CUSTOM';
@@ -161,22 +162,9 @@ export default function TradeHistory() {
       .sort((a, b) => b.timestamp - a.timestamp)
   ), [rangeFilteredTrades, visibleTradeIds]);
 
-  const stats = useMemo(() => {
-    let netProfit = 0;
-    let winCount = 0;
-    let lossCount = 0;
-    let tradeCount = 0;
-    rangeFilteredTrades.forEach(t => {
-      if (!isStockTrade(t) || !visibleTradeIds.has(t.id)) return;
-      tradeCount += 1;
-      if (t.tradeType === 'sell' && t.profit !== undefined && t.profit !== null) {
-        netProfit += t.profit;
-        if (t.profit > 0) winCount += 1;
-        else if (t.profit < 0) lossCount += 1;
-      }
-    });
-    return { netProfit, winCount, lossCount, tradeCount };
-  }, [rangeFilteredTrades, visibleTradeIds]);
+  const stats = useMemo(() => calculateRealizedTradeStats(
+    rangeFilteredTrades.filter(t => visibleTradeIds.has(t.id))
+  ), [rangeFilteredTrades, visibleTradeIds]);
 
   const startEdit = (tradeId: string, currentNote: string | undefined) => {
     setEditingId(tradeId);
@@ -346,17 +334,17 @@ export default function TradeHistory() {
         </div>
       )}
 
-      <div className={`th-stats-card ${stats.netProfit >= 0 ? 'profit' : 'loss'}`}>
+      <div className={`th-stats-card ${stats.realizedProfit >= 0 ? 'profit' : 'loss'}`}>
         <div className="th-stats-main">
           <span className="th-stats-label">區間已實現損益</span>
-          <span className={`th-stats-value ${stats.netProfit >= 0 ? 'text-profit' : 'text-loss'}`}>
-            {stats.netProfit >= 0 ? '+' : ''}NT$ {formatMoney(stats.netProfit)}
+          <span className={`th-stats-value ${stats.realizedProfit >= 0 ? 'text-profit' : 'text-loss'}`}>
+            {stats.realizedProfit >= 0 ? '+' : ''}NT$ {formatMoney(stats.realizedProfit)}
           </span>
         </div>
         <div className="th-stats-sub">
           <span className="th-stats-win">勝 {stats.winCount} 筆</span>
           <span className="th-stats-loss">敗 {stats.lossCount} 筆</span>
-          <span className="th-stats-total">{visibleStockGroups.length} 檔・{stats.tradeCount} 筆</span>
+          <span className="th-stats-total">{stats.stockCount} 檔・{stats.tradeCount} 筆</span>
         </div>
       </div>
 
