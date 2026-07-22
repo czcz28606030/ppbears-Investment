@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build",
     "test:trend": "node --test --test-isolation=none --experimental-strip-types src/utils/trendStatus.test.ts",
     "test:watchlist-priority": "node --test --test-isolation=none --experimental-strip-types src/utils/watchlistLoadPriority.test.ts",
+    "test:trade-stats": "node --test --test-isolation=none --experimental-strip-types src/utils/tradeRealizedStats.test.ts",
     "lint": "eslint .",
     "preview": "vite preview"
   },
