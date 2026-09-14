@@ -1,10 +1,10 @@
 # Only application sources and build configuration belong in a deployment.
 *
-!src/
+!src
 !src/**
-!api/
+!api
 !api/**
-!public/
+!public
 !public/**
 !index.html
 !package.json
