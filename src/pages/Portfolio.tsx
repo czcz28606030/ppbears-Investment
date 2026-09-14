@@ -399,6 +399,8 @@ export default function Portfolio() {
   const [selectedTrade, setSelectedTrade] = useState<{ mode: 'buy' | 'sell'; holding: Holding } | null>(null);
   const [quantMeta, setQuantMeta] = useState<StockQuantMeta | null>(null);
   const [priceUpdatedLabel, setPriceUpdatedLabel] = useState('');
+  const [manualRefreshing, setManualRefreshing] = useState(false);
+  const manualRefreshRef = useRef(false);
   const [dailyDataVersion, setDailyDataVersion] = useState(() => getKnownDailyAiCacheVersion('portfolio') || '');
   const [enableCustomSignal, setEnableCustomSignal] = useState(() => {
     return localStorage.getItem('ppbears_custom_signal') === 'true';
@@ -409,7 +411,7 @@ export default function Portfolio() {
   const categoryClickBlockedRef = useRef(false);
   const [isDraggingCategoryTabs, setIsDraggingCategoryTabs] = useState(false);
   const filteredHoldings = holdings;
-  const isRefreshing = priceRefreshing || signalsLoading;
+  const isRefreshing = manualRefreshing || priceRefreshing || signalsLoading;
 
   const selectHoldingCategory = useCallback((categoryName: string) => {
     if (categoryClickBlockedRef.current) {
@@ -743,15 +745,12 @@ export default function Portfolio() {
     const signal = aiSignals[h.stockCode];
     let stockData = null as Awaited<ReturnType<typeof fetchStockData>>;
     if (!basePayload.chartPrices?.length || basePayload.open === null || basePayload.open === undefined) {
-      stockData = await withTimeout(fetchStockData(h.stockCode), 9000).catch(() => null);
+      stockData = await fetchStockData(h.stockCode).catch(() => null);
     }
 
     let quantData: StockQuantData | null = null;
     if (!signal?.aiRemark || !signal?.cumRet || signal?.chipPts === undefined) {
-      quantData = await withTimeout(
-        fetchStockQuantData(h.stockCode, holdingStartDates[h.stockCode]),
-        10000
-      ).catch(() => null);
+      quantData = await fetchStockQuantData(h.stockCode, holdingStartDates[h.stockCode]).catch(() => null);
     }
 
     const latestPrice = stockData?.prices?.[stockData.prices.length - 1];
@@ -979,19 +978,13 @@ export default function Portfolio() {
 
           let doneCount = 0;
           await Promise.all(holdings.map(async (h) => {
-            const tradingSignalsPromise = withTimeout(fetchStockTradingSignals(h.stockCode), 8000).catch(() => null);
-            const stockDataPromise = withTimeout(fetchStockData(h.stockCode), 9000).catch(() => null);
-            const quantData = await withTimeout(
-              fetchStockQuantData(h.stockCode, holdingStartDates[h.stockCode], { forceFresh }),
-              12000
-            ).catch(() => null);
+            const tradingSignalsPromise = fetchStockTradingSignals(h.stockCode).catch(() => null);
+            const stockDataPromise = fetchStockData(h.stockCode).catch(() => null);
+            const quantData = await fetchStockQuantData(h.stockCode, holdingStartDates[h.stockCode], { forceFresh }).catch(() => null);
             if (quantData?.meta) quantMetas.push(quantData.meta);
             let displayQuantData: StockQuantData | null = quantData;
             if (!displayQuantData?.aiQuanBackDataComment?.cum_ret) {
-              const liveQuantData = await withTimeout(
-                fetchStockQuantData(h.stockCode, undefined, { forceFresh: true }),
-                10000
-              ).catch(() => null);
+              const liveQuantData = await fetchStockQuantData(h.stockCode, undefined, { forceFresh: true }).catch(() => null);
               if (liveQuantData?.meta) quantMetas.push(liveQuantData.meta);
               if (liveQuantData?.aiQuanBackDataComment?.cum_ret || !displayQuantData) {
                 displayQuantData = liveQuantData;
@@ -1289,24 +1282,32 @@ export default function Portfolio() {
               title="手動檢查每日 AI 快取並更新價格"
               disabled={isRefreshing}
               onClick={async () => {
-                clearCache(CACHE_KEYS.PORTFOLIO_SIGNALS);
-                clearPersistentCache(PORTFOLIO_PERSISTENT_CACHE_KEY);
-                clearQuantSignalTTLCache();
-                setAiSignals({});
-                setSignalDataDate('');
-                setQuantMeta(null);
-                setLoadingProgress(0);
-                setLoadingMsg('正在手動檢查 Simons 每日資料...');
-                await refreshDailyAiCache(holdings.map(h => h.stockCode));
-                const latest = await fetchDailyAiCacheVersion();
-                if (latest?.version) {
-                  rememberDailyAiCacheVersion(latest.version, 'portfolio');
-                  setDailyDataVersion(latest.version);
-                  invalidateDailyMarketDataCaches();
+                if (manualRefreshRef.current) return;
+                manualRefreshRef.current = true;
+                setManualRefreshing(true);
+                try {
+                  clearCache(CACHE_KEYS.PORTFOLIO_SIGNALS);
+                  clearPersistentCache(PORTFOLIO_PERSISTENT_CACHE_KEY);
+                  clearQuantSignalTTLCache();
+                  setAiSignals({});
+                  setSignalDataDate('');
+                  setQuantMeta(null);
+                  setLoadingProgress(0);
+                  setLoadingMsg('正在手動檢查 Simons 每日資料...');
+                  await refreshDailyAiCache(holdings.map(h => h.stockCode));
+                  const latest = await fetchDailyAiCacheVersion();
+                  if (latest?.version) {
+                    rememberDailyAiCacheVersion(latest.version, 'portfolio');
+                    setDailyDataVersion(latest.version);
+                    invalidateDailyMarketDataCaches();
+                  }
+                  await runPriceRefresh(true, '正在重新抓取持股價格...');
+                  // 遞增 refreshKey 重新讀取每日 AI 快取。
+                  setRefreshKey(k => k + 1);
+                } finally {
+                  manualRefreshRef.current = false;
+                  setManualRefreshing(false);
                 }
-                await runPriceRefresh(true, '正在重新抓取持股價格...');
-                // 遞增 refreshKey 重新讀取每日 AI 快取。
-                setRefreshKey(k => k + 1);
               }}
             >
               {isRefreshing ? (

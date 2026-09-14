@@ -11,13 +11,6 @@ import IndustryIcon from '../components/IndustryIcon';
 import { canAutoRefreshPrices, formatPriceUpdateLabel, PRICE_AUTO_REFRESH_MS } from '../utils/priceAutoRefresh';
 import './Explore.css';
 
-function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null> {
-  return Promise.race([
-    promise,
-    new Promise<null>(resolve => window.setTimeout(() => resolve(null), ms)),
-  ]);
-}
-
 const DAILY_AI_CACHE_POLL_MS = 90 * 1000;
 const FULL_MARKET_PRICE_MAP_MIN_SIZE = 1000;
 
@@ -69,6 +62,8 @@ export default function Explore() {
   const [simonsMeta, setSimonsMeta] = useState<Record<string, any>>({}); // 保存原始 SimonsItem 供重新評分用
   const [quantMeta, setQuantMeta] = useState<StockQuantMeta | null>(null);
   const [priceUpdatedLabel, setPriceUpdatedLabel] = useState('');
+  const [manualRefreshing, setManualRefreshing] = useState(false);
+  const manualRefreshRef = useRef(false);
   const [dailyDataVersion, setDailyDataVersion] = useState(() => getKnownDailyAiCacheVersion('explore') || '');
   const resultRef = useRef<HTMLDivElement>(null);
   const forceFreshQuantRef = useRef(false);
@@ -105,7 +100,7 @@ export default function Explore() {
         setTwsePriceMap(cachedTwse);
         setHasLoadedFullMarketPriceMap(isFullMarketPriceMap(cachedTwse));
       } else if (forceFresh || canAutoRefreshPrices()) {
-        const map = await fetchOfficialPriceMap();
+        const map = await fetchOfficialPriceMap({ forceFresh });
         if (Object.keys(map).length > 0) {
           setTwsePriceMap(map);
           setHasLoadedFullMarketPriceMap(true);
@@ -252,10 +247,7 @@ export default function Explore() {
         while (queue.length > 0) {
           const item = queue.shift();
           if (!item || cancelled) return;
-          const result = await withTimeout(
-            fetchStockQuantData(item.rec.coid, undefined, { forceFresh: forceFreshQuantRef.current }),
-            12000
-          ).catch(() => null);
+          const result = await fetchStockQuantData(item.rec.coid, undefined, { forceFresh: forceFreshQuantRef.current }).catch(() => null);
           results[item.index] = result;
           if (!cancelled) {
             completed++;
@@ -400,23 +392,31 @@ export default function Explore() {
   }
 
   async function handleRefreshData() {
-    setSearchQuantLoading(false);
-    forceFreshQuantRef.current = true;
-    invalidateDailyMarketDataCaches();
-    clearQuantSignalTTLCache();
-    clearSimonsDataTTLCache();
-    const stockCodes = [
-      ...watchlist.map(item => item.stockCode),
-      ...holdings.map(item => item.stockCode),
-    ];
-    await refreshDailyAiCache(stockCodes);
-    const latest = await fetchDailyAiCacheVersion();
-    if (latest?.version) {
-      rememberDailyAiCacheVersion(latest.version, 'explore');
-      setDailyDataVersion(latest.version);
+    if (manualRefreshRef.current) return;
+    manualRefreshRef.current = true;
+    setManualRefreshing(true);
+    try {
+      setSearchQuantLoading(false);
+      forceFreshQuantRef.current = true;
       invalidateDailyMarketDataCaches();
+      clearQuantSignalTTLCache();
+      clearSimonsDataTTLCache();
+      const stockCodes = [
+        ...watchlist.map(item => item.stockCode),
+        ...holdings.map(item => item.stockCode),
+      ];
+      await refreshDailyAiCache(stockCodes);
+      const latest = await fetchDailyAiCacheVersion();
+      if (latest?.version) {
+        rememberDailyAiCacheVersion(latest.version, 'explore');
+        setDailyDataVersion(latest.version);
+        invalidateDailyMarketDataCaches();
+      }
+      await loadData(true);
+    } finally {
+      manualRefreshRef.current = false;
+      setManualRefreshing(false);
     }
-    loadData(true);
   }
 
   // Simons 每日推薦的收盤價 Map（用於與 TWSE/TPEx 日期比較，使用較新的）
@@ -931,7 +931,7 @@ export default function Explore() {
             className="explore-refresh-btn"
             title="重新抓取最新資料"
             onClick={handleRefreshData}
-            disabled={loading || quantLoading}
+            disabled={manualRefreshing || loading || quantLoading}
           >
             🔄 重新抓取
           </button>

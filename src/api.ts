@@ -1,3 +1,4 @@
+import { fetchMarketResponse } from './utils/marketRequest';
 import type { StockData, SimonsItem, StockQuote, StockRecommendation, AIAdvice, StockLiveAnalysis, StockTradingSignal } from './types';
 import { supabase } from './supabase';
 
@@ -91,7 +92,7 @@ export function getTTLRemaining(key: string): number {
 
 // 量化訊號快取 TTL：30 分鐘（盤中最多延遲 30 分鐘，避免錯過買賣訊號）
 const QUANT_SIGNAL_TTL_MS = 30 * 60 * 1000;
-const QUANT_SIGNAL_CACHE_VERSION = 'v5';
+const QUANT_SIGNAL_CACHE_VERSION = 'v6';
 // Simons 每日推薦由雲端每日 08:00 預抓；本機保存到隔天早上 10 點，手動刷新可再檢查一次。
 const getSimonsDataTtlMs = () => getMillisecondsUntilNextTaipeiHour(10);
 const OFFICIAL_PRICE_MAP_CACHE_KEY = 'ppbears_official_price_map_daily_7am_v2';
@@ -225,7 +226,7 @@ export async function refreshDailyAiCache(stockCodes: string[] = []): Promise<Da
   };
 
   try {
-    const simonsRes = await fetch(`/api/app-cache?type=simons&manual=${Date.now()}`, {
+    const simonsRes = await fetchMarketResponse(`/api/app-cache?type=simons&manual=${Date.now()}`, {
       cache: 'no-store',
       headers: { accept: 'application/json' },
     });
@@ -246,20 +247,28 @@ export async function refreshDailyAiCache(stockCodes: string[] = []): Promise<Da
 
   const sessionResult = supabase ? await supabase.auth.getSession().catch(() => null) : null;
   const token = sessionResult?.data.session?.access_token;
-  const responses = await Promise.all(uniqueCodes.map(async code => {
-    try {
-      const res = await fetch(`/api/app-cache?type=stock-quant-snapshot&coid=${encodeURIComponent(code)}&manual=${Date.now()}`, {
-        cache: 'no-store',
-        headers: {
-          accept: 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-      });
-      if (!res.ok) return false;
-      const payload = await res.json();
-      return Boolean(payload?.saved || payload?.skipped || payload?.data?.meta);
-    } catch {
-      return false;
+  const queue = [...uniqueCodes];
+  const responses: boolean[] = [];
+  await Promise.all(Array.from({ length: Math.min(4, queue.length) }, async () => {
+    while (queue.length > 0) {
+      const code = queue.shift()!;
+      responses.push(await (async () => {
+            try {
+              const res = await fetch(`/api/app-cache?type=stock-quant-snapshot&coid=${encodeURIComponent(code)}&manual=${Date.now()}`, {
+                cache: 'no-store',
+                signal: AbortSignal.timeout(20000),
+                headers: {
+                  accept: 'application/json',
+                  ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                },
+              });
+              if (!res.ok) return false;
+              const payload = await res.json();
+              return Boolean(payload?.saved || payload?.skipped || payload?.data?.meta);
+            } catch {
+              return false;
+            }
+      })());
     }
   }));
   result.snapshotOk = responses.filter(Boolean).length;
@@ -362,13 +371,18 @@ export async function fetchTWSEAllStocks(): Promise<TWSTEStockQuote[]> {
   }
 }
 
-export async function fetchOfficialPriceMap(): Promise<OfficialPriceMap> {
+export async function fetchOfficialPriceMap(options: { forceFresh?: boolean } = {}): Promise<OfficialPriceMap> {
+  if (options.forceFresh) {
+    clearOfficialPriceMapCache();
+    twseCache = null;
+    tpexCache = null;
+  }
   const cacheKey = OFFICIAL_PRICE_MAP_CACHE_KEY;
   const cached = getTTLCache<OfficialPriceMap>(cacheKey);
   if (cached) return cached;
 
   try {
-    const response = await fetch('/api/app-cache?type=official-prices');
+    const response = await fetchMarketResponse(`/api/app-cache?type=official-prices${options.forceFresh ? '&fresh=1' : ''}`);
     if (response.ok) {
       const json = await response.json();
       const prices = json?.prices as OfficialPriceMap | undefined;
@@ -841,7 +855,7 @@ export async function getFreshStockAnalysis(
 export async function fetchStockData(coid: string): Promise<StockData | null> {
   try {
     const url = `${IFALGO_BASE}/stock?coid=${coid}`;
-    const res = await fetch(url, { cache: 'no-store' });
+    const res = await fetchMarketResponse(url, { cache: 'no-store' }, { validate: data => Array.isArray(data?.data?.stock?.position?.prices) && data.data.stock.position.prices.length > 0 });
     const json = await res.json();
     if (json.data?.stock?.position) {
       return json.data.stock.position;
@@ -870,7 +884,7 @@ export async function fetchStockTradingSignals(coid: string): Promise<StockTradi
     const token = data.session?.access_token;
     if (!token) return null;
 
-    const res = await fetch(`/api/app-cache?type=stock-trading-signals&coid=${encodeURIComponent(coid)}`, {
+    const res = await fetchMarketResponse(`/api/app-cache?type=stock-trading-signals&coid=${encodeURIComponent(coid)}`, {
       cache: 'no-store',
       headers: {
         accept: 'application/json',
@@ -1112,118 +1126,6 @@ export async function fetchInstitutionCostData(coid: string): Promise<Institutio
   }
 }
 
-function normalizeSignalText(value: unknown): string {
-  return String(value ?? '').trim();
-}
-
-const BUY_SIGNAL_TEXTS = new Set(['進場', '加碼', '買進', 'buy', 'Buy', 'BUY']);
-const SELL_SIGNAL_TEXTS = new Set(['出場', '賣出', '減碼', 'sell', 'Sell', 'SELL']);
-
-function normalizeSignalDate(value: unknown): string {
-  const raw = normalizeSignalText(value).replace(/\//g, '-');
-  if (/^\d{8}$/.test(raw)) return `${raw.slice(0, 4)}-${raw.slice(4, 6)}-${raw.slice(6, 8)}`;
-  if (/^\d{4}-\d{2}-\d{2}/.test(raw)) return raw.slice(0, 10);
-  return raw;
-}
-
-function isOpenOutDate(outDate: string, inDate: string, today: string): boolean {
-  return !outDate || outDate === 'NA' || outDate === 'null' || outDate === '-' || outDate === inDate || outDate === today;
-}
-
-function getCurrentSignalForDataDate(tradingList: any[], dataDate: string): StockQuantData['currentSignal'] {
-  const targetDate = normalizeSignalDate(dataDate);
-  if (!targetDate || !Array.isArray(tradingList)) return 'neutral';
-
-  let hasBuyEvent = false;
-  let hasSellEvent = false;
-
-  for (const item of tradingList) {
-    const inDate = normalizeSignalDate(item?.in_date);
-    const outDate = normalizeSignalDate(item?.out_date);
-    const sig = normalizeSignalText(item?.sell_sig);
-
-    if (BUY_SIGNAL_TEXTS.has(sig) && inDate === targetDate) hasBuyEvent = true;
-    if (SELL_SIGNAL_TEXTS.has(sig) && (outDate || inDate) === targetDate) hasSellEvent = true;
-  }
-
-  if (hasSellEvent) return 'sell';
-  if (hasBuyEvent) return 'buy';
-  return 'neutral';
-}
-
-function buildSignalEventMap(tradingList: any[], sinceDate?: string): Map<string, 'buy' | 'sell' | 'neutral'> {
-  const today = _todayStr();
-  const eventMap = new Map<string, 'buy' | 'sell' | 'neutral'>();
-
-  const setEvent = (eventDate: string, signal: 'buy' | 'sell' | 'neutral') => {
-    if (!eventDate) return;
-    if (sinceDate && eventDate < sinceDate) return;
-
-    const current = eventMap.get(eventDate);
-    if (signal === 'sell' || (signal === 'buy' && current !== 'sell') || !current) {
-      eventMap.set(eventDate, signal);
-    }
-  };
-
-  for (const item of tradingList) {
-    const outDateRaw = normalizeSignalText(item?.out_date);
-    const inDateRaw = normalizeSignalText(item?.in_date);
-    const outDate = normalizeSignalDate(outDateRaw);
-    const inDate = normalizeSignalDate(inDateRaw);
-    const sig = normalizeSignalText(item?.sell_sig);
-    const hasOpenPosition = isOpenOutDate(outDateRaw, inDateRaw, today);
-
-    setEvent(inDate, 'buy');
-
-    if (!hasOpenPosition) {
-      if (sig === '中立') setEvent(outDate, 'neutral');
-      else setEvent(outDate || inDate, 'sell');
-    }
-  }
-
-  return eventMap;
-}
-
-function getSortedSignalEvents(tradingList: any[], sinceDate?: string) {
-  return [...buildSignalEventMap(tradingList, sinceDate).entries()]
-    .map(([eventDate, signal]) => ({ eventDate, signal }))
-    .sort((a, b) => a.eventDate.localeCompare(b.eventDate));
-}
-
-function calculateSignalStreak(tradingList: any[], sinceDate?: string): StockQuantData['signalStreak'] {
-  let activeSignal: 'buy' | 'sell' | null = null;
-  let count = 0;
-  const signalEvents = getSortedSignalEvents(tradingList, sinceDate);
-
-  for (const { signal } of signalEvents) {
-    if (signal === 'neutral') continue;
-    if (activeSignal === signal) count += 1;
-    else {
-      activeSignal = signal;
-      count = 1;
-    }
-  }
-
-  return { signal: activeSignal, count };
-}
-
-function calculateReentryAfterExit(tradingList: any[], sinceDate?: string): StockQuantData['reentryAfterExit'] {
-  let previousSignal: 'buy' | 'sell' | null = null;
-  let previousDate = '';
-  let latestReentry: StockQuantData['reentryAfterExit'] = null;
-
-  for (const { eventDate, signal } of getSortedSignalEvents(tradingList, sinceDate)) {
-    if (signal === 'neutral') continue;
-    if (signal === 'buy' && previousSignal === 'sell' && previousDate && eventDate > previousDate) {
-      latestReentry = { hasReentry: true, exitDate: previousDate, entryDate: eventDate };
-    }
-    previousSignal = signal;
-    previousDate = eventDate;
-  }
-
-  return previousSignal === 'buy' && latestReentry?.entryDate === previousDate ? latestReentry : null;
-}
-
 export async function fetchStockQuantData(coid: string, sinceDate?: string, options: { forceFresh?: boolean } = {}): Promise<StockQuantData> {
   const empty: StockQuantData = {
     aiQuanBackDataComment: null,
@@ -1247,7 +1149,7 @@ export async function fetchStockQuantData(coid: string, sinceDate?: string, opti
   const legacyCacheKey = sinceDate ? `ppbears_quant30_${coid}_${sinceDate}` : `ppbears_quant30_${coid}`;
   if (!options.forceFresh) {
     const cached = getTTLCache<StockQuantData>(cacheKey);
-    if (cached) return cached;
+    if (cached && cached.meta?.source !== 'empty') return cached;
   }
   try {
     const params = new URLSearchParams({ coid });
@@ -1257,16 +1159,16 @@ export async function fetchStockQuantData(coid: string, sinceDate?: string, opti
       params.set('type', 'stock-quant');
       const sessionResult = supabase ? await supabase.auth.getSession().catch(() => null) : null;
       const token = sessionResult?.data.session?.access_token;
-      const cloudRes = await fetch(`/api/app-cache?${params.toString()}`, {
+      const cloudRes = await fetchMarketResponse(`/api/app-cache?${params.toString()}`, {
         ...(options.forceFresh ? { cache: 'no-store' as RequestCache } : {}),
         headers: {
           accept: 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-      });
+      }, { timeoutMs: 30000 });
       if (cloudRes.ok) {
         const cloudData = await cloudRes.json();
-        if (cloudData?.data?.aiQuanBackDataComment !== undefined) {
+        if (!cloudData?.error && cloudData?.data?.meta?.source !== 'empty' && cloudData?.data?.aiQuanBackDataComment !== undefined) {
           const result = cloudData.data as StockQuantData;
           setTTLCache(cacheKey, result, QUANT_SIGNAL_TTL_MS);
           clearTTLCache(legacyCacheKey);
@@ -1274,43 +1176,10 @@ export async function fetchStockQuantData(coid: string, sinceDate?: string, opti
         }
       }
     } catch {
-      // Local/offline fallback below.
+      // Do not derive protected signals from the sanitized public stock endpoint.
     }
 
-    const url = `${IFALGO_BASE}/stock?coid=${coid}`;
-    const res = await fetch(url, { cache: 'no-store' });
-    const json = await res.json();
-    const stock = json.data?.stock;
-    const pos = stock?.position;
-    if (!stock) return empty;
-
-    const tradingList: any[] = stock.aiQuanBackDataTradingList || [];
-    const signalStreak = calculateSignalStreak(tradingList, sinceDate);
-    const reentryAfterExit = calculateReentryAfterExit(tradingList, sinceDate);
-    const dataDate = String(pos?.chipStability?.mdate || _todayStr());
-    const currentSignal = getCurrentSignalForDataDate(tradingList, dataDate);
-
-
-    const result: StockQuantData = {
-      aiQuanBackDataComment: stock.aiQuanBackDataComment ?? null,
-      chipStability: pos?.chipStability ?? null,
-      stockInfo: pos?.stockInfo ?? null,
-      currentSignal,
-      signalStreak,
-      reentryAfterExit,
-      meta: {
-        source: 'ifalgo-live',
-        dataDate,
-        fetchedAt: new Date().toISOString(),
-        fixedUpdateTime: AI_SYNC_LABEL,
-        scheduleLabel: AI_SYNC_SCHEDULE_LABEL,
-        cacheStatus: options.forceFresh ? 'fresh' : 'miss',
-      },
-    };
-    // 寫入 30 分鐘 TTL 快取
-    setTTLCache(cacheKey, result, QUANT_SIGNAL_TTL_MS);
-    clearTTLCache(legacyCacheKey);
-    return result;
+    return empty;
   } catch (err) {
     console.error('fetchStockQuantData error:', err);
     return empty;
@@ -1344,7 +1213,7 @@ export async function fetchSimonsData(
             ? `/api/app-cache?type=simons&manual=${Date.now()}`
             : `/api/app-cache?type=simons&read=${Date.now()}`
           : '/api/app-cache?type=simons';
-        const cloudRes = await fetch(cloudUrl, options.forceFresh ? { cache: 'no-store' } : undefined);
+        const cloudRes = await fetchMarketResponse(cloudUrl, options.forceFresh ? { cache: 'no-store' } : undefined);
         if (cloudRes.ok) {
           const cloudJson = await cloudRes.json();
           const cloudItems: SimonsItem[] = Array.isArray(cloudJson?.items) ? cloudJson.items : [];
@@ -1359,7 +1228,7 @@ export async function fetchSimonsData(
     }
 
     const url = `${IFALGO_BASE}/common/getSimonsData?searchDate=${d}&_t=${Date.now()}`;
-    const res = await fetch(url, { cache: 'no-store' });
+    const res = await fetchMarketResponse(url, { cache: 'no-store' });
     const json = await res.json();
     const items: SimonsItem[] = json.data?.dataItems || [];
     if (items.length > 0) {

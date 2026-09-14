@@ -1743,7 +1743,7 @@ export const useStore = create<InvestmentStore>((set, get) => ({
     //    雲端 map 可避開本機逐檔 proxy 502 時整批無法更新的問題。
     //    比較兩者日期，使用較新的那筆 → 解決官方 API 盤後延遲問題
     const [officialPriceMap, realtimePrices, stockDatas] = await Promise.all([
-      fetchOfficialPriceMap().catch((): OfficialPriceMap => ({})),
+      fetchOfficialPriceMap({ forceFresh: options.force }).catch((): OfficialPriceMap => ({})),
       isMarketOpen()
         ? Promise.all(holdings.map(h => fetchOfficialClosePrice(h.stockCode).catch((): OfficialClosePrice | null => null)))
         : Promise.resolve([] as Array<OfficialClosePrice | null>),

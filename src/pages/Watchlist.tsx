@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState, useRef, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore, formatPrice } from '../store';
 import { fetchOfficialClosePrice, fetchOfficialPriceMap, fetchSimonsData, fetchStockData, fetchStockQuantData, toRecommendation, fetchSimonsRecommendationCounts, refreshDailyAiCache, clearQuantSignalTTLCache, clearSimonsDataTTLCache, fetchDailyAiCacheVersion, getKnownDailyAiCacheVersion, rememberDailyAiCacheVersion, ensureDailyAiCacheVersion, fetchActiveEtfRadarMap, fetchUserMarketDailyCache } from '../api';
@@ -248,6 +248,8 @@ export default function Watchlist() {
   const [recommendationCounts, setRecommendationCounts] = useState<Record<string, number>>({});
   const [activeEtfMap, setActiveEtfMap] = useState<Record<string, ActiveEtfRadarItem>>({});
   const [priceUpdatedLabel, setPriceUpdatedLabel] = useState('');
+  const [manualRefreshing, setManualRefreshing] = useState(false);
+  const manualRefreshRef = useRef(false);
   const [dailyDataVersion, setDailyDataVersion] = useState(() => getKnownDailyAiCacheVersion('watchlist') || '');
 
   // 全域登入資料載入後若還沒有觀察名單，再補一次 DB 同步；避免進頁時重複查詢。
@@ -384,6 +386,9 @@ export default function Watchlist() {
   useEffect(() => {
     if (watchlist.length === 0) return;
 
+    let cancelled = false;
+    const cleanup = () => { cancelled = true; };
+
     // 只有今天且仍在 TTL 內的快取才直接使用；否則進頁自動重新分析。
     type WatchlistCacheData = {
       quotes: Record<string, { close: number; change: number }>;
@@ -411,7 +416,7 @@ export default function Watchlist() {
     const dataVersion = dailyDataVersion || getKnownDailyAiCacheVersion('watchlist');
     if (refreshKey === 0 && hasAiFeature && !dataVersion) {
       ensureDailyAiCacheVersion('watchlist', true).then(version => {
-        setDailyDataVersion(version || 'unversioned');
+        if (!cancelled) setDailyDataVersion(version || 'unversioned');
       });
     }
 
@@ -456,6 +461,7 @@ export default function Watchlist() {
     }
 
     async function refreshMissingCacheData(baseCache: WatchlistCacheData) {
+      if (cancelled) return;
       const missingKlineCodes = getMissingKlineCodes(baseCache.klineMap, watchlistCodes);
       const needsRecommendation = hasAiFeature && watchlistCodes.some(code => !baseCache.simonsRecMap?.[code]);
       if (missingKlineCodes.length === 0 && !needsRecommendation) return;
@@ -477,6 +483,7 @@ export default function Watchlist() {
       const fetchedRows = await Promise.all(
         missingKlineCodes.map(code => fetchStockData(code).catch(() => null))
       );
+      if (cancelled) return;
       const mergedQuotes = { ...(baseCache.quotes || {}) };
       const mergedIndustry = { ...(baseCache.industryMap || {}) };
       const mergedKline = { ...(baseCache.klineMap || {}) };
@@ -502,7 +509,8 @@ export default function Watchlist() {
       const mergedRec = { ...(baseCache.simonsRecMap || {}) };
       if (needsRecommendation) {
         const simonsItems = await fetchSimonsData(undefined, { forceFresh: false }).catch(() => []);
-        const simonsItemMap: Record<string, SimonsItem> = {};
+        if (cancelled) return;
+      const simonsItemMap: Record<string, SimonsItem> = {};
         simonsItems.forEach(item => { simonsItemMap[item.coid] = item; });
         watchlist.forEach(item => {
           if (mergedRec[item.stockCode]) return;
@@ -538,6 +546,7 @@ export default function Watchlist() {
         _dataVersion: dataVersion || baseCache._dataVersion,
       };
 
+      if (cancelled) return;
       setLiveQuotes(mergedQuotes);
       setIndustryMap(mergedIndustry);
       setKlineMap(mergedKline);
@@ -555,6 +564,7 @@ export default function Watchlist() {
         fetchUserMarketDailyCache<WatchlistCacheData>('watchlist'),
         WATCHLIST_CLOUD_CACHE_TIMEOUT_MS
       );
+      if (cancelled) return true;
       if (!cloud?.payload) return false;
       const payload = cloud.payload;
       if (
@@ -602,7 +612,7 @@ export default function Watchlist() {
         setCache(cacheKey, normalizedCache, refreshSlot.ttlMs);
         setPersistentCache(WATCHLIST_PERSISTENT_CACHE_KEY, normalizedCache, refreshSlot.ttlMs, refreshSlot.key);
         refreshMissingCacheData(normalizedCache).catch(() => {});
-        return;
+        return cleanup;
       }
 
       setCache(cacheKey, normalizedCache, Math.min(WATCHLIST_STALE_FIRST_TTL_MS, refreshSlot.ttlMs));
@@ -613,10 +623,11 @@ export default function Watchlist() {
         .catch(() => {
           refreshMissingCacheData(normalizedCache).catch(() => {});
         });
-      return;
+      return cleanup;
     }
 
     async function fetchQuotesAndSignals() {
+      if (cancelled) return;
       setUsingWatchlistCache(false);
       setDataLoading(true);
       setLoadingStep(`正在抓取 ${watchlist.length} 支股票報價...`);
@@ -625,9 +636,9 @@ export default function Watchlist() {
       const forceFresh = refreshKey > 0;
 
       const cachedOfficialMap = getCache<Record<string, OfficialPriceMapEntry>>(CACHE_KEYS.TWSE_PRICE_MAP);
-      const shouldRefreshPrices = canAutoRefreshPrices();
+      const shouldRefreshPrices = forceFresh || canAutoRefreshPrices();
       const officialMapPromise = shouldRefreshPrices
-        ? fetchOfficialPriceMap().catch(() => cachedOfficialMap || {} as Record<string, OfficialPriceMapEntry>)
+        ? fetchOfficialPriceMap({ forceFresh }).catch(() => cachedOfficialMap || {} as Record<string, OfficialPriceMapEntry>)
         : Promise.resolve(cachedOfficialMap || {} as Record<string, OfficialPriceMapEntry>);
       const realtimeQuotesPromise = shouldRefreshPrices
         ? Promise.all(watchlist.map(w => fetchOfficialClosePrice(w.stockCode).catch((): OfficialClosePrice | null => null)))
@@ -639,6 +650,7 @@ export default function Watchlist() {
         officialMapPromise,
         realtimeQuotesPromise,
       ]);
+      if (cancelled) return;
       setMarketMap(officialMap);
 
       const quotes: Record<string, { close: number; change: number }> = {};
@@ -710,6 +722,7 @@ export default function Watchlist() {
 
       const simonsItems = await fetchSimonsData(undefined, { forceFresh }).catch(() => []);
 
+      if (cancelled) return;
       const simonsItemMap: Record<string, SimonsItem> = {};
       simonsItems.forEach((item) => {
         simonsItemMap[item.coid] = item;
@@ -721,6 +734,7 @@ export default function Watchlist() {
       setLoadingStep('正在分析 MA5 與量能訊號...');
       // 訊號 + 警告分析
       await checkWatchlistSignals(stockDataMap);
+      if (cancelled) return;
       setLiveQuotes(quotes);
       setDataLoading(false);
 
@@ -776,15 +790,13 @@ export default function Watchlist() {
       let completed = 0;
       const workerCount = Math.min(4, queue.length);
       async function runWorker() {
-        while (queue.length > 0) {
+        while (!cancelled && queue.length > 0) {
           const w = queue.shift();
           if (!w) return;
-          const qd = await withTimeout(
-            fetchStockQuantData(w.stockCode, undefined, { forceFresh }),
-            12000
-          ).catch(() => null);
+          const qd = await fetchStockQuantData(w.stockCode, undefined, { forceFresh }).catch(() => null);
+          if (cancelled) return;
 
-          if (qd) {
+          if (qd && qd.meta?.source !== 'empty') {
             nextQuantDataMap[w.stockCode] = qd;
             const simonsItem = simonsItemMap[w.stockCode];
             let rec: StockRecommendation | null = null;
@@ -819,6 +831,7 @@ export default function Watchlist() {
 
       await Promise.all(Array.from({ length: workerCount }, () => runWorker()));
 
+      if (cancelled) return;
       // 記錄分析完成時間
       const analyzedAt = formatAnalyzeTimestamp();
       const analyzedDate = getTodayString();
@@ -855,11 +868,13 @@ export default function Watchlist() {
         return undefined;
       })
       .catch((err) => {
+        if (cancelled) return;
         console.error('watchlist fetchQuotesAndSignals error:', err);
         setDataLoading(false);
         setQuotesLoading(false);
         setLoadingStep('資料讀取失敗，請稍後再試或手動重新抓取');
       });
+    return cleanup;
   }, [watchlist, refreshKey, checkWatchlistSignals, hasAiFeature, dailyDataVersion]);
 
   useEffect(() => {
@@ -1612,30 +1627,38 @@ export default function Watchlist() {
           <button
             className="wl-refresh-btn"
             title={hasAiFeature ? '手動檢查每日 AI 快取並更新價格' : '手動重新整理觀察資料'}
-            disabled={dataLoading}
+            disabled={manualRefreshing || dataLoading}
             onClick={async () => {
-              invalidateDailyMarketDataCaches();
-              clearSimonsDataTTLCache();
-              if (hasAiFeature) {
-                clearQuantSignalTTLCache();
-                setLoadingStep('正在手動檢查 Simons 每日資料...');
-                await refreshDailyAiCache(watchlist.map(item => item.stockCode));
-                const latest = await fetchDailyAiCacheVersion();
-                if (latest?.version) {
-                  rememberDailyAiCacheVersion(latest.version, 'watchlist');
-                  setDailyDataVersion(latest.version);
-                  invalidateDailyMarketDataCaches();
+              if (manualRefreshRef.current) return;
+              manualRefreshRef.current = true;
+              setManualRefreshing(true);
+              try {
+                invalidateDailyMarketDataCaches();
+                clearSimonsDataTTLCache();
+                if (hasAiFeature) {
+                  clearQuantSignalTTLCache();
+                  setLoadingStep('正在手動檢查 Simons 每日資料...');
+                  await refreshDailyAiCache(watchlist.map(item => item.stockCode));
+                  const latest = await fetchDailyAiCacheVersion();
+                  if (latest?.version) {
+                    rememberDailyAiCacheVersion(latest.version, 'watchlist');
+                    setDailyDataVersion(latest.version);
+                    invalidateDailyMarketDataCaches();
+                  }
                 }
+                // 重新讀取每日快取。
+                setLastAnalyzedAt(null);
+                setUsingWatchlistCache(false);
+                setLiveQuotes({});
+                setPriceUpdatedLabel('');
+                setKlineMap({});
+                setQuantDataMap({});
+                setSimonsRecMap({});
+                setRefreshKey(k => k + 1);
+              } finally {
+                manualRefreshRef.current = false;
+                setManualRefreshing(false);
               }
-              // 重新讀取每日快取。
-              setLastAnalyzedAt(null);
-              setUsingWatchlistCache(false);
-              setLiveQuotes({});
-              setPriceUpdatedLabel('');
-              setKlineMap({});
-              setQuantDataMap({});
-              setSimonsRecMap({});
-              setRefreshKey(k => k + 1);
             }}
           >
             🔄 重新抓取

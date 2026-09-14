@@ -710,7 +710,7 @@ async function getSanitizedIfalgoStock(coid: string) {
   const response = await fetchWithTimeout(`${IFALGO_BASE}/stock?coid=${encodeURIComponent(coid)}`, {
     headers: { accept: 'application/json' },
   }, 10000);
-  if (!response.ok) return { error: `IFAlgo HTTP ${response.status}` };
+  if (!response.ok) throw new Error(`IFAlgo HTTP ${response.status}`);
   const json = await response.json() as any;
   return sanitizeIfalgoStockPayload(json);
 }
@@ -725,7 +725,7 @@ async function getStockTradingSignals(coid: string) {
   const response = await fetchWithTimeout(`${IFALGO_BASE}/stock?coid=${encodeURIComponent(coid)}`, {
     headers: { accept: 'application/json' },
   }, 10000);
-  if (!response.ok) return { error: `IFAlgo HTTP ${response.status}` };
+  if (!response.ok) throw new Error(`IFAlgo HTTP ${response.status}`);
   const json = await response.json() as any;
   const stock = json?.data?.stock;
   const rows = Array.isArray(stock?.aiQuanBackDataTradingList) ? stock.aiQuanBackDataTradingList : [];
@@ -760,10 +760,10 @@ async function getStockTradingSignals(coid: string) {
 async function getStockQuantData(coid: string, sinceDate?: string) {
   if (!/^\d{4,6}$/.test(coid)) return emptyQuantData();
   const response = await fetchWithTimeout(`${IFALGO_BASE}/stock?coid=${coid}`, {}, 10000);
-  if (!response.ok) return emptyQuantData();
+  if (!response.ok) throw new Error(`IFAlgo HTTP ${response.status}`);
   const json = await response.json() as any;
   const stock = json?.data?.stock;
-  if (!stock) return emptyQuantData();
+  if (!stock) throw new Error('IFAlgo stock data unavailable');
   const dataDate = String(stock?.position?.chipStability?.mdate || todayTaipei());
   return {
     ...parseQuantData(stock, sinceDate, dataDate),
@@ -1602,8 +1602,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     return res.status(400).json({ error: 'Unknown cache type' });
   } catch (error) {
-    res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=300');
-    return res.status(200).json({
+    res.setHeader('Cache-Control', 'no-store, max-age=0');
+    return res.status(502).json({
       error: error instanceof Error ? error.message : String(error),
       data: type === 'stock-quant' ? emptyQuantData() : undefined,
       items: type === 'simons' ? [] : undefined,
