@@ -895,17 +895,6 @@
   box-shadow: inset 0 -6px 0 rgba(0, 0, 0, 0.08);
 }
 
-.signal-badge-historical {
-  background: linear-gradient(180deg, #e9edf2, #cbd2da);
-  box-shadow: inset 0 -6px 0 rgba(52, 65, 81, 0.12);
-}
-
-.signal-badge-historical .signal-badge-text {
-  color: #354052;
-  white-space: normal;
-  line-height: 1.15;
-}
-
 .holding-signal-date {
   margin-top: 3px;
   font-size: 11px;

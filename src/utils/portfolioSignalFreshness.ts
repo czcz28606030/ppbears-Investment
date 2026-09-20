@@ -28,17 +28,17 @@ export function getPortfolioSignalPresentation(
   if (source === 'empty' || !asOf || !quoteDate) {
     return {
       status: 'unverified',
-      badgeLabel: 'AI 訊號待核對',
+      badgeLabel: 'AI 中立',
       dateLabel: source !== 'empty' && asOf
-        ? `IFAlgo 訊號日期 ${asOf}；官方價格日期待核對`
-        : '無可驗證的 IFAlgo 訊號日期',
+        ? `IFAlgo 訊號日期 ${asOf}；官方價格日期待核對，AI 中立為預設顯示`
+        : 'IFAlgo 無可用訊號；AI 中立為預設顯示',
     };
   }
   if (asOf < quoteDate) {
     return {
       status: 'historical',
-      badgeLabel: `歷史 ${primaryLabel}`,
-      dateLabel: `截至 ${asOf}；官方價格至 ${quoteDate}`,
+      badgeLabel: 'AI 中立',
+      dateLabel: `IFAlgo 截至 ${asOf}；官方價格至 ${quoteDate}。資料未更新，AI 中立為預設顯示`,
     };
   }
   return {

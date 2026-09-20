@@ -1172,6 +1172,7 @@ export default function Portfolio() {
   const dataDateLabel = quantMeta?.dataDate ? quantMeta.dataDate.replace(/-/g, '/') : '同步中';
   const hasNonCurrentAiSignals = hasAiFeature && holdings.some(h => {
     const signal = aiSignals[h.stockCode];
+    if (!signal) return !signalsLoading;
     return Boolean(signal && getPortfolioSignalPresentation(
       signal.primaryLabel, signal.dataDate || '', marketMap[h.stockCode]?.date || '', signal.dataSource || 'empty',
     ).status !== 'current');
@@ -1462,7 +1463,9 @@ export default function Portfolio() {
                     signal.dataSource || 'empty',
                   )
                   : { status: 'current' as const, badgeLabel: signal.primaryLabel, dateLabel: '' }
-                : null;
+                : hasAiFeature && !signalsLoading
+                  ? getPortfolioSignalPresentation('AI 中立', '', marketMap[h.stockCode]?.date || '', 'empty')
+                  : null;
               const actionableSignal = signalPresentation?.status === 'current' ? signal : undefined;
               const memberQuantChips = hasAiFeature && actionableSignal ? renderMemberQuantChips(actionableSignal) : null;
               return (
@@ -1473,12 +1476,12 @@ export default function Portfolio() {
                 >
                   <div className="holding-main-row">
                     <div className="holding-left">
-                      {signal ? (
-                        <div className={`signal-badge signal-badge-${signalPresentation?.status === 'current' ? signal.primaryType : 'historical'}`} title={signalPresentation?.dateLabel}>
-                          <span className="signal-badge-icon">{signalPresentation?.status === 'current' ? signal.primaryIcon : '🕘'}</span>
-                          <span className="signal-badge-text">{signalPresentation?.badgeLabel}</span>
-                          {signalPresentation?.status === 'current' && signal.streakCount !== undefined && signal.streakCount > 1 && (
-                            <span className="signal-badge-count">X{signal.streakCount}</span>
+                      {signalPresentation ? (
+                        <div className={`signal-badge signal-badge-${actionableSignal?.primaryType || 'neutral'}`} title={signalPresentation.dateLabel}>
+                          <span className="signal-badge-icon">{actionableSignal?.primaryIcon || '⚖️'}</span>
+                          <span className="signal-badge-text">{signalPresentation.badgeLabel}</span>
+                          {actionableSignal?.streakCount !== undefined && actionableSignal.streakCount > 1 && (
+                            <span className="signal-badge-count">X{actionableSignal.streakCount}</span>
                           )}
                         </div>
                       ) : hasAiFeature ? (
