@@ -3,7 +3,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 const TAIPEI_OFFSET_MS = 8 * 60 * 60 * 1000;
 const WATCHLIST_CACHE_VERSION = 'score-fallback-kline-v4';
-const PORTFOLIO_CACHE_VERSION = 'portfolio-signal-rich-v2';
+const PORTFOLIO_CACHE_VERSION = 'portfolio-signal-rich-v5';
 const AI_SYNC_LABEL = '08:00 自動檢查；可手動重新抓取';
 const AI_SYNC_SCHEDULE_LABEL = 'AI訊號每日 08:00 檢查 Simons 完成狀態；手動重新抓取可再檢查一次；價格資料獨立更新';
 
@@ -369,6 +369,8 @@ function buildPortfolioPayload(rows: HoldingRow[], ctx: WarmContext) {
       aiRemark: quant.aiQuanBackDataComment?.remark,
       cumRet: quant.aiQuanBackDataComment?.cum_ret,
       chipPts: Number.isFinite(chipPts) ? chipPts : undefined,
+      dataDate: quant.meta?.source === 'empty' ? undefined : quant.meta?.dataDate,
+      dataSource: quant.meta?.source,
     };
   }
 

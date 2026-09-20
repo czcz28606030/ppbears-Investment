@@ -12,6 +12,7 @@ import type { TradeSnapshotPayload } from '../utils/tradeSnapshot';
 import { canAutoRefreshPrices, formatPriceUpdateLabel, PRICE_AUTO_REFRESH_MS } from '../utils/priceAutoRefresh';
 import { calculateAddPriority } from '../utils/addPriority';
 import { calculateTrendStatus, type TrendStatusResult } from '../utils/trendStatus';
+import { getPortfolioSignalPresentation } from '../utils/portfolioSignalFreshness';
 import './Portfolio.css';
 
 type PortfolioAiSignal = {
@@ -23,6 +24,8 @@ type PortfolioAiSignal = {
   cumRet?: string;
   chipPts?: number;
   trendStatus?: TrendStatusResult;
+  dataDate?: string;
+  dataSource?: string;
 };
 type ActiveEtfInfoDialog = {
   stockCode: string;
@@ -132,7 +135,7 @@ type FinMindPriceRow = {
 const PORTFOLIO_SIGNAL_TTL_MS = 18 * 60 * 60 * 1000;
 const PORTFOLIO_STALE_FIRST_TTL_MS = 3 * 60 * 1000;
 const PORTFOLIO_CLOUD_CACHE_TIMEOUT_MS = 900;
-const PORTFOLIO_SIGNAL_CACHE_SCHEMA = 'portfolio-signal-rich-v4';
+const PORTFOLIO_SIGNAL_CACHE_SCHEMA = 'portfolio-signal-rich-v5';
 const PORTFOLIO_PERSISTENT_CACHE_KEY = 'ppbears_portfolio_signals_v10';
 const DAILY_AI_CACHE_POLL_MS = 90 * 1000;
 const DATA_REFRESH_SCHEDULE = [
@@ -227,12 +230,15 @@ function getLatestQuantMeta(metas: StockQuantMeta[]): StockQuantMeta | null {
   return metas.sort((a, b) => new Date(b.fetchedAt).getTime() - new Date(a.fetchedAt).getTime())[0];
 }
 
-function getDataFreshness(meta: StockQuantMeta | null, loading: boolean, hasData: boolean, priceRefreshError: string | null) {
+function getDataFreshness(meta: StockQuantMeta | null, loading: boolean, hasData: boolean, priceRefreshError: string | null, hasNonCurrentAiSignals: boolean) {
   if (loading) {
     return { className: 'pf-data-freshness-updating', label: '正在讀取每日快取與更新價格' };
   }
   if (priceRefreshError) {
     return { className: 'pf-data-freshness-stale', label: priceRefreshError };
+  }
+  if (hasNonCurrentAiSignals) {
+    return { className: 'pf-data-freshness-stale', label: '部分 IFAlgo 訊號落後或日期待核對' };
   }
   if (!hasData) {
     return { className: 'pf-data-freshness-waiting', label: '等待 Simons 最新交易日資料' };
@@ -704,6 +710,7 @@ export default function Portfolio() {
   }
 
   function getPortfolioCautionLabel(signal?: PortfolioAiSignal) {
+    if (!signal) return 'AI 訊號待更新';
     const cumRetPct = parseReturnPct(signal?.cumRet);
     if (signal?.primaryType === 'sell') return '暫緩加碼';
     if (cumRetPct !== null && cumRetPct > 35) return '小心加碼';
@@ -711,8 +718,21 @@ export default function Portfolio() {
     return '小心加碼';
   }
 
+  function getActionableSignal(stockCode: string): PortfolioAiSignal | undefined {
+    const signal = aiSignals[stockCode];
+    if (!signal) return undefined;
+    if (!hasAiFeature) return signal;
+    const presentation = getPortfolioSignalPresentation(
+      signal.primaryLabel,
+      signal.dataDate || '',
+      marketMap[stockCode]?.date || '',
+      signal.dataSource || 'empty',
+    );
+    return presentation.status === 'current' ? signal : undefined;
+  }
+
   function getSnapshotContextForHolding(h: Holding): Partial<TradeSnapshotPayload> {
-    const signal = aiSignals[h.stockCode];
+    const signal = getActionableSignal(h.stockCode);
     const priority = getPortfolioAddPriority(h.stockCode, signal);
     const marketInfo = marketMap[h.stockCode];
     const rawChangeAmount = marketInfo?.change !== undefined && marketInfo?.change !== null
@@ -742,7 +762,7 @@ export default function Portfolio() {
   }
 
   async function preparePortfolioSnapshotContext(h: Holding, basePayload: TradeSnapshotPayload): Promise<Partial<TradeSnapshotPayload>> {
-    const signal = aiSignals[h.stockCode];
+    const signal = getActionableSignal(h.stockCode);
     let stockData = null as Awaited<ReturnType<typeof fetchStockData>>;
     if (!basePayload.chartPrices?.length || basePayload.open === null || basePayload.open === undefined) {
       stockData = await fetchStockData(h.stockCode).catch(() => null);
@@ -753,14 +773,17 @@ export default function Portfolio() {
       quantData = await fetchStockQuantData(h.stockCode, holdingStartDates[h.stockCode]).catch(() => null);
     }
 
+    const currentQuantData = quantData && getPortfolioSignalPresentation(
+      'AI 中立', quantData.meta?.dataDate || '', marketMap[h.stockCode]?.date || '', quantData.meta?.source || 'empty',
+    ).status === 'current' ? quantData : null;
     const latestPrice = stockData?.prices?.[stockData.prices.length - 1];
-    const quantChipPts = quantData?.chipStability?.pts !== undefined ? parseFloat(String(quantData.chipStability.pts)) : undefined;
+    const quantChipPts = currentQuantData?.chipStability?.pts !== undefined ? parseFloat(String(currentQuantData.chipStability.pts)) : undefined;
     const mergedSignal: PortfolioAiSignal = {
-      primaryLabel: signal?.primaryLabel || (quantData?.currentSignal === 'buy' ? 'AI 加碼' : quantData?.currentSignal === 'sell' ? 'AI 出場' : 'AI 中立'),
-      primaryType: signal?.primaryType || quantData?.currentSignal || 'neutral',
+      primaryLabel: signal?.primaryLabel || (currentQuantData?.currentSignal === 'buy' ? 'AI 加碼' : currentQuantData?.currentSignal === 'sell' ? 'AI 出場' : 'AI 中立'),
+      primaryType: signal?.primaryType || currentQuantData?.currentSignal || 'neutral',
       primaryIcon: signal?.primaryIcon || '⚖️',
-      aiRemark: signal?.aiRemark || quantData?.aiQuanBackDataComment?.remark,
-      cumRet: signal?.cumRet || quantData?.aiQuanBackDataComment?.cum_ret,
+      aiRemark: signal?.aiRemark || currentQuantData?.aiQuanBackDataComment?.remark,
+      cumRet: signal?.cumRet || currentQuantData?.aiQuanBackDataComment?.cum_ret,
       chipPts: signal?.chipPts ?? (Number.isFinite(quantChipPts) ? quantChipPts : undefined),
       trendStatus: signal?.trendStatus,
     };
@@ -781,7 +804,7 @@ export default function Portfolio() {
       cumulativeReturn: basePayload.cumulativeReturn || mergedSignal.cumRet || null,
       chipScore: basePayload.chipScore ?? mergedSignal.chipPts ?? null,
       chipLabel: basePayload.chipLabel || getChipLabel(mergedSignal.chipPts),
-      cautionLabel: basePayload.cautionLabel || getPortfolioCautionLabel(mergedSignal),
+      cautionLabel: signal || currentQuantData ? getPortfolioCautionLabel(mergedSignal) : 'AI 訊號待更新',
     };
   }
   function renderAddPriorityChip(stockCode: string, signal?: PortfolioAiSignal) {
@@ -1000,7 +1023,7 @@ export default function Portfolio() {
             let primaryType: 'buy' | 'sell' | 'neutral';
             let primaryIcon: string;
 
-            const signalSource = quantData || displayQuantData;
+            const signalSource = quantData && quantData.meta?.source !== 'empty' ? quantData : displayQuantData;
             const sig = signalSource?.currentSignal ?? 'neutral';
             if (sig === 'buy') {
               primaryLabel = 'AI 加碼'; primaryType = 'buy'; primaryIcon = '🚀';
@@ -1031,6 +1054,8 @@ export default function Portfolio() {
               cumRet: displayQuantData?.aiQuanBackDataComment?.cum_ret || fallbackCumRet,
               chipPts: Number.isFinite(chipPts) ? chipPts : undefined,
               trendStatus,
+              dataDate: signalSource?.meta?.source === 'empty' ? undefined : signalSource?.meta?.dataDate,
+              dataSource: signalSource?.meta?.source,
             };
             if (!hasRichAiSignal(signals[h.stockCode])) incompleteCodes.push(h.stockCode);
             doneCount++;
@@ -1145,7 +1170,13 @@ export default function Portfolio() {
 
   const dataUpdateLabel = quantMeta ? formatMetaDateTime(quantMeta.fetchedAt) : signalDataDate || '載入中...';
   const dataDateLabel = quantMeta?.dataDate ? quantMeta.dataDate.replace(/-/g, '/') : '同步中';
-  const dataFreshness = getDataFreshness(quantMeta, isRefreshing, Boolean(signalDataDate || quantMeta), priceRefreshError);
+  const hasNonCurrentAiSignals = hasAiFeature && holdings.some(h => {
+    const signal = aiSignals[h.stockCode];
+    return Boolean(signal && getPortfolioSignalPresentation(
+      signal.primaryLabel, signal.dataDate || '', marketMap[h.stockCode]?.date || '', signal.dataSource || 'empty',
+    ).status !== 'current');
+  });
+  const dataFreshness = getDataFreshness(quantMeta, isRefreshing, Boolean(signalDataDate || quantMeta), priceRefreshError, hasNonCurrentAiSignals);
 
   return (
     <div className="portfolio">
@@ -1422,20 +1453,31 @@ export default function Portfolio() {
               const itemIsProfit = itemPL >= 0;
               const isStopLossAlert = Number.isFinite(itemPLPct) && itemPLPct <= -20;
               const signal = aiSignals[h.stockCode];
-              const memberQuantChips = hasAiFeature ? renderMemberQuantChips(signal) : null;
+              const signalPresentation = signal
+                ? hasAiFeature
+                  ? getPortfolioSignalPresentation(
+                    signal.primaryLabel,
+                    signal.dataDate || '',
+                    marketMap[h.stockCode]?.date || '',
+                    signal.dataSource || 'empty',
+                  )
+                  : { status: 'current' as const, badgeLabel: signal.primaryLabel, dateLabel: '' }
+                : null;
+              const actionableSignal = signalPresentation?.status === 'current' ? signal : undefined;
+              const memberQuantChips = hasAiFeature && actionableSignal ? renderMemberQuantChips(actionableSignal) : null;
               return (
                 <div
                   key={h.stockCode}
-                  className={`holding-item${signal ? ` signal-${signal.primaryType}` : ''}${isStopLossAlert ? ' holding-item-stop-loss' : ''}`}
+                  className={`holding-item${actionableSignal ? ` signal-${actionableSignal.primaryType}` : ''}${isStopLossAlert ? ' holding-item-stop-loss' : ''}`}
                   onClick={() => navigate(`/stock/${h.stockCode}`)}
                 >
                   <div className="holding-main-row">
                     <div className="holding-left">
                       {signal ? (
-                        <div className={`signal-badge signal-badge-${signal.primaryType}`}>
-                          <span className="signal-badge-icon">{signal.primaryIcon}</span>
-                          <span className="signal-badge-text">{signal.primaryLabel}</span>
-                          {signal.streakCount !== undefined && signal.streakCount > 1 && (
+                        <div className={`signal-badge signal-badge-${signalPresentation?.status === 'current' ? signal.primaryType : 'historical'}`} title={signalPresentation?.dateLabel}>
+                          <span className="signal-badge-icon">{signalPresentation?.status === 'current' ? signal.primaryIcon : '🕘'}</span>
+                          <span className="signal-badge-text">{signalPresentation?.badgeLabel}</span>
+                          {signalPresentation?.status === 'current' && signal.streakCount !== undefined && signal.streakCount > 1 && (
                             <span className="signal-badge-count">X{signal.streakCount}</span>
                           )}
                         </div>
@@ -1456,13 +1498,18 @@ export default function Portfolio() {
                         <div className="holding-code-market-line">
                           <span className="holding-code">{h.stockCode}</span>
                         </div>
+                        {signalPresentation?.dateLabel && (
+                          <div className={`holding-signal-date${signalPresentation.status === 'current' ? '' : ' is-stale'}`}>
+                            {signalPresentation.dateLabel}
+                          </div>
+                        )}
                         <div className={`holding-rec-line${hasAiFeature ? ' holding-rec-line-quant' : ''}`}>
-                          {renderAddPriorityChip(h.stockCode, signal)}
-                          {renderTrendStatusChip(signal)}
+                          {actionableSignal && renderAddPriorityChip(h.stockCode, actionableSignal)}
+                          {actionableSignal && renderTrendStatusChip(actionableSignal)}
                           {renderActiveEtfRadarChip(h.stockCode, h.stockName)}
                           {memberQuantChips}
                           {!hasAiFeature && renderRecommendationCountBadge(h.stockCode)}
-                          {renderProfitLossLevelBadge(itemPLPct, signal)}
+                          {renderProfitLossLevelBadge(itemPLPct, actionableSignal)}
                         </div>
                       </div>
                     </div>
