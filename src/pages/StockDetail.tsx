@@ -1,6 +1,6 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { fetchStockData, fetchSimonsData, fetchStockQuantData, fetchInstitutionCostData, fetchStockQuantHistory, fetchStockTradingSignals, fetchSimonsInstitutionCostData, toRecommendation, POPULAR_STOCKS, fetchTWSEStockPrice, fetchTPEXStockPrice, getOrGenerateKidFriendlyDesc, fetchTWSEDividendYields, getFreshStockAnalysis, calculateSimonsScore, clearQuantSignalTTLCache, clearSimonsDataTTLCache, fetchDailyAiCacheVersion, getKnownDailyAiCacheVersion, rememberDailyAiCacheVersion, fetchActiveEtfRadarMap, fetchSimonsRecommendationCounts } from '../api';
+import { fetchStockData, fetchOfficialStockHistory, fetchSimonsData, fetchStockQuantData, fetchInstitutionCostData, fetchStockQuantHistory, fetchStockTradingSignals, fetchSimonsInstitutionCostData, toRecommendation, POPULAR_STOCKS, fetchTWSEStockPrice, fetchTPEXStockPrice, getOrGenerateKidFriendlyDesc, fetchTWSEDividendYields, getFreshStockAnalysis, calculateSimonsScore, clearQuantSignalTTLCache, clearSimonsDataTTLCache, fetchDailyAiCacheVersion, getKnownDailyAiCacheVersion, rememberDailyAiCacheVersion, fetchActiveEtfRadarMap, fetchSimonsRecommendationCounts } from '../api';
 import type { ActiveEtfRadarItem, InstitutionCostData, SimonsInstitutionCostData, StockQuantData, StockQuantHistoryPoint } from '../api';
 import type { TWSTEStockQuote, TPEXStockQuote } from '../api';
 import { useStore, formatPrice, formatMoney } from '../store';
@@ -11,6 +11,7 @@ import IndustryIcon from '../components/IndustryIcon';
 import StockTradeModal from '../components/StockTradeModal';
 import { invalidateDailyMarketDataCaches } from '../cache';
 import { calculateAddPriority } from '../utils/addPriority';
+import { getStockChartDataNote, limitSignalsToIfalgoDates, mergeStockChartPrices } from '../utils/officialStockHistory';
 import './StockDetail.css';
 
 type ChipHistoryDays = 30 | 60;
@@ -162,6 +163,8 @@ export default function StockDetail() {
   const { code } = useParams<{ code: string }>();
   const navigate = useNavigate();
   const [stockData, setStockData] = useState<StockData | null>(null);
+  const [officialChartPrices, setOfficialChartPrices] = useState<StockPrice[]>([]);
+  const [officialChartLoadFailed, setOfficialChartLoadFailed] = useState(false);
   const [recommendation, setRecommendation] = useState<StockRecommendation | null>(null);
   const [simonsMeta, setSimonsMeta] = useState<SimonsItem | null>(null); // 【NEW】保存原始 SimonsItem 以便重新評分
   const [latestPrice, setLatestPrice] = useState<StockPrice | null>(null);
@@ -369,6 +372,8 @@ export default function StockDetail() {
     setPageReleased(false);
     analysisRequestRef.current = { key: '', startedAt: 0 };
     setStockData(null);
+    setOfficialChartPrices([]);
+    setOfficialChartLoadFailed(false);
     setLatestPrice(null);
     setTwseQuote(null);
     setTpexQuote(null);
@@ -546,13 +551,33 @@ export default function StockDetail() {
         }
       }
 
-      if (twseRes && twseRes.ClosingPrice) {
+      let officialMarket: 'listed' | 'otc' | null = null;
+      if (twseRes) {
         // 上市股票：使用 TWSE 官方收盤價
         setTwseQuote(twseRes);
+        officialMarket = 'listed';
       } else {
         // 上櫃股票：fallback 到 TPEx 官方收盤價（不用 ifalgo，避免時序落差）
         const tpexRes = await fetchTPEXStockPrice(coid);
-        if (tpexRes && tpexRes.Close) setTpexQuote(tpexRes);
+        if (tpexRes) {
+          setTpexQuote(tpexRes);
+          officialMarket = 'otc';
+        }
+      }
+
+      if (officialMarket) {
+        const ifalgoLatestDate = stockRes?.prices?.at(-1)?.mdate || '';
+        const officialHistory = await fetchOfficialStockHistory(coid, officialMarket, ifalgoLatestDate);
+        if (officialHistory) {
+          setOfficialChartPrices(officialHistory.prices);
+          setOfficialChartLoadFailed(officialHistory.prices.length === 0);
+        } else {
+          setOfficialChartPrices([]);
+          setOfficialChartLoadFailed(true);
+        }
+      } else {
+        setOfficialChartPrices([]);
+        setOfficialChartLoadFailed(true);
       }
 
       // 殖利率資料（最新）
@@ -613,6 +638,19 @@ export default function StockDetail() {
         if (prices?.length > 0) {
           setLatestPrice(prices[prices.length - 1]);
         }
+      }
+      const market = twseQuote ? 'listed' : tpexQuote ? 'otc' : null;
+      if (market) {
+        const ifalgoLatestDate = stockRes?.prices?.at(-1)?.mdate || '';
+        const officialHistory = await fetchOfficialStockHistory(code, market, ifalgoLatestDate);
+        if (officialHistory) {
+          setOfficialChartPrices(officialHistory.prices);
+          setOfficialChartLoadFailed(officialHistory.prices.length === 0);
+        } else {
+          setOfficialChartLoadFailed(true);
+        }
+      } else {
+        setOfficialChartLoadFailed(true);
       }
     } finally {
       setChartRetrying(false);
@@ -800,8 +838,23 @@ export default function StockDetail() {
       ? 'otc' as const
       : null;
   const stockDisplayName = stockData?.stkname || twseQuote?.Name || tpexQuote?.CompanyName || '';
-  const chartPrices = Array.isArray(stockData?.prices) ? stockData.prices : [];
+  const ifalgoChartPrices = useMemo(
+    () => Array.isArray(stockData?.prices) ? stockData.prices : [],
+    [stockData?.prices],
+  );
+  const chartMerge = useMemo(
+    () => mergeStockChartPrices(ifalgoChartPrices, officialChartPrices),
+    [ifalgoChartPrices, officialChartPrices],
+  );
+  const chartPrices = chartMerge.prices;
+  const chartTradingSignals = useMemo(
+    () => limitSignalsToIfalgoDates(tradingSignals, ifalgoChartPrices),
+    [tradingSignals, ifalgoChartPrices],
+  );
   const hasChartPrices = chartPrices.length > 0;
+  const officialLatestDate = officialDate.length === 8
+    ? `${officialDate.slice(0, 4)}-${officialDate.slice(4, 6)}-${officialDate.slice(6, 8)}`
+    : '';
   const finmindFlowItems = institutionCostData?.finmind?.items || [];
   const formatFlowShares = (shares: number) => {
     const lots = Math.round(shares / 1000);
@@ -899,13 +952,15 @@ export default function StockDetail() {
       : belowInstitutionCosts.length === 1
         ? '現價貼近部分法人成本，適合搭配技術線圖確認是否有續航力。'
         : '現價已高於主要法人成本，代表市場先漲一段，追價前要更謹慎。';
+  const chartLatestLabel = chartMerge.chartLatestDate ? `至 ${chartMerge.chartLatestDate}` : '';
   const tvChartSubtitle = hasAiFeature
     ? tradingSignalLoading
-      ? '日K · MA5 · MA20 · 成交量 · 進出場訊號讀取中'
+      ? `日K ${chartLatestLabel} · MA5 · MA20 · 成交量 · 進出場訊號讀取中`
       : tradingSignalDate
-        ? `日K · MA5 · MA20 · 成交量 · IFAlgo訊號 ${tradingSignalDate}`
-        : '日K · MA5 · MA20 · 成交量 · 會員進出場訊號'
-    : '日K · MA5 · MA20 · 成交量';
+        ? `日K ${chartLatestLabel} · MA5 · MA20 · 成交量 · IFAlgo訊號 ${tradingSignalDate}`
+        : `日K ${chartLatestLabel} · MA5 · MA20 · 成交量 · 會員進出場訊號`
+    : `日K ${chartLatestLabel} · MA5 · MA20 · 成交量`;
+  const tvChartDataNote = getStockChartDataNote(chartMerge, officialLatestDate, officialChartLoadFailed);
   const tvChartSignalNote = hasAiFeature
     ? tradingSignalError
       ? tradingSignalError
@@ -1213,9 +1268,14 @@ export default function StockDetail() {
               </button>
             </div>
           </div>
+          {tvChartDataNote.text && (
+            <div className={`tv-chart-data-note ${tvChartDataNote.tone === 'info' ? 'is-supplemented' : 'is-warning'}`}>
+              {tvChartDataNote.text}
+            </div>
+          )}
           {hasAiFeature && tvChartSignalNote && (
             <div className={`tv-chart-signal-note ${tradingSignalError ? 'is-error' : ''}`}>
-              {!tradingSignalError && tradingSignals.length > 0 && (
+              {!tradingSignalError && chartTradingSignals.some(signal => signal.inDate || signal.outDate) && (
                 <span className="tv-chart-signal-legend">
                   <span><i className="tv-signal-arrow entry">↑</i>建立 / 加碼</span>
                   <span><i className="tv-signal-arrow exit">↓</i>出清 / 結束</span>
@@ -1229,7 +1289,7 @@ export default function StockDetail() {
               <StockChart
                 prices={chartPrices}
                 stockName={stockData?.stkname || stockDisplayName || code}
-                tradingSignals={hasAiFeature ? tradingSignals : undefined}
+                tradingSignals={hasAiFeature ? chartTradingSignals : undefined}
                 showMa5={showMa5}
                 showMa20={showMa20}
               />

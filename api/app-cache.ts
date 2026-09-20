@@ -11,6 +11,12 @@ import {
 } from '../src/server/newsletter-utils.js';
 import handleInstitutionCost from '../src/server/institution-cost.js';
 import { buildAndSaveUserMarketCaches } from '../src/server/user-market-cache.js';
+import {
+  getOfficialHistoryMonths,
+  isIsoCalendarDate,
+  normalizeTpexHistory,
+  normalizeTwseHistory,
+} from '../src/utils/officialStockHistory.js';
 
 const IFALGO_BASE = 'https://api.ifalgo.com.tw/frontapi';
 const TAIPEI_OFFSET_MS = 8 * 60 * 60 * 1000;
@@ -1495,6 +1501,46 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     if (type === 'warmup') return await handleWarmup(req, res);
     if (type === 'user-market-cache') return await handleUserMarketCache(req, res);
+    if (type === 'official-stock-history') {
+      res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=900');
+      const coid = String(req.query.coid || '').trim();
+      const market = String(req.query.market || '').trim();
+      const sinceDate = String(req.query.sinceDate || '').trim();
+      if (!/^\d{4,6}$/.test(coid)) return res.status(400).json({ error: 'Invalid coid' });
+      if (market !== 'listed' && market !== 'otc') return res.status(400).json({ error: 'Invalid market' });
+      if (sinceDate && !isIsoCalendarDate(sinceDate)) return res.status(400).json({ error: 'Invalid sinceDate' });
+
+      const months = getOfficialHistoryMonths(sinceDate, todayTaipei());
+      const monthlyPrices = await Promise.all(months.map(async month => {
+        const response = market === 'listed'
+          ? await fetchWithTimeout(`https://www.twse.com.tw/exchangeReport/STOCK_DAY?response=json&date=${month}&stockNo=${encodeURIComponent(coid)}`, {
+              headers: { accept: 'application/json' },
+            })
+          : await fetchWithTimeout(`https://www.tpex.org.tw/www/zh-tw/afterTrading/tradingStock?code=${encodeURIComponent(coid)}&date=${month.slice(0, 4)}/${month.slice(4, 6)}/01&response=json`, {
+              headers: { accept: 'application/json' },
+            });
+        if (!response.ok) return [];
+        const payload = await response.json();
+        return market === 'listed'
+          ? normalizeTwseHistory(coid, payload)
+          : normalizeTpexHistory(coid, payload);
+      }));
+      const priceByDate = new Map(
+        monthlyPrices.flat()
+          .filter(price => !sinceDate || price.mdate > sinceDate)
+          .map(price => [price.mdate, price]),
+      );
+      const prices = [...priceByDate.values()].sort((a, b) => a.mdate.localeCompare(b.mdate));
+      return res.status(200).json({
+        coid,
+        market,
+        sinceDate,
+        latestDate: prices.at(-1)?.mdate || '',
+        source: market === 'listed' ? 'twse-stock-day' : 'tpex-trading-stock',
+        prices,
+        generatedAt: new Date().toISOString(),
+      });
+    }
     if (type === 'ifalgo-stock') {
       res.setHeader('Cache-Control', 'no-store, max-age=0');
       const coid = String(req.query.coid || '').trim();

@@ -2,6 +2,12 @@ import { createClient } from '@supabase/supabase-js'
 import { defineConfig, loadEnv, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import * as fs from 'fs'
+import {
+  getOfficialHistoryMonths,
+  isIsoCalendarDate,
+  normalizeTpexHistory,
+  normalizeTwseHistory,
+} from './src/utils/officialStockHistory'
 
 const packageJson = JSON.parse(fs.readFileSync('./package.json', 'utf-8'))
 const IFALGO_BASE = 'https://api.ifalgo.com.tw/frontapi'
@@ -21,6 +27,16 @@ function sendJson(res: any, status: number, body: unknown) {
   res.setHeader('Content-Type', 'application/json; charset=utf-8')
   res.setHeader('Cache-Control', 'no-store')
   res.end(JSON.stringify(body))
+}
+
+async function fetchWithTimeout(url: string, init: RequestInit = {}, timeoutMs = 12000): Promise<Response> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    return await fetch(url, { ...init, signal: controller.signal })
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
 function isPremium(row: Pick<DevUserRow, 'tier' | 'is_admin' | 'subscription_expires_at'> | null): boolean {
@@ -97,6 +113,56 @@ function ppbearsDevApiPlugin(env: Record<string, string>): Plugin {
     configureServer(server) {
       server.middlewares.use(async (req, res, next) => {
         const url = new URL(req.url || '', 'http://127.0.0.1')
+
+        if (
+          req.method === 'GET'
+          && url.pathname === '/api/app-cache'
+          && url.searchParams.get('type') === 'official-stock-history'
+        ) {
+          const coid = String(url.searchParams.get('coid') || '').trim()
+          const market = String(url.searchParams.get('market') || '').trim()
+          const sinceDate = String(url.searchParams.get('sinceDate') || '').trim()
+          if (!/^\d{4,6}$/.test(coid)) return sendJson(res, 400, { error: 'Invalid coid' })
+          if (market !== 'listed' && market !== 'otc') return sendJson(res, 400, { error: 'Invalid market' })
+          if (sinceDate && !isIsoCalendarDate(sinceDate)) return sendJson(res, 400, { error: 'Invalid sinceDate' })
+
+          try {
+            const taipeiNow = new Date(Date.now() + 8 * 60 * 60 * 1000)
+            const today = `${taipeiNow.getUTCFullYear()}-${String(taipeiNow.getUTCMonth() + 1).padStart(2, '0')}-${String(taipeiNow.getUTCDate()).padStart(2, '0')}`
+            const months = getOfficialHistoryMonths(sinceDate, today)
+            const monthlyPrices = await Promise.all(months.map(async month => {
+              const upstream = market === 'listed'
+                ? await fetchWithTimeout(`https://www.twse.com.tw/exchangeReport/STOCK_DAY?response=json&date=${month}&stockNo=${encodeURIComponent(coid)}`, {
+                    headers: { accept: 'application/json' },
+                  })
+                : await fetchWithTimeout(`https://www.tpex.org.tw/www/zh-tw/afterTrading/tradingStock?code=${encodeURIComponent(coid)}&date=${month.slice(0, 4)}/${month.slice(4, 6)}/01&response=json`, {
+                    headers: { accept: 'application/json' },
+                  })
+              if (!upstream.ok) return []
+              const payload = await upstream.json()
+              return market === 'listed'
+                ? normalizeTwseHistory(coid, payload)
+                : normalizeTpexHistory(coid, payload)
+            }))
+            const priceByDate = new Map(
+              monthlyPrices.flat()
+                .filter(price => !sinceDate || price.mdate > sinceDate)
+                .map(price => [price.mdate, price]),
+            )
+            const prices = [...priceByDate.values()].sort((a, b) => a.mdate.localeCompare(b.mdate))
+            return sendJson(res, 200, {
+              coid,
+              market,
+              sinceDate,
+              latestDate: prices.at(-1)?.mdate || '',
+              source: market === 'listed' ? 'twse-stock-day' : 'tpex-trading-stock',
+              prices,
+              generatedAt: new Date().toISOString(),
+            })
+          } catch (err) {
+            return sendJson(res, 502, { error: err instanceof Error ? err.message : 'Official history fetch failed' })
+          }
+        }
 
         if (req.method === 'GET' && url.pathname === '/api/ifalgo/stock') {
           try {

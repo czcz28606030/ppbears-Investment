@@ -1,5 +1,5 @@
 import { fetchMarketResponse } from './utils/marketRequest';
-import type { StockData, SimonsItem, StockQuote, StockRecommendation, AIAdvice, StockLiveAnalysis, StockTradingSignal } from './types';
+import type { StockData, StockPrice, SimonsItem, StockQuote, StockRecommendation, AIAdvice, StockLiveAnalysis, StockTradingSignal } from './types';
 import { supabase } from './supabase';
 
 const IFALGO_BASE = '/api/ifalgo';
@@ -863,6 +863,37 @@ export async function fetchStockData(coid: string): Promise<StockData | null> {
     return null;
   } catch (err) {
     console.error('fetchStockData error:', err);
+    return null;
+  }
+}
+
+export type OfficialStockHistoryPayload = {
+  coid: string;
+  market: 'listed' | 'otc';
+  sinceDate: string;
+  latestDate: string;
+  source: 'twse-stock-day' | 'tpex-trading-stock';
+  prices: StockPrice[];
+  generatedAt: string;
+};
+
+export async function fetchOfficialStockHistory(
+  coid: string,
+  market: 'listed' | 'otc',
+  sinceDate = '',
+): Promise<OfficialStockHistoryPayload | null> {
+  try {
+    const params = new URLSearchParams({ type: 'official-stock-history', coid, market });
+    if (sinceDate) params.set('sinceDate', sinceDate);
+    const response = await fetch(`/api/app-cache?${params.toString()}`, {
+      cache: 'no-store',
+      headers: { accept: 'application/json' },
+    });
+    if (!response.ok) return null;
+    const payload = await response.json() as OfficialStockHistoryPayload;
+    return Array.isArray(payload?.prices) ? payload : null;
+  } catch (error) {
+    console.error('fetchOfficialStockHistory error:', error);
     return null;
   }
 }
