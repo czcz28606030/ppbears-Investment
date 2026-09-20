@@ -1,4 +1,4 @@
-import type { StockPrice, StockTradingSignal } from '../types';
+import type { StockPrice, StockTradingSignal } from '../types.js';
 
 export type OfficialMarket = 'listed' | 'otc';
 
@@ -140,7 +140,7 @@ export function mergeStockChartPrices(
   const sortedIfalgo = [...ifalgoPrices]
     .filter(price => Boolean(normalizeDate(price.mdate)))
     .sort((a, b) => normalizeDate(a.mdate).localeCompare(normalizeDate(b.mdate)));
-  const ifalgoLatestDate = normalizeDate(sortedIfalgo.at(-1)?.mdate || '');
+  const ifalgoLatestDate = normalizeDate(sortedIfalgo[sortedIfalgo.length - 1]?.mdate || '');
   const priceByDate = new Map<string, StockPrice>();
 
   for (const price of sortedIfalgo) {
@@ -156,7 +156,7 @@ export function mergeStockChartPrices(
   const prices = [...priceByDate.entries()]
     .sort(([dateA], [dateB]) => dateA.localeCompare(dateB))
     .map(([, price]) => price);
-  const chartLatestDate = normalizeDate(prices.at(-1)?.mdate || '');
+  const chartLatestDate = normalizeDate(prices[prices.length - 1]?.mdate || '');
   return {
     prices,
     ifalgoLatestDate,

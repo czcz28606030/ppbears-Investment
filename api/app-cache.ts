@@ -1535,7 +1535,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         coid,
         market,
         sinceDate,
-        latestDate: prices.at(-1)?.mdate || '',
+        latestDate: prices[prices.length - 1]?.mdate || '',
         source: market === 'listed' ? 'twse-stock-day' : 'tpex-trading-stock',
         prices,
         generatedAt: new Date().toISOString(),
