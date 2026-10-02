@@ -1,7 +1,7 @@
 {
   "name": "ppbears-investment",
   "private": true,
-  "version": "1.24.116",
+  "version": "1.24.117",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -14,7 +14,8 @@
     "test:trade-stats": "node --test --test-isolation=none --experimental-strip-types src/utils/tradeRealizedStats.test.ts",
     "test:supabase-migration": "node --test scripts/supabase-investment-migration/*.test.mjs",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:strategy": "node --test --test-isolation=none --experimental-strip-types src/utils/trendStrategy*.test.ts src/server/strategy-journal.test.cjs scripts/strategy-api.test.cjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.103.0",

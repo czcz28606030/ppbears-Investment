@@ -18,6 +18,13 @@ export type TradeSnapshotPayload = {
   low?: string | number | null;
   volume?: string | number | null;
   priceDate?: string;
+  strategyLabel?: string | null;
+  strategyReason?: string | null;
+  strategyDate?: string | null;
+  protectionPrice?: number | null;
+  addTriggerPrice?: number | null;
+  initialRisk?: number | null;
+  suggestedQuantity?: number | null;
   aiRecommendation?: string | null;
   aiSignalLabel?: string | null;
   addPriorityScore?: string | number | null;
@@ -50,19 +57,6 @@ function compact(value: string | number | null | undefined): string {
 function firstPart(value: string | null | undefined): string {
   const cleaned = String(value || '').split(',')[0]?.trim();
   return cleaned || '--';
-}
-
-function scoreDisplay(value: string | number | null | undefined, suffix = '分'): string {
-  if (value === null || value === undefined || value === '') return '--';
-  if (typeof value === 'number') return `${Number.isInteger(value) ? value.toFixed(0) : value.toFixed(1)}${suffix}`;
-  return String(value);
-}
-
-function chipDisplay(score: string | number | null | undefined, label?: string | null): string {
-  const scoreText = scoreDisplay(score, '分');
-  const cleanLabel = String(label || '').replace(/[🏆✨👍⚠️🔴]/g, '').trim();
-  if (scoreText === '--') return cleanLabel || '--';
-  return cleanLabel ? `${scoreText} ${cleanLabel}` : scoreText;
 }
 
 function shareDisplay(value: number | null | undefined): string {
@@ -238,7 +232,7 @@ export async function createTradeSnapshotWebp(payload: TradeSnapshotPayload): Pr
   text(ctx, tradeLabel, 879, 125, { size: 30, weight: '900', color: '#fff', align: 'center' });
   text(ctx, date, 104, 188, { size: 25, color: '#8a7c70', weight: '800' });
   drawPill(ctx, marketIndustry, 104, 210, 344, '#dcfce7', '#047857');
-  drawPill(ctx, compact(payload.aiSignalLabel), 468, 210, 230, '#eef2ff', '#4338ca');
+  drawPill(ctx, compact(payload.strategyLabel), 468, 210, 230, '#eef2ff', '#4338ca');
 
   text(ctx, money(payload.price), 104, 314, { size: 74, weight: '900' });
   text(
@@ -261,19 +255,19 @@ export async function createTradeSnapshotWebp(payload: TradeSnapshotPayload): Pr
   drawMetric(ctx, '最低', compact(payload.low), 552, 410, 204, '#16a34a');
   drawMetric(ctx, '成交量', compact(payload.volume), 776, 410, 200);
 
-  drawMetric(ctx, 'AI推薦度', compact(payload.aiRecommendation), 104, 548, 276, '#b91c1c');
-  drawMetric(ctx, '股票本質分數', scoreDisplay(payload.stockEssenceScore), 402, 548, 276, '#7b2cbf');
-  drawMetric(ctx, '累積報酬率', compact(payload.cumulativeReturn), 700, 548, 276, '#0f766e');
+  drawMetric(ctx, '保護線', compact(payload.protectionPrice), 104, 548, 276, '#b91c1c');
+  drawMetric(ctx, '2R 加碼門檻', compact(payload.addTriggerPrice), 402, 548, 276, '#7b2cbf');
+  drawMetric(ctx, '首次風險 R', compact(payload.initialRisk), 700, 548, 276, '#0f766e');
 
   drawChart(ctx, payload.chartPrices, 104, 676, 872, 390);
 
   drawInfoCard(ctx, 'AI狀態', compact(payload.aiSignalLabel), 104, 1096, 204, '#4338ca');
-  drawInfoCard(ctx, '加碼時機', payload.addPriorityScore != null ? `${compact(payload.addPriorityScore)}分` : '--', 328, 1096, 204, '#c2410c');
-  drawInfoCard(ctx, '判讀', compact(payload.addPriorityLabel), 552, 1096, 204, '#9a3412');
-  drawInfoCard(ctx, '風險提醒', compact(payload.cautionLabel), 776, 1096, 200, '#dc2626');
+  drawInfoCard(ctx, '訊號資料日', compact(payload.strategyDate), 328, 1096, 204, '#c2410c');
+  drawInfoCard(ctx, '建議股數', payload.suggestedQuantity == null ? '--' : shareDisplay(payload.suggestedQuantity), 552, 1096, 204, '#9a3412');
+  drawInfoCard(ctx, '策略執行', '不自動下單', 776, 1096, 200, '#dc2626');
 
-  drawInfoCard(ctx, '市場/產業', marketIndustry, 104, 1202, 276, '#047857');
-  drawInfoCard(ctx, '籌碼', chipDisplay(payload.chipScore, payload.chipLabel), 402, 1202, 276, '#0f766e');
+  drawInfoCard(ctx, '訊號原因', compact(payload.strategyReason), 104, 1202, 574, '#047857');
+
   drawInfoCard(ctx, `${tradeLabel}股數`, shareDisplay(payload.quantity), 700, 1202, 276, tradeColor);
 
   return new Promise((resolve, reject) => {

@@ -9,8 +9,9 @@ import {
   HistogramSeries,
   createSeriesMarkers,
 } from 'lightweight-charts';
-import type { IChartApi, SeriesMarker } from 'lightweight-charts';
-import type { StockPrice, StockTradingSignal } from '../types';
+import type { IChartApi, SeriesMarker, CandlestickData, LineData, HistogramData, Time } from 'lightweight-charts';
+import type { StockPrice } from '../types';
+import type { StrategyEvent } from '../utils/trendStrategy';
 
 // ── Error Boundary ──────────────────────────────────
 class ChartErrorBoundary extends Component<
@@ -36,9 +37,10 @@ class ChartErrorBoundary extends Component<
 interface StockChartProps {
   prices: StockPrice[];
   stockName: string;
-  tradingSignals?: StockTradingSignal[];
+  strategyEvents?: StrategyEvent[];
   showMa5?: boolean;
   showMa20?: boolean;
+  visibleBars?: number;
 }
 
 function toDateStr(mdate: string): string {
@@ -55,51 +57,36 @@ function formatChartDate(time: unknown, withYear = false): string {
   const raw = typeof time === 'string'
     ? time
     : typeof time === 'object' && time !== null && 'year' in time
-      ? `${(time as any).year}-${String((time as any).month).padStart(2, '0')}-${String((time as any).day).padStart(2, '0')}`
+      ? `${(time as { year: number; month: number; day: number }).year}-${String((time as { year: number; month: number; day: number }).month).padStart(2, '0')}-${String((time as { year: number; month: number; day: number }).day).padStart(2, '0')}`
       : '';
   const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (!match) return String(time ?? '');
   return withYear ? `${match[1]}/${match[2]}/${match[3]}` : `${match[2]}/${match[3]}`;
 }
 
-const SELL_SIGNAL_TEXTS = new Set(['出場', '賣出', '減碼', 'sell', 'Sell', 'SELL']);
-
-function buildTradingSignalMarkers(
-  tradingSignals: StockTradingSignal[] | undefined,
-  availableDates: Set<string>
-): SeriesMarker<string>[] {
-  if (!tradingSignals?.length) return [];
-
-  const signalByDate = new Map<string, 'buy' | 'sell'>();
-
-  for (const signal of tradingSignals) {
-    if (signal.inDate && availableDates.has(signal.inDate)) {
-      if (!signalByDate.has(signal.inDate)) {
-        signalByDate.set(signal.inDate, 'buy');
-      }
-    }
-
-    if (signal.outDate && availableDates.has(signal.outDate) && SELL_SIGNAL_TEXTS.has(signal.signal)) {
-      signalByDate.set(signal.outDate, 'sell');
-    }
-  }
-
-  return Array.from(signalByDate.entries())
-    .map(([time, signal]) => ({
-      time,
-      position: signal === 'buy' ? 'belowBar' : 'aboveBar',
-      color: signal === 'buy' ? '#8b5cf6' : '#111827',
-      shape: signal === 'buy' ? 'arrowUp' : 'arrowDown',
-    } satisfies SeriesMarker<string>))
-    .sort((a, b) => String(a.time).localeCompare(String(b.time)));
+function buildStrategyEventMarkers(events: StrategyEvent[] | undefined, availableDates: Set<string>): SeriesMarker<string>[] {
+  const styles = {
+    entry: { color: '#7c3aed', text: '進場', position: 'belowBar', shape: 'arrowUp' },
+    add: { color: '#2563eb', text: '加碼', position: 'belowBar', shape: 'arrowUp' },
+    reduce: { color: '#d97706', text: '減碼', position: 'aboveBar', shape: 'arrowDown' },
+    exit: { color: '#111827', text: '出場', position: 'aboveBar', shape: 'arrowDown' },
+  } as const;
+  const seen = new Set<string>();
+  return (events || []).filter(event => {
+    const key = `${event.date}:${event.action}`;
+    if (!availableDates.has(event.date) || seen.has(key) || !styles[event.action]) return false;
+    seen.add(key);
+    return true;
+  }).map(event => ({ time: event.date, ...styles[event.action] }))
+    .sort((a, b) => a.time.localeCompare(b.time));
 }
-
 const StockChartInner = memo(function StockChartInner({
   prices,
   stockName,
-  tradingSignals,
+  strategyEvents,
   showMa5 = true,
   showMa20 = true,
+  visibleBars = 130,
 }: StockChartProps) {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -188,10 +175,10 @@ const StockChartInner = memo(function StockChartInner({
         wickUpColor: '#dc2626',
         wickDownColor: '#16a34a',
       });
-      candleSeries.setData(uniqueCandles as any);
+      candleSeries.setData(uniqueCandles as CandlestickData<Time>[]);
 
-      const tradingMarkers = buildTradingSignalMarkers(
-        tradingSignals,
+      const tradingMarkers = buildStrategyEventMarkers(
+        strategyEvents,
         new Set(uniqueCandles.map(candle => candle.time))
       );
       if (tradingMarkers.length > 0) {
@@ -216,7 +203,7 @@ const StockChartInner = memo(function StockChartInner({
           lastValueVisible: false,
           crosshairMarkerVisible: false,
         });
-        ma5Series.setData(ma5 as any);
+        ma5Series.setData(ma5 as LineData<Time>[]);
       }
 
       // MA20 均線（紫色）
@@ -234,7 +221,7 @@ const StockChartInner = memo(function StockChartInner({
           lastValueVisible: false,
           crosshairMarkerVisible: false,
         });
-        ma20Series.setData(ma20 as any);
+        ma20Series.setData(ma20 as LineData<Time>[]);
       }
 
       // 成交量 histogram
@@ -260,15 +247,15 @@ const StockChartInner = memo(function StockChartInner({
         volSeries.priceScale().applyOptions({
           scaleMargins: { top: 0.8, bottom: 0 },
         });
-        volSeries.setData(uniqueVol as any);
+        volSeries.setData(uniqueVol as HistogramData<Time>[]);
       }
 
       // 預設顯示最近半年（約 130 個交易日）
-      const HALF_YEAR_BARS = 130;
-      if (uniqueCandles.length > HALF_YEAR_BARS) {
+      const HALF_YEAR_BARS = visibleBars;
+      if (HALF_YEAR_BARS > 0 && uniqueCandles.length > HALF_YEAR_BARS) {
         const fromDate = uniqueCandles[uniqueCandles.length - HALF_YEAR_BARS].time;
         const toDate = uniqueCandles[uniqueCandles.length - 1].time;
-        chart.timeScale().setVisibleRange({ from: fromDate, to: toDate } as any);
+        chart.timeScale().setVisibleRange({ from: fromDate as Time, to: toDate as Time });
       } else {
         chart.timeScale().fitContent();
       }
@@ -290,22 +277,23 @@ const StockChartInner = memo(function StockChartInner({
     } catch (err) {
       console.warn('[StockChart] chart creation error:', err);
     }
-  }, [prices, stockName, tradingSignals, showMa5, showMa20]);
+  }, [prices, stockName, strategyEvents, showMa5, showMa20, visibleBars]);
 
   return <div ref={chartContainerRef} style={{ width: '100%', height: '100%' }} />;
 });
 
 /**
  * StockChart — 使用 lightweight-charts v5 繪製台股 K 線圖
- * 完全使用本地 ifalgo 數據，無外部授權限制
+ * 使用官方日 K 與已保存的持倉策略事件
  * 包含 Error Boundary 防止圖表錯誤影響整頁
  */
 export default function StockChart({
   prices,
   stockName,
-  tradingSignals,
+  strategyEvents,
   showMa5 = true,
   showMa20 = true,
+  visibleBars = 130,
 }: StockChartProps) {
   const [key, setKey] = useState(0);
 
@@ -324,9 +312,10 @@ export default function StockChart({
       <StockChartInner
         prices={prices}
         stockName={stockName}
-        tradingSignals={tradingSignals}
+        strategyEvents={strategyEvents}
         showMa5={showMa5}
         showMa20={showMa20}
+        visibleBars={visibleBars}
       />
     </ChartErrorBoundary>
   );

@@ -1,18 +1,6 @@
 {
   "crons": [
     {
-      "path": "/api/app-cache",
-      "schedule": "0 0 * * *"
-    },
-    {
-      "path": "/api/app-cache",
-      "schedule": "0 21 * * *"
-    },
-    {
-      "path": "/api/app-cache",
-      "schedule": "10 0 * * 1-5"
-    },
-    {
       "path": "/api/cron-newsletter-prepare",
       "schedule": "0 0 * * *"
     },
@@ -22,7 +10,7 @@
     },
     {
       "path": "/api/backtest-daily-collect",
-      "schedule": "0 0 * * *"
+      "schedule": "5 7 * * 1-5"
     },
     {
       "path": "/api/cron-dividend-payments",
@@ -31,20 +19,16 @@
     {
       "path": "/api/cron-active-etf-import",
       "schedule": "30 13 * * 1-5"
+    },
+    {
+      "path": "/api/app-cache",
+      "schedule": "0 7 * * 1-5"
     }
   ],
   "rewrites": [
     {
       "source": "/api/institution-cost",
       "destination": "/api/app-cache?type=institution-cost"
-    },
-    {
-      "source": "/api/ifalgo/stock",
-      "destination": "/api/app-cache?type=ifalgo-stock"
-    },
-    {
-      "source": "/api/ifalgo/:path*",
-      "destination": "https://api.ifalgo.com.tw/frontapi/:path*"
     },
     {
       "source": "/api/twse/:path*",

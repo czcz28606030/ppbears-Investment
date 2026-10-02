@@ -1,4 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { getStrategyPrices } from './strategy-service.js';
 
 type InstitutionKey = 'foreign' | 'trust' | 'dealer';
 
@@ -28,7 +29,7 @@ type FinMindFlowResponse = {
 
 type InstitutionCostResponse = {
   code: string;
-  source: 'goodinfo';
+  source: 'goodinfo' | 'finmind';
   sourceUrl: string;
   period: string;
   note: string;
@@ -254,16 +255,11 @@ function getInstitutionLabel(key: InstitutionKey): string {
   return '自營商';
 }
 
-async function fetchIfalgoCloseMap(code: string): Promise<Map<string, number>> {
-  const response = await fetchWithTimeout(`https://api.ifalgo.com.tw/frontapi/stock?coid=${encodeURIComponent(code)}`, {
-    headers: { accept: 'application/json' },
-  }, 10000);
-  if (!response.ok) throw new Error(`IFAlgo HTTP ${response.status}`);
-  const json = await response.json() as { data?: { stock?: { position?: { prices?: Array<{ mdate?: string; close_d?: string }> } } } };
-  const prices = json.data?.stock?.position?.prices || [];
+async function fetchOfficialCloseMap(code: string): Promise<Map<string, number>> {
+  const prices = await getStrategyPrices(code);
   const closeMap = new Map<string, number>();
   for (const price of prices) {
-    const date = String(price.mdate || '').trim();
+    const date = String(price.mdate || '').trim().replace(/^(\d{4})(\d{2})(\d{2})$/, '$1-$2-$3');
     const close = parseNumber(String(price.close_d || ''));
     if (date && close > 0) closeMap.set(date, close);
   }
@@ -292,7 +288,7 @@ async function fetchFinMindFlows(code: string): Promise<FinMindFlowResponse> {
     .sort()
     .slice(-10);
   const latestDateSet = new Set(latestDates);
-  const closeMap = await fetchIfalgoCloseMap(code).catch(() => new Map<string, number>());
+  const closeMap = await fetchOfficialCloseMap(code).catch(() => new Map<string, number>());
   const totals: Record<InstitutionKey, FinMindFlowItem> = {
     foreign: { key: 'foreign', label: '外資', buyShares: 0, sellShares: 0, netShares: 0 },
     trust: { key: 'trust', label: '投信', buyShares: 0, sellShares: 0, netShares: 0 },
@@ -396,10 +392,10 @@ export default async function handleInstitutionCost(req: VercelRequest, res: Ver
       res.setHeader('Cache-Control', 's-maxage=1800, stale-while-revalidate=21600');
       return res.status(200).json({
         code,
-        source: 'goodinfo',
+        source: 'finmind',
         sourceUrl: finmind.sourceUrl,
         period: finmind.period,
-        note: 'Goodinfo 雲端讀取失敗，暫以 FinMind 近10日法人買進股數搭配 IFAlgo 日收盤價估算近期買進成本；這不是官方持倉成本。',
+        note: 'Goodinfo 雲端讀取失敗，暫以 FinMind 近10日法人買進股數搭配官方日 K 收盤價估算近期買進成本；這不是官方持倉成本。',
         items: finmind.estimatedCostItems,
         finmind: {
           sourceUrl: finmind.sourceUrl,

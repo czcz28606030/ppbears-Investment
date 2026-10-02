@@ -5,7 +5,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import {
-  supabase, fetchLatestSimonsData, filterByAI,
+  supabase, fetchWeeklyNewsletterCandidates,
   sendNewsletterToUser, loadTodayCache, getNewsletterCacheDateTW,
   userHasNewsletterFeature,
   type FilteredStock,
@@ -18,12 +18,12 @@ export const config = {
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const authHeader = req.headers.authorization;
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}` && process.env.NODE_ENV === 'production') {
+  if ((!process.env.CRON_SECRET || authHeader !== `Bearer ${process.env.CRON_SECRET}`) && process.env.NODE_ENV === 'production') {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
   try {
-    // ── 抓取 Simons 資料 ─────────────────────────────────────────────────────
+    // ── 抓取 週榜 資料 ─────────────────────────────────────────────────────
     // 優先使用 08:00 準備 cron 寫入的快取；若快取不存在才即時計算
     const todayDate = getNewsletterCacheDateTW();
     let allStocks: SimonsItem[];
@@ -31,16 +31,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const cache = await loadTodayCache(todayDate);
     if (cache && cache.all_stocks.length > 0) {
-      console.log(`[cron-newsletter] 使用快取資料（${todayDate}），跳過 AI 篩選`);
+      console.log(`[cron-newsletter] 使用快取資料（${todayDate}），使用週榜候選快取`);
       allStocks = cache.all_stocks;
       aiFiltered = cache.ai_filtered;
     } else {
       console.log('[cron-newsletter] 無快取，即時計算（時間可能較長）');
-      allStocks = await fetchLatestSimonsData();
+      allStocks = await fetchWeeklyNewsletterCandidates();
       if (allStocks.length === 0) {
-        return res.status(200).json({ error: '無法取得 Simons 資料' });
+        return res.status(200).json({ error: '無法取得 週榜 資料' });
       }
-      aiFiltered = await filterByAI(allStocks);
+      aiFiltered = null;
     }
 
     // ── 取得所有用戶，逐一套用「每日電子報」開關（預設 Premium 開、Free 關）──

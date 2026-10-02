@@ -1849,3 +1849,6 @@ button.holding-quant-chip:hover {
   margin-top: 2px;
 }
 
+
+.holding-strategy-details{display:flex;flex-direction:column;gap:6px;line-height:1.5;margin:8px 0;font-size:13px;overflow-wrap:anywhere}
+.pf-strategy-note{font-size:13px;color:var(--text-secondary);line-height:1.6}

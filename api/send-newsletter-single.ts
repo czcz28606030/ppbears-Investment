@@ -6,23 +6,8 @@
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import {
-  supabase,
-  fetchLatestSimonsData,
-  filterByAI,
-  filterByStrategy,
-  generateStocksAnalysis,
-  buildHoldingsWithSignals,
-  buildEmailHtml,
-  userHasAiFeature,
-  userHasNewsletterFeature,
-  STRATEGY_LABELS,
-  resend,
-  loadTodayCache,
-  getNewsletterCacheDateTW,
-  type FilteredStock,
-  type SimonsItem,
-} from '../src/server/newsletter-utils.js';
+import {supabase, fetchWeeklyNewsletterCandidates, userHasNewsletterFeature,
+  sendNewsletterToUser, loadTodayCache, getNewsletterCacheDateTW} from '../src/server/newsletter-utils.js';
 
 export const config = {
   maxDuration: 60,
@@ -33,7 +18,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const authHeader = req.headers.authorization;
   const token = authHeader?.replace('Bearer ', '') || '';
 
-  let isAuthorized = token === process.env.CRON_SECRET;
+  let isAuthorized = Boolean(process.env.CRON_SECRET) && token === process.env.CRON_SECRET;
 
   if (!isAuthorized && token) {
     try {
@@ -78,68 +63,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const todayDate = getNewsletterCacheDateTW();
     const cache = await loadTodayCache(todayDate);
 
-    let allStocks: SimonsItem[];
-    let cachedAiFiltered: FilteredStock[] | null;
-
-    if (cache && cache.all_stocks.length > 0) {
-      allStocks = cache.all_stocks;
-      cachedAiFiltered = cache.ai_filtered; // 包含 aiAnalysis，已分析完畢
-    } else {
-      allStocks = await fetchLatestSimonsData();
-      if (allStocks.length === 0) {
-        return res.status(200).json({ success: false, error: '無法取得 Simons 資料' });
-      }
-      cachedAiFiltered = null;
-    }
-
-    // ── 依用戶功能決定篩選方式 ────────────────────────────────────────────────
-    const hasAi = await userHasAiFeature(userId, userData.tier);
-    const strategy = userData.newsletter_strategy as string | undefined;
-
-    let stocks: FilteredStock[];
-    let strategyLabel: string | undefined;
-
-    if (hasAi || !strategy) {
-      // AI 模式：優先使用快取（已含 aiAnalysis）；無快取才即時篩選
-      if (cachedAiFiltered && cachedAiFiltered.length > 0) {
-        stocks = cachedAiFiltered;
-      } else {
-        stocks = await filterByAI(allStocks);
-        if (stocks.length === 0) {
-          return res.status(200).json({ success: false, error: '無符合 AI 條件的精選股票' });
-        }
-        await generateStocksAnalysis(stocks);
-      }
-    } else {
-      // 策略模式（直接從 Simons 資料篩選，不需外部 API）
-      stocks = filterByStrategy(allStocks, strategy);
-      strategyLabel = STRATEGY_LABELS[strategy];
-      if (stocks.length === 0) {
-        return res.status(200).json({ success: false, error: `策略 ${strategy} 無符合股票` });
-      }
-      // 為策略選股補上 AI 分析
-      await generateStocksAnalysis(stocks);
-    }
-
-    // ── 取得庫存訊號 ──────────────────────────────────────────────────────────
-    const allCoids = new Set(allStocks.map(s => s.coid));
-    const holdings = await buildHoldingsWithSignals(userId, allCoids);
-
-    // ── 發送電子報 ────────────────────────────────────────────────────────────
-    const html = buildEmailHtml(userData.display_name, stocks, holdings, todayDate, strategyLabel);
-    const subjectStrategy = strategyLabel ? `${strategyLabel} 策略` : 'AI 精選';
-
-    const { error: sendError } = await resend.emails.send({
-      from: 'PPBears Investment <newsletter@investment.ppbears.com>',
-      to: userData.email,
-      subject: `🐻 PPBears 電子報 ${todayDate} ｜${subjectStrategy} ${stocks.length} 檔`,
-      html,
-    });
-
-    if (sendError) {
-      return res.status(200).json({ success: false, error: sendError.message });
-    }
-
+    const allStocks = cache?.all_stocks?.length ? cache.all_stocks : await fetchWeeklyNewsletterCandidates();
+    if (!allStocks.length) return res.status(200).json({success:false,error:'週榜候選資料尚未備妥'});
+    const result = await sendNewsletterToUser(userData, allStocks, null, todayDate);
+    if (!result.success) return res.status(200).json(result);
     return res.status(200).json({ success: true, message: `電子報已發送至 ${userData.email}` });
 
   } catch (err) {

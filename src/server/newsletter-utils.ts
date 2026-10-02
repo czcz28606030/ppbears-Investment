@@ -1,673 +1,127 @@
-/**
- * PPBears Investment - 電子報共用工具
- * 供 cron-newsletter.ts 與 send-newsletter-single.ts 共用
- */
-
 import { createClient } from '@supabase/supabase-js';
 import { Resend } from 'resend';
+import { getWeeklyTop } from './weekly-top.js';
+import { getStrategySignalsForUser } from './strategy-service.js';
+import type { StrategyDecision } from '../utils/trendStrategy.js';
 
-// ─── 初始化 Clients ───────────────────────────────────────────────────────────
-export const supabase = createClient(
-  process.env.VITE_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
-
+export const supabase = createClient(process.env.VITE_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 export const resend = new Resend(process.env.RESEND_API_KEY);
-
-// ─── 資料型別 ─────────────────────────────────────────────────────────────────
+// Legacy export names remain for callers during migration; values are weekly candidates only.
 export interface SimonsItem {
-  mdate: string;
-  coid: string;
-  stkname: string;
-  close: string;
-  strength: string;
-  psr: number;
-  ret_w: string;
-  ret_m: string;
-  wtcost: string;
-  fcost: string;
-  unusual: string;
-  category: string;
-  subindustry?: string;
+  mdate: string; coid: string; stkname: string; close: string;
+  weeklyRank?: number; source?: 'stoxgauge-weekly'; weeklyObservedAt?: string; firstObservedDate?: string;
 }
-
-export interface FilteredStock extends SimonsItem {
-  score: number;
-  cum_ret: string;
-  remark: string;
-  latestNews?: string[];
-  aiAnalysis?: {
-    technical: string;
-    chips: string;
-    news: string;
-    advice: string;
-  };
-}
-
+export interface FilteredStock extends SimonsItem { remark: string; decision?: StrategyDecision }
 export interface HoldingRow {
-  stock_code: string;
-  stock_name: string;
-  total_shares: number;
-  avg_cost: number;
-  current_price: number;
-  signal?: '加碼' | '出場' | '中立';
+  stock_code: string; stock_name: string; total_shares: number; avg_cost: number;
+  current_price: number; signal?: string; decision?: StrategyDecision;
 }
-
-export interface UserRow {
-  id: string;
-  email: string;
-  display_name: string;
-  newsletter_strategy?: string;
-}
-
+export interface UserRow { id: string; email: string; display_name: string; newsletter_strategy?: string }
 export const DAILY_NEWSLETTER_FEATURE_KEY = 'daily_newsletter';
-
-// ─── 策略名稱對照 ─────────────────────────────────────────────────────────────
-export const STRATEGY_LABELS: Record<string, string> = {
-  A: '🏢 穩穩大公司',
-  B: '🚀 最近變強公司',
-  C: '👀 市場有注意公司',
-  D: '👴 價值潛力公司',
-  E: '💰 配息安心公司',
-  F: '🏷️ 便宜好公司',
-};
-
-// ─── 計算分數 ─────────────────────────────────────────────────────────────────
-export function calculateScore(item: SimonsItem): number {
-  const psr = item.psr || 0;
-  const strength = parseFloat(item.strength) || 0;
-  const close = parseFloat(item.close) || 0;
-  const wtcost = parseFloat(item.wtcost) || 0;
-  const fcost = parseFloat(item.fcost) || 0;
-
-  let score = 50;
-  score += (psr - 5) * 6;
-
-  if (item.ret_w === 'rise') score += 8;
-  if (item.ret_m === 'rise') score += 8;
-  if (item.ret_w === 'drop') score -= 8;
-  if (item.ret_m === 'drop') score -= 8;
-
-  if (strength > 2) score += 10;
-  else if (strength > 1.5) score += 5;
-  else if (strength < 0.5) score -= 10;
-
-  if (close < wtcost && close < fcost) score += 10;
-  else if (close > wtcost * 1.1 && close > fcost * 1.1) score -= 5;
-
-  if (item.unusual && item.unusual !== 'N') {
-    if (item.unusual.includes('紅K') || item.unusual.includes('上影線')) score += 3;
-  }
-
-  return Math.max(0, Math.min(100, score));
+export const STRATEGY_LABELS: Record<string, string> = { A: '週榜趨勢', B: '週榜趨勢', C: '週榜趨勢', D: '週榜趨勢', E: '週榜趨勢', F: '週榜趨勢' };
+export const calculateScore = (_item: SimonsItem): null => null;
+export async function fetchWeeklyNewsletterCandidates(): Promise<SimonsItem[]> {
+  const weekly = await getWeeklyTop();
+  const observedAt = new Date().toISOString();
+  return weekly.items.map(item => ({ coid: item.ticker, stkname: item.name, mdate: item.weekEndDate,
+    close: '', weeklyRank: item.rank, source: 'stoxgauge-weekly', weeklyObservedAt: observedAt,
+    firstObservedDate: getTodayTW() }));
 }
-
-// ─── 通用：帶超時的 fetch ────────────────────────────────────────────────────
-function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs = 8000): Promise<Response> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  return fetch(url, { ...options, signal: controller.signal }).finally(() => clearTimeout(timer));
+export const fetchLatestSimonsData = fetchWeeklyNewsletterCandidates;
+export function filterByStrategy(stocks: SimonsItem[], _strategy: string): FilteredStock[] {
+  return [...stocks].sort((a,b) => (a.weeklyRank ?? Infinity) - (b.weeklyRank ?? Infinity))
+    .map(stock => ({ ...stock, remark: '週榜候選' }));
 }
-
-// ─── 抓取 Simons 資料 ─────────────────────────────────────────────────────────
-export async function fetchLatestSimonsData(): Promise<SimonsItem[]> {
-  const today = new Date();
-  for (let i = 0; i < 7; i++) {
-    const date = new Date(today);
-    date.setDate(date.getDate() - i);
-    if (date.getDay() === 0 || date.getDay() === 6) continue;
-    const dateStr = date.toISOString().split('T')[0];
-    try {
-      const res = await fetchWithTimeout(
-        `https://api.ifalgo.com.tw/frontapi/common/getSimonsData?searchDate=${dateStr}`,
-        { headers: { 'Accept': 'application/json' } },
-        8000
-      );
-      if (!res.ok) continue;
-      const json = await res.json() as { data?: { dataItems?: SimonsItem[] } };
-      const items = json.data?.dataItems || [];
-      if (items.length > 0) return items;
-    } catch {
-      continue;
-    }
-  }
-  return [];
+export async function filterByAI(stocks: SimonsItem[]): Promise<FilteredStock[]> { return filterByStrategy(stocks, ''); }
+export async function generateStocksAnalysis(_stocks: FilteredStock[]): Promise<void> { /* Rule decisions are rendered directly. */ }
+export async function buildHoldingsWithSignals(userId: string, _allStockCoids: Set<string>): Promise<HoldingRow[]> {
+  const { data, error } = await supabase.from('holdings')
+    .select('stock_code, stock_name, total_shares, avg_cost, current_price').eq('user_id', userId);
+  if (error) throw new Error(error.message);
+  if (!data?.length) return [];
+  const { signals } = await getStrategySignalsForUser(userId, data.map(h => h.stock_code));
+  return data.map(h => ({ ...h, total_shares: Number(h.total_shares), avg_cost: Number(h.avg_cost),
+    current_price: Number(h.current_price), signal: signals[h.stock_code]?.label ?? '資料不足', decision: signals[h.stock_code] }));
 }
-
-// ─── 策略篩選（非 AI 用戶）────────────────────────────────────────────────────
-export function filterByStrategy(allStocks: SimonsItem[], strategy: string): FilteredStock[] {
-  const scored = allStocks.map(s => ({ ...s, score: calculateScore(s) }));
-  let list: typeof scored = [];
-
-  switch (strategy) {
-    case 'A':
-      list = scored.filter(r => r.psr >= 6);
-      break;
-    case 'B':
-      list = scored.filter(r => r.ret_w === 'rise' && r.ret_m === 'rise');
-      if (list.length < 5)
-        list = scored.filter(r => r.ret_w === 'rise' && parseFloat(r.strength || '0') >= 1.8);
-      break;
-    case 'C':
-      list = scored.filter(r => parseFloat(r.strength || '0') > 2.0);
-      if (list.length < 5)
-        list = scored.filter(r => parseFloat(r.strength || '0') >= 1.8);
-      break;
-    case 'D':
-      list = scored.filter(r => {
-        const close = parseFloat(r.close || '0');
-        const wtcost = parseFloat(r.wtcost || '0');
-        return r.psr >= 7 && wtcost > 0 && close < wtcost;
-      });
-      if (list.length < 5)
-        list = scored.filter(r => {
-          const close = parseFloat(r.close || '0');
-          const wtcost = parseFloat(r.wtcost || '0');
-          return r.psr >= 6 && wtcost > 0 && close <= wtcost * 1.03;
-        });
-      break;
-    case 'E':
-      list = scored.filter(r =>
-        (r.category?.includes('金融') || r.category?.includes('電信') ||
-         r.category?.includes('電力') || r.category?.includes('公用') ||
-         r.subindustry?.includes('金融')) && r.ret_m !== 'drop'
-      );
-      if (list.length < 5)
-        list = scored.filter(r => r.psr >= 8 && r.ret_m !== 'drop' && r.ret_w !== 'drop');
-      break;
-    case 'F':
-      list = scored.filter(r => {
-        const close = parseFloat(r.close || '0');
-        const wtcost = parseFloat(r.wtcost || '0');
-        const fcost = parseFloat(r.fcost || '0');
-        return wtcost > 0 && fcost > 0 && close < wtcost && close < fcost;
-      });
-      if (list.length < 5)
-        list = scored.filter(r => {
-          const close = parseFloat(r.close || '0');
-          const wtcost = parseFloat(r.wtcost || '0');
-          const fcost = parseFloat(r.fcost || '0');
-          return r.psr >= 5 && ((wtcost > 0 && close < wtcost) || (fcost > 0 && close < fcost));
-        });
-      break;
-    default:
-      list = scored;
-  }
-
-  const strategyLabel = STRATEGY_LABELS[strategy] || strategy;
-  return list
-    .sort((a, b) => b.score - a.score)
-    .map(s => ({
-      ...s,
-      cum_ret: s.ret_w === 'rise' ? '週漲' : s.ret_m === 'rise' ? '月漲' : '持平',
-      remark: strategyLabel,
-    }));
+export function escapeNewsletterHtml(value: unknown): string {
+  return String(value ?? '').replace(/[&<>"']/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[char]!));
 }
-
-// ─── AI 篩選（有 ai_stock_picking 功能的用戶）────────────────────────────────
-export async function filterByAI(allStocks: SimonsItem[]): Promise<FilteredStock[]> {
-  const sortedStocks = allStocks
-    .map(s => ({ ...s, score: calculateScore(s) }))
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 15);
-
-  const fetchPromises = sortedStocks.map(async (s) => {
-    try {
-      const res = await fetchWithTimeout(`https://api.ifalgo.com.tw/frontapi/stock?coid=${s.coid}`, {}, 8000);
-      if (!res.ok) return null;
-      const json = await res.json() as any;
-      const comment = json.data?.stock?.aiQuanBackDataComment;
-      if (comment) {
-        const cumRetStr = comment.cum_ret || '';
-        const cumRet = parseFloat(cumRetStr.replace('%', ''));
-        const remark = comment.remark || '';
-        const isPositive = !isNaN(cumRet) && cumRet > 0;
-        const isHighRec = remark.includes('中') || remark.includes('高') || remark.includes('強');
-
-        if (isPositive && isHighRec) {
-          let latestNews: string[] = [];
-          try {
-            const yRes = await fetchWithTimeout(`https://tw.stock.yahoo.com/quote/${s.coid}/news`, {}, 5000);
-            if (yRes.ok) {
-              const yText = await yRes.text();
-              const matches = [...yText.matchAll(/<h3[^>]*>(.*?)<\/h3>/g)];
-              latestNews = matches.map(m => m[1].replace(/<[^>]+>/g, '')).filter(t => t !== '個股相關新聞與公告').slice(0, 3);
-            }
-          } catch {
-            // ignore news fetch failure
-          }
-          return { ...s, cum_ret: cumRetStr, remark, latestNews } as FilteredStock;
-        }
-      }
-    } catch {
-      return null;
-    }
-    return null;
-  }); // end fetchPromises
-
-  const results = await Promise.all(fetchPromises);
-  return (results.filter(Boolean) as FilteredStock[])
-    .sort((a, b) => b.score - a.score);
+function decisionHtml(decision?: StrategyDecision): string {
+  const escape = escapeNewsletterHtml;
+  if (!decision) return '<p>資料不足：尚未取得規則狀態</p>';
+  return `<p><strong>${escape(decision.label)}</strong>：${escape(decision.reason)}</p>
+    <p>價格日期：${escape(decision.dataDate || '無')} ｜收盤：${escape(decision.close ?? '無')}
+    ｜保護線：${escape(decision.protectionPrice ?? '無')} ｜建議新增股數：${escape(decision.suggestedQuantity ?? '無')}</p>`;
 }
-
-// ─── AI 多面向分析（gpt-4o-mini）─────────────────────────────────────────────
-export async function generateStocksAnalysis(stocks: FilteredStock[]): Promise<void> {
-  const openaiKey = process.env.OPENAI_API_KEY;
-  if (!openaiKey || stocks.length === 0) return;
-
-  const stocksData = stocks.map(s => ({
-    coid: s.coid, stkname: s.stkname, close: s.close,
-    latestNews: s.latestNews, remark: s.remark, cum_ret: s.cum_ret,
-    psr: s.psr, strength: s.strength, wtcost: s.wtcost, fcost: s.fcost, ret_w: s.ret_w,
-  }));
-
-  const prompt = `你是一位專業的台股分析師。請針對以下 ${stocks.length} 檔精選股票，綜合提供的真實數據與「奇摩股市新聞」撰寫出專業且客觀的財經解析。
-請務必嚴格依照以下 JSON 格式回傳（只需要回傳 JSON，不要加 markdown block 等任何多餘文字），針對每一檔股票填入對應分析：
-
-{
-  "results": [
-    {
-      "coid": "股票代號",
-      "technical": "技術面：(請依據提供的收盤價趨勢，給出技術指標動能短評)",
-      "chips": "籌碼面：(請依據提供的外資與加權成本等，給出籌碼穩定度分析)",
-      "news": "消息面：(請務必依據「latestNews」捕捉到的奇摩股市最新相關新聞，或 AI推薦度，給出具體且非憑空對齊市場的消息面解析)",
-      "advice": "最佳建議：(綜合技術/籌碼/消息，給出具體的對應持股或停損等進出場建議)"
-    }
-  ]
+export function buildEmailHtml(recipientName: string, stocks: FilteredStock[], holdings: HoldingRow[], todayDate: string, _strategyLabel?: string): string {
+  const escape = escapeNewsletterHtml;
+  const stockHtml = stocks.map(s => `<article style="border:1px solid #eee;padding:16px;margin-bottom:12px">
+    <h3>${escape(s.coid)} ${escape(s.stkname)}</h3><p>週榜第 ${escape(s.weeklyRank ?? '無')} 名 · 週期 ${escape(s.mdate)}</p>${decisionHtml(s.decision)}</article>`).join('');
+  const holdingsHtml = holdings.map(h => `<article style="border:1px solid #eee;padding:16px;margin-bottom:12px">
+    <h3>${escape(h.stock_code)} ${escape(h.stock_name)}</h3>${decisionHtml(h.decision)}</article>`).join('');
+  return `<!DOCTYPE html><html lang="zh-TW"><head><meta charset="UTF-8"><title>PPBears 每日投資電子報 ${escape(todayDate)}</title></head>
+    <body style="font-family:sans-serif;background:#fafafa"><main style="max-width:600px;margin:auto;padding:24px;background:white">
+    <h1>🐻 PPBears 每日投資電子報</h1><p>嗨 ${escape(recipientName)}！資料準備時間：${escape(getNewsletterDataLabelTW(todayDate))}</p>
+    <h2>週榜候選與趨勢規則</h2><p>週榜只定義候選池；上榜不等於進場或加碼。既有電子報偏好保留，訊號統一依週榜趨勢規則計算。</p>
+    ${stockHtml}${holdings.length ? `<h2>個人持倉規則狀態</h2>${holdingsHtml}` : ''}
+    <p>持倉決策依實際交易、現金及風險限制計算；資料不足時停止加碼。收盤規則不代替即時委託，平台不自動下單。</p>
+    <a href="https://ppbears-investment.vercel.app">進入平台查看詳情</a><p>可於平台調整每日電子報偏好。以上資訊僅供學習參考。</p></main></body></html>`;
 }
-
-給定的個股數據：
-${JSON.stringify(stocksData, null, 2)}`;
-
+async function userHasFeature(userId: string, tier: string, key: string): Promise<boolean> {
+  const { data, error } = await supabase.from('feature_overrides').select('enabled').eq('user_id', userId).eq('feature_key', key).maybeSingle();
+  if (error) throw new Error(error.message);
+  return data ? Boolean(data.enabled) : tier === 'premium';
+}
+export const userHasAiFeature = (userId: string, tier: string) => userHasFeature(userId, tier, 'ai_stock_picking');
+export const userHasNewsletterFeature = (userId: string, tier: string) => userHasFeature(userId, tier, DAILY_NEWSLETTER_FEATURE_KEY);
+export async function sendNewsletterToUser(user: UserRow & {tier:string}, allStocks: SimonsItem[], _cache: FilteredStock[] | null, todayDate: string): Promise<{success:boolean;error?:string}> {
   try {
-    const res = await fetchWithTimeout('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${openaiKey}` },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [{ role: 'user', content: prompt }],
-        response_format: { type: 'json_object' },
-        temperature: 0.7,
-      }),
-    }, 25000);
-    const data = await res.json() as any;
-    const content = data.choices?.[0]?.message?.content || '{}';
-    const parsed = JSON.parse(content);
-    if (parsed.results && Array.isArray(parsed.results)) {
-      parsed.results.forEach((r: any) => {
-        const target = stocks.find(s => s.coid === r.coid);
-        if (target) {
-          target.aiAnalysis = {
-            technical: r.technical || '暫無資料',
-            chips: r.chips || '暫無資料',
-            news: r.news || '暫無資料',
-            advice: r.advice || '暫定觀望',
-          };
-        }
-      });
-    }
-  } catch (e) {
-    console.error('OpenAI Analysis Failed:', e);
-  }
+    if (!await userHasNewsletterFeature(user.id, user.tier)) return {success:false,error:'此帳號的每日電子報已關閉'};
+    const candidates = allStocks.filter(s => s.source === 'stoxgauge-weekly');
+    if (!candidates.length) return {success:false,error:'週榜候選資料尚未備妥'};
+    const {signals} = await getStrategySignalsForUser(user.id, candidates.map(s => s.coid));
+    const stocks = filterByStrategy(candidates, user.newsletter_strategy || '').map(s => ({...s, decision: signals[s.coid]}));
+    const holdings = await buildHoldingsWithSignals(user.id, new Set(candidates.map(s => s.coid)));
+    const {error} = await resend.emails.send({ from:'PPBears Investment <newsletter@investment.ppbears.com>', to:user.email,
+      subject:`🐻 PPBears 電子報 ${todayDate} ｜週榜趨勢 ${stocks.length} 檔`, html:buildEmailHtml(user.display_name, stocks, holdings, todayDate) });
+    return error ? {success:false,error:error.message} : {success:true};
+  } catch (error) { return {success:false,error:String(error)}; }
 }
-
-// ─── 建立庫存訊號列表 ────────────────────────────────────────────────────────
-export async function buildHoldingsWithSignals(
-  userId: string,
-  allStockCoids: Set<string>
-): Promise<HoldingRow[]> {
-  const { data: holdingsData } = await supabase
-    .from('holdings')
-    .select('stock_code, stock_name, total_shares, avg_cost, current_price')
-    .eq('user_id', userId);
-
-  if (!holdingsData || holdingsData.length === 0) return [];
-
-  // 快取 sell_sig 查詢
-  const stockCache: Record<string, { sell_sig: string }> = {};
-  const getStockDetail = async (coid: string) => {
-    if (stockCache[coid] !== undefined) return stockCache[coid];
-    try {
-      const res = await fetchWithTimeout(`https://api.ifalgo.com.tw/frontapi/stock?coid=${coid}`, {}, 8000);
-      if (!res.ok) { stockCache[coid] = { sell_sig: '' }; return stockCache[coid]; }
-      const json = await res.json() as any;
-      const list = json.data?.stock?.aiQuanBackDataTradingList || [];
-      const last = list.length > 0 ? list[list.length - 1].sell_sig : '';
-      stockCache[coid] = { sell_sig: last };
-    } catch {
-      stockCache[coid] = { sell_sig: '' };
-    }
-    return stockCache[coid];
-  };
-
-  const holdingsPromises = holdingsData.map(async (h: any) => {
-    let signal: '加碼' | '出場' | '中立' = '中立';
-    if (allStockCoids.has(h.stock_code)) {
-      signal = '加碼';
-    } else {
-      const detail = await getStockDetail(h.stock_code);
-      if (detail.sell_sig === '出場' || detail.sell_sig === '賣出') {
-        signal = '出場';
-      }
-    }
-    return {
-      stock_code: h.stock_code,
-      stock_name: h.stock_name,
-      total_shares: Number(h.total_shares),
-      avg_cost: Number(h.avg_cost),
-      current_price: Number(h.current_price),
-      signal,
-    } as HoldingRow;
+export interface NewsletterCache { cache_date:string; all_stocks:SimonsItem[]; ai_filtered:FilteredStock[]; created_at?:string }
+export function getTodayTW(): string { return new Date(Date.now()+8*3600000).toISOString().slice(0,10); }
+export function getLatestCompletedTradingDateTW(now=Date.now()): string {
+  const day=new Date(now+8*3600000); day.setUTCHours(0,0,0,0); day.setUTCDate(day.getUTCDate()-1);
+  while ([0,6].includes(day.getUTCDay())) day.setUTCDate(day.getUTCDate()-1);
+  return day.toISOString().slice(0,10);
+}
+export function normalizeSimonsDate(value:unknown):string {
+  const raw=String(value??'').trim(); return /^\d{8}$/.test(raw) ? `${raw.slice(0,4)}-${raw.slice(4,6)}-${raw.slice(6,8)}` : raw.slice(0,10).replace(/\//g,'-');
+}
+export function getSimonsItemDataDate(items:SimonsItem[]):string {return normalizeSimonsDate(items[0]?.mdate);}
+export function isSimonsDataReadyForDate(items:SimonsItem[], date:string):boolean {return !!items.length && getSimonsItemDataDate(items)===date;}
+// Retired date-specific source: never backfill historical candidate eligibility using today's weekly list.
+export async function fetchSimonsDataForDate(_date:string):Promise<SimonsItem[]> {return [];}
+export function getNewsletterCacheDateTW(now=Date.now()):string {
+  const day=new Date(now+8*3600000); if(day.getUTCHours()<8)day.setUTCDate(day.getUTCDate()-1);return day.toISOString().slice(0,10);
+}
+export function getNewsletterDataLabelTW(date:string):string {return `${date} 08:00 台灣時間`;}
+export async function saveTodayCache(data:NewsletterCache):Promise<void> {
+  const {data: existing, error: readError} = await supabase.from('newsletter_daily_cache')
+    .select('all_stocks,created_at').eq('cache_date', data.cache_date).maybeSingle();
+  if (readError) throw new Error(readError.message);
+  const previous = new Map<string, SimonsItem>((existing?.all_stocks || []).map((item: SimonsItem) => [`${item.mdate}:${item.coid}`, item]));
+  const allStocks = data.all_stocks.map(item => {
+    const prior = previous.get(`${item.mdate}:${item.coid}`);
+    return prior?.source === 'stoxgauge-weekly' && prior.weeklyObservedAt
+      ? {...item, weeklyObservedAt: prior.weeklyObservedAt, firstObservedDate: prior.firstObservedDate ?? item.firstObservedDate}
+      : item;
   });
-
-  return Promise.all(holdingsPromises);
+  const {error}=await supabase.from('newsletter_daily_cache').upsert({...data, all_stocks: allStocks,
+    ai_filtered:[], created_at:data.created_at ?? existing?.created_at ?? new Date().toISOString()}, {onConflict:'cache_date'});
+  if(error)throw new Error(error.message);
 }
-
-// ─── 產生 HTML 電子報 ─────────────────────────────────────────────────────────
-export function buildEmailHtml(
-  recipientName: string,
-  stocks: FilteredStock[],
-  holdings: HoldingRow[],
-  todayDate: string,
-  strategyLabel?: string
-): string {
-  const dataLabel = getNewsletterDataLabelTW(todayDate);
-
-  const stocksHtml = stocks.map((s) => {
-    const badgeColor = s.remark.includes('超高') ? '#e11d48'
-      : s.remark.includes('高') ? '#ef4444'
-      : s.remark.includes('強') ? '#ef4444'
-      : '#f59e0b';
-    return `
-    <div style="background:#fff;border-radius:12px;border:1px solid #eaeaea;margin-bottom:24px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.04);">
-      <div style="padding:16px 20px;border-bottom:1px solid #f0f0f0;">
-        <div style="font-size:20px;font-weight:900;color:#222;display:flex;align-items:center;gap:12px;">
-          <span style="color:#555;">${s.coid}</span> ${s.stkname}
-          <span style="font-size:12px;color:#fff;background:${badgeColor};padding:4px 8px;border-radius:4px;font-weight:700;">${s.remark}</span>
-        </div>
-      </div>
-      <div style="padding:20px;background:#fafafa;text-align:center;">
-        <div style="font-size:13px;color:#888;margin-bottom:8px;font-weight:600;">收盤價</div>
-        <div style="font-size:36px;font-weight:900;color:#111;line-height:1;">${s.close}</div>
-        <div style="color:#dc2626;font-weight:800;font-size:15px;margin-top:12px;">報酬趨勢 ${s.cum_ret}</div>
-      </div>
-      ${s.aiAnalysis ? `
-      <div style="padding:20px 24px;line-height:1.7;font-size:14px;color:#444;">
-        <p style="margin-top:0;">📈 <strong>技術面：</strong> ${s.aiAnalysis.technical}</p>
-        <p>💰 <strong>籌碼面：</strong> ${s.aiAnalysis.chips}</p>
-        <p>📰 <strong>消息面：</strong> ${s.aiAnalysis.news}</p>
-      </div>
-      <div style="padding:20px 24px;background:#fef9c3;border-top:1px solid #fde047;border-bottom-left-radius:12px;border-bottom-right-radius:12px;">
-        <p style="margin:0;color:#854d0e;font-size:14.5px;line-height:1.6;">💡 <strong>最佳建議：</strong> ${s.aiAnalysis.advice}</p>
-      </div>
-      ` : `
-      <div style="padding:24px;text-align:center;color:#888;font-size:14px;">目前暫無詳細解析數據</div>
-      `}
-    </div>
-  `;
-  }).join('');
-
-  const getSignalStyle = (sig?: string) => {
-    if (sig === '加碼') return { bg: '#fef2f2', border: '#ef4444', text: '#ef4444', icon: '🚀' };
-    if (sig === '出場') return { bg: '#ecfdf5', border: '#10b981', text: '#10b981', icon: '⚠️' };
-    return { bg: '#f4f9ff', border: '#3b82f6', text: '#3b82f6', icon: '⚖️' };
-  };
-
-  const holdingsHtml = holdings.length > 0
-    ? holdings.map(h => {
-        const ui = getSignalStyle(h.signal);
-        return `
-        <div style="background:${ui.bg};border-radius:6px;border-left:5px solid ${ui.border};padding:14px 16px;margin-bottom:12px;">
-          <table style="width:100%;border-collapse:collapse;">
-            <tr>
-              <td style="text-align:left;">
-                <div style="font-size:16px;color:#222;font-weight:700;">${h.stock_code} ${h.stock_name}</div>
-                <div style="font-size:12px;color:#888;margin-top:6px;">訊號日期: ${todayDate}</div>
-              </td>
-              <td style="text-align:right;vertical-align:middle;">
-                <div style="font-size:18px;font-weight:800;color:${ui.text};">${ui.icon} ${h.signal ?? '中立'}</div>
-              </td>
-            </tr>
-          </table>
-        </div>
-        `;
-      }).join('')
-    : '';
-
-  const sectionTitle = strategyLabel
-    ? `📊 ${strategyLabel} 策略精選`
-    : '🤖 今日 AI 精選股票';
-
-  const sectionDesc = strategyLabel
-    ? `篩選條件：${strategyLabel}`
-    : '篩選條件：✅ 累積報酬為正 + ✅ AI推薦中度以上';
-
-  return `
-<!DOCTYPE html>
-<html lang="zh-TW">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PPBears 每日投資電子報 ${todayDate}</title>
-</head>
-<body style="margin:0;padding:0;background:#f5f5f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
-  <div style="max-width:600px;margin:0 auto;background:#fff;">
-    <div style="background:linear-gradient(135deg,#FF924C,#FF595E);padding:36px 24px;text-align:center;">
-      <div style="font-size:44px;margin-bottom:10px;">🐻📈</div>
-      <h1 style="margin:0;color:#fff;font-size:24px;font-weight:900;">PPBears 每日投資電子報</h1>
-      <div style="color:rgba(255,255,255,0.85);font-size:14px;margin-top:6px;font-weight:600;">資料時間：${dataLabel} · Premium 版</div>
-    </div>
-    <div style="padding:32px 24px;">
-      <p style="color:#555;font-size:16px;margin:0 0 32px;line-height:1.6;">嗨 ${recipientName}！早安 ☕ 今天 PPBear 幫你找了 ${stocks.length} 檔值得關注的好股票，並搭配 AI 財經深度解析，一起來看看吧～</p>
-
-      <h2 style="margin:0 0 16px;font-size:20px;font-weight:900;color:#FF595E;border-left:5px solid #FF595E;padding-left:14px;">${sectionTitle}</h2>
-      <div style="font-size:13px;color:#888;margin-bottom:16px;background:#fef2f2;padding:6px 12px;border-radius:6px;display:inline-block;font-weight:600;">${sectionDesc}</div>
-      <div>${stocksHtml}</div>
-
-      ${holdings.length > 0 ? `
-      <hr style="border:none;border-top:1px dashed #e5e5e5;margin:36px 0;">
-      <h2 style="margin:0 0 20px;font-size:20px;font-weight:900;color:#3b82f6;border-left:5px solid #3b82f6;padding-left:14px;">💼 庫存加碼 / 出場訊號</h2>
-      <div style="font-size:13px;color:#888;margin-bottom:16px;">📈 加碼：站上推薦清單｜⚠️ 出場：賣出訊號觸發｜⚖️ 中立：持續觀察</div>
-      <div>${holdingsHtml}</div>
-      ` : ''}
-
-      <div style="text-align:center;margin-top:40px;">
-        <a href="https://ppbears-investment.vercel.app"
-           style="display:inline-block;padding:16px 36px;background:linear-gradient(135deg,#FF924C,#FF595E);color:#fff;font-weight:900;font-size:16px;text-decoration:none;border-radius:50px;box-shadow:0 6px 16px rgba(255,89,94,0.3);">
-          📱 進入平台查看詳情
-        </a>
-      </div>
-    </div>
-    <div style="background:#f9f9f9;padding:24px;text-align:center;color:#aaa;font-size:13px;border-top:1px solid #eee;">
-      <p style="margin:0 0 6px;font-weight:600;">📧 PPBears Investment Premium 電子報</p>
-      <p style="margin:0;line-height:1.5;">此郵件由系統自動寄送，AI 分析數據與建議僅供學習參考，不構成投資建議。</p>
-    </div>
-  </div>
-</body>
-</html>
-  `.trim();
-}
-
-// ─── 判斷用戶是否擁有 ai_stock_picking 功能 ──────────────────────────────────
-export async function userHasAiFeature(userId: string, userTier: string): Promise<boolean> {
-  const { data } = await supabase
-    .from('feature_overrides')
-    .select('enabled')
-    .eq('user_id', userId)
-    .eq('feature_key', 'ai_stock_picking')
-    .maybeSingle();
-
-  if (data) return Boolean(data.enabled);
-  return userTier === 'premium'; // 預設：premium 有 AI
-}
-
-// ─── 判斷用戶是否要收到每日電子報 ─────────────────────────────────────────────
-export async function userHasNewsletterFeature(userId: string, userTier: string): Promise<boolean> {
-  const { data } = await supabase
-    .from('feature_overrides')
-    .select('enabled')
-    .eq('user_id', userId)
-    .eq('feature_key', DAILY_NEWSLETTER_FEATURE_KEY)
-    .maybeSingle();
-
-  if (data) return Boolean(data.enabled);
-  return userTier === 'premium'; // 預設：Premium 收信、Free 不收，管理員可逐一覆蓋
-}
-
-// ─── 發送單一用戶電子報 ───────────────────────────────────────────────────────
-export async function sendNewsletterToUser(
-  user: UserRow & { tier: string },
-  allStocks: SimonsItem[],
-  aiFilteredCache: FilteredStock[] | null,
-  todayDate: string
-): Promise<{ success: boolean; error?: string }> {
-  try {
-    const hasAi = await userHasAiFeature(user.id, user.tier);
-    const strategy = user.newsletter_strategy;
-
-    let stocks: FilteredStock[];
-    let strategyLabel: string | undefined;
-
-    if (hasAi || !strategy) {
-      // AI 模式：使用快取的 AI 篩選結果
-      // 若 AI 快取為空（篩選嚴格或當日資料未備妥），fallback 至策略 B（最近變強公司）
-      if (!aiFilteredCache || aiFilteredCache.length === 0) {
-        console.warn(`[newsletter] ${user.email}: AI 快取空，fallback 至策略 B`);
-        stocks = filterByStrategy(allStocks, 'B');
-        strategyLabel = STRATEGY_LABELS['B'];
-        if (stocks.length === 0) {
-          // 最後 fallback：策略 A（穩穩大公司）
-          stocks = filterByStrategy(allStocks, 'A');
-          strategyLabel = STRATEGY_LABELS['A'];
-        }
-        if (stocks.length === 0) return { success: false, error: 'AI 快取與策略篩選均無結果，跳過發信' };
-        await generateStocksAnalysis(stocks);
-      } else {
-        stocks = aiFilteredCache;
-      }
-    } else {
-      // 策略模式
-      stocks = filterByStrategy(allStocks, strategy);
-      strategyLabel = STRATEGY_LABELS[strategy];
-      if (stocks.length === 0) {
-        // fallback 至策略 A 避免漏信
-        console.warn(`[newsletter] ${user.email}: 策略 ${strategy} 無結果，fallback 至策略 A`);
-        stocks = filterByStrategy(allStocks, 'A');
-        strategyLabel = STRATEGY_LABELS['A'];
-        if (stocks.length === 0) return { success: false, error: `策略 ${strategy} 及 fallback 均無符合股票` };
-      }
-      await generateStocksAnalysis(stocks);
-    }
-
-    const allCoids = new Set(allStocks.map(s => s.coid));
-    const holdings = await buildHoldingsWithSignals(user.id, allCoids);
-    const html = buildEmailHtml(user.display_name, stocks, holdings, todayDate, strategyLabel);
-
-    const subjectStrategy = strategyLabel ? `${strategyLabel} 策略` : 'AI 精選';
-    const { error: sendError } = await resend.emails.send({
-      from: 'PPBears Investment <newsletter@investment.ppbears.com>',
-      to: user.email,
-      subject: `🐻 PPBears 電子報 ${todayDate} ｜${subjectStrategy} ${stocks.length} 檔`,
-      html,
-    });
-
-    if (sendError) return { success: false, error: sendError.message };
-    return { success: true };
-  } catch (e) {
-    return { success: false, error: String(e) };
-  }
-}
-
-// ─── 電子報每日快取 ───────────────────────────────────────────────────────────
-
-export interface NewsletterCache {
-  cache_date: string;           // YYYY-MM-DD
-  all_stocks: SimonsItem[];     // 當日完整 Simons 資料
-  ai_filtered: FilteredStock[]; // AI 篩選 + OpenAI 分析完成的結果
-  created_at?: string;
-}
-
-/** 取得今日台灣日期字串（YYYY-MM-DD）*/
-export function getTodayTW(): string {
-  return new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString().slice(0, 10);
-}
-
-export function getLatestCompletedTradingDateTW(now = Date.now()): string {
-  const tw = new Date(now + 8 * 60 * 60 * 1000);
-  tw.setUTCHours(0, 0, 0, 0);
-  // Morning sync reads the latest fully completed market day, not the same-day
-  // intraday session.
-  tw.setUTCDate(tw.getUTCDate() - 1);
-
-  while (tw.getUTCDay() === 0 || tw.getUTCDay() === 6) {
-    tw.setUTCDate(tw.getUTCDate() - 1);
-  }
-  return tw.toISOString().slice(0, 10);
-}
-
-export function normalizeSimonsDate(value: unknown): string {
-  const raw = String(value ?? '').trim();
-  if (!raw) return '';
-  if (/^\d{8}$/.test(raw)) return `${raw.slice(0, 4)}-${raw.slice(4, 6)}-${raw.slice(6, 8)}`;
-  return raw.slice(0, 10).replace(/\//g, '-');
-}
-
-export function getSimonsItemDataDate(items: SimonsItem[]): string {
-  return normalizeSimonsDate(items[0]?.mdate);
-}
-
-export function isSimonsDataReadyForDate(items: SimonsItem[], targetDate: string): boolean {
-  if (!Array.isArray(items) || items.length === 0) return false;
-  const dataDate = getSimonsItemDataDate(items);
-  return dataDate === targetDate;
-}
-
-export async function fetchSimonsDataForDate(dateStr: string): Promise<SimonsItem[]> {
-  try {
-    const res = await fetchWithTimeout(
-      `https://api.ifalgo.com.tw/frontapi/common/getSimonsData?searchDate=${dateStr}`,
-      { headers: { 'Accept': 'application/json' } },
-      8000
-    );
-    if (!res.ok) return [];
-    const json = await res.json() as { data?: { dataItems?: SimonsItem[] } };
-    return json.data?.dataItems || [];
-  } catch {
-    return [];
-  }
-}
-
-/** 台灣時間今天 08:00 的資料快取日期；08:00 前手動寄送仍使用前一個準備批次。 */
-export function getNewsletterCacheDateTW(now = Date.now()): string {
-  const tw = new Date(now + 8 * 60 * 60 * 1000);
-  if (tw.getUTCHours() < 8) tw.setUTCDate(tw.getUTCDate() - 1);
-  return tw.toISOString().slice(0, 10);
-}
-
-export function getNewsletterDataLabelTW(cacheDate: string): string {
-  return `${cacheDate} 08:00 台灣時間`;
-}
-
-/** 將準備好的資料寫入 newsletter_daily_cache */
-export async function saveTodayCache(data: Omit<NewsletterCache, never>): Promise<void> {
-  await supabase
-    .from('newsletter_daily_cache')
-    .upsert({
-      cache_date: data.cache_date,
-      all_stocks: data.all_stocks,
-      ai_filtered: data.ai_filtered,
-      created_at: new Date().toISOString(),
-    }, { onConflict: 'cache_date' });
-}
-
-/** 讀取今日快取；無快取則回傳 null */
-export async function loadTodayCache(date?: string): Promise<NewsletterCache | null> {
-  const cacheDate = date ?? getNewsletterCacheDateTW();
-  const { data, error } = await supabase
-    .from('newsletter_daily_cache')
-    .select('cache_date, all_stocks, ai_filtered, created_at')
-    .eq('cache_date', cacheDate)
-    .maybeSingle();
-  if (error || !data) return null;
-  return data as NewsletterCache;
+export async function loadTodayCache(date=getNewsletterCacheDateTW()):Promise<NewsletterCache|null> {
+  const {data,error}=await supabase.from('newsletter_daily_cache').select('cache_date,all_stocks,ai_filtered,created_at').eq('cache_date',date).maybeSingle();
+  if(error||!data||!Array.isArray(data.all_stocks)||!data.all_stocks.length||data.all_stocks.some((s:SimonsItem)=>s.source!=='stoxgauge-weekly'||!s.weeklyObservedAt))return null;
+  return {...data,ai_filtered:[]} as NewsletterCache;
 }

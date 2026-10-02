@@ -79,6 +79,10 @@ export default function StockTradeModal({
     : price;
   const customPriceInvalid = hasCustomPrice && (!Number.isFinite(customPriceNumber) || customPriceNumber <= 0);
 
+  const strategyProtectionPrice = Number(snapshotContext?.protectionPrice);
+  const hasStrategyProtection = Number.isFinite(strategyProtectionPrice) && strategyProtectionPrice > 0;
+  const strategyProtectionBreached = hasStrategyProtection && tradePrice <= strategyProtectionPrice;
+
   const modalTitle = useMemo(() => (
     `${tradeMode === 'buy' ? '🛒 買入' : '💰 賣出'} ${stockName || stockCode}`
   ), [stockCode, stockName, tradeMode]);
@@ -98,7 +102,7 @@ export default function StockTradeModal({
       const estimatedFee = Math.max(minFee, Math.round(buyAmount * feeRate));
       const finalBuyCost = buyAmount + estimatedFee;
       const stopLossPct = Math.min(80, Math.max(1, user?.stopLossAlertPct ?? 20));
-      const stopLossPrice = tradePrice * (1 - stopLossPct / 100);
+      const stopLossPrice = hasStrategyProtection ? strategyProtectionPrice : tradePrice * (1 - stopLossPct / 100);
       const existingShares = holding?.totalShares ?? 0;
       const existingAvgCost = holding?.avgCost ?? 0;
       const existingCost = existingShares * existingAvgCost;
@@ -128,8 +132,8 @@ export default function StockTradeModal({
         { label: '買後平均成本', value: `NT$ ${formatPrice(newAvgCost)}`, tone: tradePrice < existingAvgCost ? 'warning' : 'normal' },
         { label: '買後總投入成本', value: `NT$ ${formatMoney(newPositionCost)}` },
         { label: '買後部位市值', value: `NT$ ${formatMoney(newPositionValue)}（總資產 ${newPositionWeight.toFixed(1)}%）`, tone: newPositionWeight > 15 ? 'warning' : 'normal' },
-        { label: `跌到 -${stopLossPct}% 參考價`, value: `NT$ ${formatPrice(stopLossPrice)}` },
-        { label: '本次加碼可能損失', value: `NT$ ${formatMoney(addOnStopLossLoss)}`, tone: 'loss' },
+        { label: hasStrategyProtection ? '週榜趨勢保護線' : `跌到 -${stopLossPct}% 參考價`, value: `NT$ ${formatPrice(stopLossPrice)}` },
+        { label: '本次加碼可能損失', value: strategyProtectionBreached ? '已觸及保護線，不估算下跌空間' : `NT$ ${formatMoney(addOnStopLossLoss)}`, tone: 'loss' },
         {
           label: '整檔到參考價損益',
           value: `${wholePositionStopLossPnL >= 0 ? '+' : '-'}NT$ ${formatMoney(Math.abs(wholePositionStopLossPnL))}`,
@@ -138,6 +142,14 @@ export default function StockTradeModal({
         ...(balanceAfter !== null ? [{ label: '買後可用餘額', value: `NT$ ${formatMoney(balanceAfter)}`, tone: balanceAfter < 0 ? 'loss' : 'normal' } as const] : []),
       ] : undefined;
 
+      if (strategyProtectionBreached) {
+        warnings.push({
+          icon: '🛑', title: '目前價格已觸及策略保護線',
+          message: `成交參考價 NT$ ${formatPrice(tradePrice)} 已等於或低於週榜趨勢保護線 NT$ ${formatPrice(strategyProtectionPrice)}。此時不能以保護線估算新的買入下跌空間。`,
+          tip: '先確認目前策略出場狀態與買入理由；仍由你決定是否手動交易。',
+          level: 'danger', details: addOnDetails,
+        });
+      }
       if (totalAssets > 0 && newPositionValue / totalAssets > 0.15) {
         const pct = newPositionWeight.toFixed(1);
         warnings.push({
@@ -479,8 +491,8 @@ export default function StockTradeModal({
                 const estTax = tradeMode === 'sell' ? Math.round(baseValue * taxRate) : 0;
                 const finalTotal = tradeMode === 'buy' ? baseValue + estFee : baseValue - estFee - estTax;
                 const stopLossPct = Math.min(80, Math.max(1, user?.stopLossAlertPct ?? 20));
-                const stopLossPrice = tradePrice * (1 - stopLossPct / 100);
-                const estimatedStopLossLoss = Math.round((tradePrice - stopLossPrice) * q);
+                const stopLossPrice = hasStrategyProtection ? strategyProtectionPrice : tradePrice * (1 - stopLossPct / 100);
+                const estimatedStopLossLoss = Math.round(Math.max(0, tradePrice - stopLossPrice) * q);
                 const affordableLossPct = user?.availableBalance
                   ? (estimatedStopLossLoss / Math.max(user.availableBalance, 1)) * 100
                   : 0;
@@ -516,21 +528,19 @@ export default function StockTradeModal({
                     {tradeMode === 'buy' && (
                       <div className="trade-risk-preview">
                         <div className="stock-trade-risk-head">
-                          <span>🛡️ 停損風險預估</span>
-                          <strong>-{stopLossPct}%</strong>
+                          <span>🛡️ {hasStrategyProtection ? '策略保護線風險' : '停損風險預估'}</span>
+                          <strong>{hasStrategyProtection ? (strategyProtectionBreached ? '已觸及保護線' : '週榜趨勢') : `-${stopLossPct}%`}</strong>
                         </div>
                         <div className="trade-preview-row">
-                          <span>停損參考價</span>
+                          <span>{hasStrategyProtection ? '週榜趨勢保護線' : '停損參考價'}</span>
                           <span>NT$ {formatPrice(stopLossPrice)}</span>
                         </div>
                         <div className="trade-preview-row">
-                          <span>跌到停損時預估損失</span>
-                          <span className="text-loss">NT$ {formatMoney(estimatedStopLossLoss)}</span>
+                          <span>{hasStrategyProtection ? '跌到保護線預估損失' : '跌到停損時預估損失'}</span>
+                          <span className="text-loss">{strategyProtectionBreached ? '不適用' : `NT$ ${formatMoney(estimatedStopLossLoss)}`}</span>
                         </div>
                         <div className="stock-trade-risk-note">
-                          如果股價跌到 NT$ {formatPrice(stopLossPrice)}，這筆單大約會虧 NT$ {formatMoney(estimatedStopLossLoss)}
-                          {user?.availableBalance ? `，約佔目前可用餘額 ${affordableLossPct.toFixed(1)}%。` : '。'}
-                          下單前先想想：這個損失你能接受嗎？
+                          {strategyProtectionBreached ? '目前價格已等於或低於策略保護線。請先確認出場狀態與買入理由；此時不估算新的下跌空間。' : `如果股價跌到 NT$ ${formatPrice(stopLossPrice)}，這筆單大約會虧 NT$ ${formatMoney(estimatedStopLossLoss)}${user?.availableBalance ? `，約佔目前可用餘額 ${affordableLossPct.toFixed(1)}%。` : '。'}下單前先確認能否接受這個損失。`}
                         </div>
                       </div>
                     )}

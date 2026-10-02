@@ -11,7 +11,7 @@ async function load(relative, imports = '') {
   return import(`data:text/javascript;base64,${Buffer.from(code).toString('base64')}`);
 }
 
-test('API refresh integration: cached price is bypassed and errors never become quant cache', async () => {
+test('API refresh integration: cached official prices are bypassed and retired quant source is never fetched', async () => {
   const previousFetch = globalThis.fetch;
   const previousStorage = globalThis.localStorage;
   const values = new Map();
@@ -36,11 +36,11 @@ test('API refresh integration: cached price is bypassed and errors never become 
     };
     await api.fetchStockQuantData('2356');
     await api.fetchStockQuantData('2356');
-    assert.equal(quantCalls, 2, 'empty quant results must not be cached for 30 minutes');
+    assert.equal(quantCalls, 0, 'retired quant source must never be requested');
   } finally { globalThis.fetch = previousFetch; globalThis.localStorage = previousStorage; }
 });
 
-test('backend timeout returns non-cacheable 502 instead of a cached HTTP 200', async () => {
+test('retired backend returns non-cacheable 410 without requesting the unavailable provider', async () => {
   const { default: handler } = await load('../api/app-cache.ts');
   const previousFetch = globalThis.fetch;
   globalThis.fetch = async () => { throw new Error('This operation was aborted'); };
@@ -54,8 +54,8 @@ test('backend timeout returns non-cacheable 502 instead of a cached HTTP 200', a
   };
   try {
     await handler({ method: 'GET', query: { type: 'ifalgo-stock', coid: '2356' } }, response);
-    assert.equal(status, 502);
+    assert.equal(status, 410);
     assert.equal(headers['Cache-Control'], 'no-store, max-age=0');
-    assert.equal(body.error, 'This operation was aborted');
+    assert.equal(body.source, 'retired');
   } finally { globalThis.fetch = previousFetch; }
 });

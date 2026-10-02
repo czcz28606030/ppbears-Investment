@@ -2,7 +2,8 @@ import { fetchMarketResponse } from './utils/marketRequest';
 import type { StockData, StockPrice, SimonsItem, StockQuote, StockRecommendation, AIAdvice, StockLiveAnalysis, StockTradingSignal } from './types';
 import { supabase } from './supabase';
 
-const IFALGO_BASE = '/api/ifalgo';
+import type { StrategySignalsPayload } from './utils/trendStrategy';
+import { getStockIndustryFromSource } from './data/stockIndustryClassifications';
 const DAILY_CACHE_TAIPEI_OFFSET_MS = 8 * 60 * 60 * 1000;
 
 function getMillisecondsUntilNextTaipeiHour(hour: number): number {
@@ -38,7 +39,7 @@ function getDailyCache<T>(key: string): T | null {
   } catch { return null; }
 }
 function setDailyCache<T>(key: string, data: T): void {
-  try { localStorage.setItem(key, JSON.stringify({ date: _todayStr(), data })); } catch {}
+  try { localStorage.setItem(key, JSON.stringify({ date: _todayStr(), data })); } catch { /* Browser storage can be unavailable. */ }
 }
 
 // ── TTL 短效快取工具（適合盤中訊號，避免全天使用過期資料）──────────────────────
@@ -58,11 +59,11 @@ function getTTLCache<T>(key: string): T | null {
 function setTTLCache<T>(key: string, data: T, ttlMs: number): void {
   try {
     localStorage.setItem(key, JSON.stringify({ expiry: Date.now() + ttlMs, data }));
-  } catch {}
+  } catch { /* Browser storage can be unavailable. */ }
 }
 /** 清除指定 key 的 TTL 快取（手動強制刷新用） */
 export function clearTTLCache(key: string): void {
-  try { localStorage.removeItem(key); } catch {}
+  try { localStorage.removeItem(key); } catch { /* Browser storage can be unavailable. */ }
 }
 
 /** 清除所有本機量化訊號 TTL 快取，避免手動刷新時仍吃到舊瀏覽器暫存。 */
@@ -70,7 +71,7 @@ export function clearQuantSignalTTLCache(): void {
   try {
     const keys = Object.keys(localStorage).filter(key => key.startsWith('ppbears_quant30_'));
     keys.forEach(key => localStorage.removeItem(key));
-  } catch {}
+  } catch { /* Browser storage can be unavailable. */ }
 }
 
 /** 清除 Simons 每日推薦 TTL 快取，手動刷新後需重新讀雲端每日快取。 */
@@ -78,7 +79,7 @@ export function clearSimonsDataTTLCache(): void {
   try {
     const keys = Object.keys(localStorage).filter(key => key.startsWith('ppbears_simons_daily7_'));
     keys.forEach(key => localStorage.removeItem(key));
-  } catch {}
+  } catch { /* Browser storage can be unavailable. */ }
 }
 /** 取得剩餘 TTL 秒數（0 = 已過期或不存在） */
 export function getTTLRemaining(key: string): number {
@@ -91,13 +92,8 @@ export function getTTLRemaining(key: string): number {
 }
 
 // 量化訊號快取 TTL：30 分鐘（盤中最多延遲 30 分鐘，避免錯過買賣訊號）
-const QUANT_SIGNAL_TTL_MS = 30 * 60 * 1000;
-const QUANT_SIGNAL_CACHE_VERSION = 'v6';
 // Simons 每日推薦由雲端每日 08:00 預抓；本機保存到隔天早上 10 點，手動刷新可再檢查一次。
-const getSimonsDataTtlMs = () => getMillisecondsUntilNextTaipeiHour(10);
 const OFFICIAL_PRICE_MAP_CACHE_KEY = 'ppbears_official_price_map_daily_7am_v2';
-const AI_SYNC_LABEL = '08:00 自動檢查；可手動重新抓取';
-const AI_SYNC_SCHEDULE_LABEL = 'AI訊號每日 08:00 檢查 Simons 完成狀態；手動重新抓取可再檢查一次';
 
 export function clearOfficialPriceMapCache(): void {
   clearTTLCache(OFFICIAL_PRICE_MAP_CACHE_KEY);
@@ -139,15 +135,6 @@ export type UserMarketDailyCache<T = unknown> = {
 const DAILY_AI_CACHE_VERSION_KEY = 'ppbears_daily_ai_cache_version_v1';
 const DAILY_AI_CACHE_GLOBAL_SURFACE = 'global';
 
-function toDailyAiVersionToken(version: string | null | undefined): string {
-  if (!version) return 'unversioned';
-  return version.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 160);
-}
-
-function getDailyAiCacheVersionToken(): string {
-  return toDailyAiVersionToken(getKnownDailyAiCacheVersion(DAILY_AI_CACHE_GLOBAL_SURFACE));
-}
-
 export async function fetchDailyAiCacheVersion(): Promise<DailyAiCacheVersion | null> {
   try {
     const res = await fetch(`/api/app-cache?type=ai-cache-version&t=${Date.now()}`, {
@@ -180,7 +167,7 @@ export function rememberDailyAiCacheVersion(version: string, surface = DAILY_AI_
   try {
     localStorage.setItem(`${DAILY_AI_CACHE_VERSION_KEY}_${DAILY_AI_CACHE_GLOBAL_SURFACE}`, version);
     localStorage.setItem(`${DAILY_AI_CACHE_VERSION_KEY}_${surface}`, version);
-  } catch {}
+  } catch { /* Browser storage can be unavailable. */ }
 }
 
 export async function ensureDailyAiCacheVersion(surface = DAILY_AI_CACHE_GLOBAL_SURFACE, forceFetch = false): Promise<string | null> {
@@ -218,61 +205,7 @@ export async function fetchUserMarketDailyCache<T>(surface: UserMarketCacheSurfa
 }
 
 export async function refreshDailyAiCache(stockCodes: string[] = []): Promise<DailyAiCacheRefreshResult> {
-  const uniqueCodes = [...new Set(stockCodes.map(code => String(code || '').trim()).filter(code => /^\d{4,6}$/.test(code)))].slice(0, 80);
-  const result: DailyAiCacheRefreshResult = {
-    simonsStatus: 'unknown',
-    snapshotOk: 0,
-    snapshotTotal: uniqueCodes.length,
-  };
-
-  try {
-    const simonsRes = await fetchMarketResponse(`/api/app-cache?type=simons&manual=${Date.now()}`, {
-      cache: 'no-store',
-      headers: { accept: 'application/json' },
-    });
-    if (simonsRes.ok) {
-      const payload = await simonsRes.json();
-      result.simonsStatus = payload?.status === 'ready' ? 'ready' : payload?.status === 'waiting-simons' ? 'waiting-simons' : 'unknown';
-      result.targetDate = payload?.targetDate;
-      result.dataDate = payload?.dataDate;
-      result.source = payload?.source;
-    }
-  } catch (err) {
-    console.error('refreshDailyAiCache simons check failed:', err);
-  }
-
-  if (result.simonsStatus !== 'ready' || uniqueCodes.length === 0) {
-    return result;
-  }
-
-  const sessionResult = supabase ? await supabase.auth.getSession().catch(() => null) : null;
-  const token = sessionResult?.data.session?.access_token;
-  const queue = [...uniqueCodes];
-  const responses: boolean[] = [];
-  await Promise.all(Array.from({ length: Math.min(4, queue.length) }, async () => {
-    while (queue.length > 0) {
-      const code = queue.shift()!;
-      responses.push(await (async () => {
-            try {
-              const res = await fetch(`/api/app-cache?type=stock-quant-snapshot&coid=${encodeURIComponent(code)}&manual=${Date.now()}`, {
-                cache: 'no-store',
-                signal: AbortSignal.timeout(20000),
-                headers: {
-                  accept: 'application/json',
-                  ...(token ? { Authorization: `Bearer ${token}` } : {}),
-                },
-              });
-              if (!res.ok) return false;
-              const payload = await res.json();
-              return Boolean(payload?.saved || payload?.skipped || payload?.data?.meta);
-            } catch {
-              return false;
-            }
-      })());
-    }
-  }));
-  result.snapshotOk = responses.filter(Boolean).length;
-  return result;
+  return { simonsStatus: 'unknown', source: 'retired', snapshotOk: 0, snapshotTotal: stockCodes.length };
 }
 
 // TWSE OpenAPI Base
@@ -506,7 +439,7 @@ export async function fetchExDividendCalendar(): Promise<Map<string, ExDividendI
   try {
     const res = await fetch('/api/twse/exchangeReport/TWT48U_ALL', { headers: { Accept: 'application/json' } });
     if (res.ok) {
-      const items: any[] = await res.json();
+      const items: Array<Record<string, string>> = await res.json();
       for (const item of items) {
         const cashDiv = parseFloat(item.CashDividend);
         if (!item.CashDividend || isNaN(cashDiv) || cashDiv <= 0) continue;
@@ -530,7 +463,7 @@ export async function fetchExDividendCalendar(): Promise<Map<string, ExDividendI
   try {
     const res = await fetch('/api/tpex/tpex_exright_prepost', { headers: { Accept: 'application/json' } });
     if (res.ok) {
-      const items: any[] = await res.json();
+      const items: Array<Record<string, string>> = await res.json();
       for (const item of items) {
         const cashDiv = parseFloat(item.CashDividend);
         if (!item.CashDividend || isNaN(cashDiv) || cashDiv <= 0) continue;
@@ -813,7 +746,7 @@ export async function getFreshStockAnalysis(
   industry: string,
   status: string
 ): Promise<StockLiveAnalysis | null> {
-  const cacheKey = `ppbears_daily_analysis_v2_${code}`;
+  const cacheKey = `ppbears_daily_analysis_official_v3_${code}`;
   const cached = getDailyCache<StockLiveAnalysis>(cacheKey);
   if (cached) return cached;
   try {
@@ -852,19 +785,56 @@ export async function getFreshStockAnalysis(
 
 
 // 取得個股資料
-export async function fetchStockData(coid: string): Promise<StockData | null> {
-  try {
-    const url = `${IFALGO_BASE}/stock?coid=${coid}`;
-    const res = await fetchMarketResponse(url, { cache: 'no-store' }, { validate: data => Array.isArray(data?.data?.stock?.position?.prices) && data.data.stock.position.prices.length > 0 });
-    const json = await res.json();
-    if (json.data?.stock?.position) {
-      return json.data.stock.position;
-    }
-    return null;
-  } catch (err) {
-    console.error('fetchStockData error:', err);
-    return null;
+export async function fetchStrategySignals(codes: string[], options: { forceFresh?: boolean } = {}): Promise<StrategySignalsPayload | null> {
+  const unique = [...new Set(codes.map(code => String(code).trim()).filter(code => /^\d{4,6}$/.test(code)))];
+  if (!unique.length) return null;
+  const sessionResult = supabase ? await supabase.auth.getSession() : null;
+  const token = sessionResult?.data.session?.access_token;
+  if (!token) throw new Error('請先登入以取得帳戶策略訊號');
+  const params = new URLSearchParams({ type: 'strategy-signals', coids: unique.join(',') });
+  if (options.forceFresh) params.set('fresh', String(Date.now()));
+  const response = await fetch(`/api/app-cache?${params.toString()}`, {
+    cache: 'no-store', headers: { accept: 'application/json', Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error(`策略訊號讀取失敗 (${response.status})`);
+  const payload = await response.json() as StrategySignalsPayload;
+  if (payload?.source !== 'weekly-trend-v1' || typeof payload.generatedAt !== 'string' || !payload.signals || typeof payload.signals !== 'object' || Array.isArray(payload.signals)) throw new Error('策略訊號資料格式錯誤');
+  const allowedActions = new Set(['entry', 'neutral', 'add', 'hold', 'reduce', 'exit', 'unavailable']);
+  for (const code of unique) {
+    const decision = payload.signals[code];
+    if (!decision || decision.code !== code || decision.source !== 'weekly-trend-v1' || !allowedActions.has(decision.action)
+      || !['ready', 'unavailable'].includes(decision.status) || typeof decision.label !== 'string' || typeof decision.reason !== 'string' || !Array.isArray(decision.events)
+      || typeof decision.held !== 'boolean' || typeof decision.dataDate !== 'string' || typeof decision.weeklyDate !== 'string'
+      || !Number.isFinite(decision.suggestedQuantity) || decision.suggestedQuantity < 0) throw new Error('策略訊號資料不完整');
+    const indicators = [decision.close, decision.ma20, decision.ma60, decision.breakoutPrice, decision.atr, decision.initialRisk, decision.protectionPrice, decision.addTriggerPrice, decision.weeklyRank];
+    if (indicators.some(value => value !== null && (typeof value !== 'number' || !Number.isFinite(value)))) throw new Error('策略指標格式錯誤');
+    if (decision.events.some(event => !event || !['entry', 'add', 'reduce', 'exit'].includes(event.action)
+      || !/^\d{4}-\d{2}-\d{2}$/.test(event.date) || typeof event.label !== 'string' || typeof event.reason !== 'string')) throw new Error('策略事件格式錯誤');
   }
+  return payload;
+}
+
+export async function fetchStrategyPrices(code: string, market?: 'listed' | 'otc'): Promise<StockPrice[]> {
+  if (!/^\d{4,6}$/.test(code)) throw new Error('股票代號格式錯誤');
+  const params = new URLSearchParams({ type: 'strategy-prices', coid: code });
+  if (market) params.set('market', market);
+  const response = await fetch(`/api/app-cache?${params.toString()}`, { cache: 'no-store', headers: { accept: 'application/json' } });
+  if (!response.ok) throw new Error(`官方日 K 讀取失敗 (${response.status})`);
+  const payload = await response.json() as { source?: string; prices?: StockPrice[] };
+  if (payload.source !== 'official-daily' || !Array.isArray(payload.prices)) throw new Error('官方日 K 資料格式錯誤');
+  return payload.prices;
+}
+
+export async function fetchStockData(coid: string): Promise<StockData | null> {
+  if (!/^\d{4,6}$/.test(coid)) return null;
+  try {
+    const map = await fetchOfficialPriceMap();
+    const entry = map[coid];
+    const prices = await fetchStrategyPrices(coid, entry?.market);
+    if (!entry && !prices.length) return null;
+    return { coid, stkname: entry?.name || POPULAR_STOCKS.find(s => s.code === coid)?.name || coid,
+      subindustry: getStockIndustryFromSource(coid) || '', status: entry?.market === 'otc' ? '上櫃' : entry?.market === 'listed' ? '上市' : '', prices };
+  } catch (error) { console.error('fetchStockData official history error:', error); return null; }
 }
 
 export type OfficialStockHistoryPayload = {
@@ -907,28 +877,9 @@ export type StockTradingSignalsPayload = {
   generatedAt: string;
 };
 
-export async function fetchStockTradingSignals(coid: string): Promise<StockTradingSignalsPayload | null> {
-  try {
-    const { data } = supabase
-      ? await supabase.auth.getSession()
-      : { data: { session: null } };
-    const token = data.session?.access_token;
-    if (!token) return null;
-
-    const res = await fetchMarketResponse(`/api/app-cache?type=stock-trading-signals&coid=${encodeURIComponent(coid)}`, {
-      cache: 'no-store',
-      headers: {
-        accept: 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-    });
-    if (!res.ok) return null;
-    const json = await res.json();
-    return Array.isArray(json?.signals) ? json as StockTradingSignalsPayload : null;
-  } catch (err) {
-    console.error('fetchStockTradingSignals error:', err);
-    return null;
-  }
+export async function fetchStockTradingSignals(_coid: string): Promise<StockTradingSignalsPayload | null> {
+  void _coid;
+  return null;
 }
 
 export interface StockQuantData {
@@ -980,7 +931,7 @@ export interface StockQuantHistoryPoint {
 
 export interface InstitutionCostData {
   code: string;
-  source: 'goodinfo';
+  source: 'goodinfo' | 'finmind';
   sourceUrl: string;
   period: string;
   note: string;
@@ -1007,47 +958,13 @@ export interface InstitutionCostData {
 }
 
 export async function fetchStockQuantHistory(coid: string, days = 60): Promise<StockQuantHistoryPoint[]> {
-  try {
-    const params = new URLSearchParams({
-      type: 'stock-quant-history',
-      coid,
-      days: String(days),
-    });
-    const res = await fetch(`/api/app-cache?${params.toString()}`, {
-      cache: 'no-store',
-      headers: { accept: 'application/json' },
-    });
-    if (!res.ok) return [];
-    const data = await res.json();
-    return Array.isArray(data?.points) ? data.points : [];
-  } catch (err) {
-    console.error('fetchStockQuantHistory error:', err);
-    return [];
-  }
+  void coid; void days;
+  return [];
 }
 
 export async function fetchSimonsRecommendationCounts(coids: string[], days = 90): Promise<Record<string, number>> {
-  const uniqueCoids = [...new Set(coids.filter(Boolean))];
-  if (uniqueCoids.length === 0) return {};
-
-  try {
-    const params = new URLSearchParams({
-      type: 'simons-rec-counts',
-      coids: uniqueCoids.join(','),
-      days: String(days),
-    });
-    const res = await fetch(`/api/app-cache?${params.toString()}`, {
-      headers: { accept: 'application/json' },
-    });
-    if (!res.ok) return {};
-    const data = await res.json();
-    return data?.counts && typeof data.counts === 'object'
-      ? data.counts as Record<string, number>
-      : {};
-  } catch (err) {
-    console.error('fetchSimonsRecommendationCounts error:', err);
-    return {};
-  }
+  void coids; void days;
+  return {};
 }
 
 export type ActiveEtfAction = 'added' | 'increased' | 'decreased' | 'removed' | 'held';
@@ -1121,24 +1038,8 @@ export interface SimonsInstitutionCostData {
 }
 
 export async function fetchSimonsInstitutionCostData(coid: string, days = 90): Promise<SimonsInstitutionCostData | null> {
-  try {
-    const params = new URLSearchParams({
-      type: 'simons-institution-cost',
-      coid,
-      days: String(days),
-    });
-    const res = await fetch(`/api/app-cache?${params.toString()}`, {
-      headers: { accept: 'application/json' },
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    return data?.cost && typeof data.cost === 'object'
-      ? data.cost as SimonsInstitutionCostData
-      : null;
-  } catch (err) {
-    console.error('fetchSimonsInstitutionCostData error:', err);
-    return null;
-  }
+  void coid; void days;
+  return null;
 }
 
 export async function fetchInstitutionCostData(coid: string): Promise<InstitutionCostData | null> {
@@ -1157,123 +1058,16 @@ export async function fetchInstitutionCostData(coid: string): Promise<Institutio
   }
 }
 
-export async function fetchStockQuantData(coid: string, sinceDate?: string, options: { forceFresh?: boolean } = {}): Promise<StockQuantData> {
-  const empty: StockQuantData = {
-    aiQuanBackDataComment: null,
-    chipStability: null,
-    stockInfo: null,
-    currentSignal: 'neutral',
-    signalStreak: { signal: null, count: 0 },
-    reentryAfterExit: null,
-    meta: {
-      source: 'empty',
-      dataDate: _todayStr(),
-      fetchedAt: new Date().toISOString(),
-      fixedUpdateTime: AI_SYNC_LABEL,
-      scheduleLabel: AI_SYNC_SCHEDULE_LABEL,
-      cacheStatus: 'miss',
-    },
-  };
-  // v5: 改用 30 分鐘 TTL 快取（原每日快取會讓訊號延遲整天，盤中訊號不可接受）
-  const dailyVersionToken = getDailyAiCacheVersionToken();
-  const cacheKey = sinceDate ? `ppbears_quant30_${QUANT_SIGNAL_CACHE_VERSION}_${dailyVersionToken}_${coid}_${sinceDate}` : `ppbears_quant30_${QUANT_SIGNAL_CACHE_VERSION}_${dailyVersionToken}_${coid}`;
-  const legacyCacheKey = sinceDate ? `ppbears_quant30_${coid}_${sinceDate}` : `ppbears_quant30_${coid}`;
-  if (!options.forceFresh) {
-    const cached = getTTLCache<StockQuantData>(cacheKey);
-    if (cached && cached.meta?.source !== 'empty') return cached;
-  }
-  try {
-    const params = new URLSearchParams({ coid });
-    if (sinceDate) params.set('sinceDate', sinceDate);
-    if (options.forceFresh) params.set('fresh', String(Date.now()));
-    try {
-      params.set('type', 'stock-quant');
-      const sessionResult = supabase ? await supabase.auth.getSession().catch(() => null) : null;
-      const token = sessionResult?.data.session?.access_token;
-      const cloudRes = await fetchMarketResponse(`/api/app-cache?${params.toString()}`, {
-        ...(options.forceFresh ? { cache: 'no-store' as RequestCache } : {}),
-        headers: {
-          accept: 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-      }, { timeoutMs: 30000 });
-      if (cloudRes.ok) {
-        const cloudData = await cloudRes.json();
-        if (!cloudData?.error && cloudData?.data?.meta?.source !== 'empty' && cloudData?.data?.aiQuanBackDataComment !== undefined) {
-          const result = cloudData.data as StockQuantData;
-          setTTLCache(cacheKey, result, QUANT_SIGNAL_TTL_MS);
-          clearTTLCache(legacyCacheKey);
-          return result;
-        }
-      }
-    } catch {
-      // Do not derive protected signals from the sanitized public stock endpoint.
-    }
-
-    return empty;
-  } catch (err) {
-    console.error('fetchStockQuantData error:', err);
-    return empty;
-  }
+export async function fetchStockQuantData(_coid: string, _sinceDate?: string, _options: { forceFresh?: boolean } = {}): Promise<StockQuantData> {
+  void _coid; void _sinceDate; void _options;
+  return { aiQuanBackDataComment: null, chipStability: null, stockInfo: null, currentSignal: 'neutral',
+    signalStreak: { signal: null, count: 0 }, reentryAfterExit: null,
+    meta: { source: 'empty', dataDate: '', fetchedAt: new Date().toISOString(), fixedUpdateTime: '已停用', scheduleLabel: '舊訊號已停用，請改用週榜趨勢訊號', cacheStatus: 'miss' } };
 }
 
-// 取得 Simons 每日推薦
-// 今日資料優先讀取雲端每日快取；雲端沒有時才回原始 IFAlgo。
-export async function fetchSimonsData(
-  date?: string,
-  options: { forceFresh?: boolean; updateSharedCache?: boolean } = {}
-): Promise<SimonsItem[]> {
-  const d = date || _todayStr();
-  // 指定歷史日期時仍用每日快取；今日資料保存到隔天早上 7 點
-  const isToday = !date || date === _todayStr();
-  const dailyVersionToken = isToday ? getDailyAiCacheVersionToken() : '';
-  const cacheKey = isToday
-    ? `ppbears_simons_daily7_${d}_${dailyVersionToken}`
-    : `ppbears_daily_simons_${d}`;     // 歷史：每日快取
-  const cached = options.forceFresh
-    ? null
-    : isToday
-      ? getTTLCache<SimonsItem[]>(cacheKey)
-      : getDailyCache<SimonsItem[]>(cacheKey);
-  if (cached) return cached;
-  try {
-    if (isToday) {
-      try {
-        const cloudUrl = options.forceFresh
-          ? options.updateSharedCache
-            ? `/api/app-cache?type=simons&manual=${Date.now()}`
-            : `/api/app-cache?type=simons&read=${Date.now()}`
-          : '/api/app-cache?type=simons';
-        const cloudRes = await fetchMarketResponse(cloudUrl, options.forceFresh ? { cache: 'no-store' } : undefined);
-        if (cloudRes.ok) {
-          const cloudJson = await cloudRes.json();
-          const cloudItems: SimonsItem[] = Array.isArray(cloudJson?.items) ? cloudJson.items : [];
-          if (cloudItems.length > 0) {
-            setTTLCache(cacheKey, cloudItems, getSimonsDataTtlMs());
-            return cloudItems;
-          }
-        }
-      } catch {
-        // Local/offline fallback below.
-      }
-    }
-
-    const url = `${IFALGO_BASE}/common/getSimonsData?searchDate=${d}&_t=${Date.now()}`;
-    const res = await fetchMarketResponse(url, { cache: 'no-store' });
-    const json = await res.json();
-    const items: SimonsItem[] = json.data?.dataItems || [];
-    if (items.length > 0) {
-      if (isToday) {
-        setTTLCache(cacheKey, items, getSimonsDataTtlMs());
-      } else {
-        setDailyCache(cacheKey, items);
-      }
-    }
-    return items;
-  } catch (err) {
-    console.error('fetchSimonsData error:', err);
-    return [];
-  }
+export async function fetchSimonsData(_date?: string, _options: { forceFresh?: boolean; updateSharedCache?: boolean } = {}): Promise<SimonsItem[]> {
+  void _date; void _options;
+  return [];
 }
 
 export interface MarketMomentumPoint {
@@ -1334,760 +1128,19 @@ export interface HomeMarketSummary {
   };
 }
 
-interface IFAlgoStockPayload {
-  data?: {
-    stock?: {
-      position?: {
-        ewgin?: Array<{ mdate: string; gin3?: number; gin7?: number; gin8?: number }>;
-      };
-    };
-  };
-}
-
-interface IFAlgoIndexFirstZoneData {
-  lastImrset?: {
-    mdate?: string;
-    lmrToday?: string | number;
-    lmrSafe?: string | number;
-    boundary?: string | number;
-  };
-  imrsetList?: Array<{
-    mdate?: string;
-    lmrToday?: string | number;
-    lmrSafe?: string | number;
-    boundary?: string | number;
-  }>;
-  lastForcastMonthly?: {
-    mdate?: string;
-    conv1?: string | number;
-    mforecast?: string | number;
-    longshort?: string;
-  };
-  lastForecastMonthly?: {
-    mdate?: string;
-    conv1?: string | number;
-    mforecast?: string | number;
-    longshort?: string;
-  };
-  forcastMonthlyList?: Array<string | number>;
-  forcastMonthlyDateList?: string[];
-  currencyList?: Array<string | number>;
-  lastForcastDaily?: {
-    mdate?: string;
-    longshort?: string;
-  };
-  lastPtsTw?: {
-    mdate?: string;
-    pts?: string | number;
-    mforecast?: string | number;
-    wforecast?: string | number;
-    dforecast?: string | number;
-  };
-}
-
-const HOME_MARKET_MOMENTUM_POINTS: MarketMomentumPoint[] = [
-  { label: '2022/07', moneyMomentum: -0.3150, taiex: 14800 },
-  { label: '2022/08', moneyMomentum: -0.4660, taiex: 14900 },
-  { label: '2022/09', moneyMomentum: -0.2860, taiex: 15050 },
-  { label: '2022/10', moneyMomentum: -0.4410, taiex: 13900 },
-  { label: '2022/11', moneyMomentum: -0.8620, taiex: 13650 },
-  { label: '2022/12', moneyMomentum: -1.0010, taiex: 14600 },
-  { label: '2023/01', moneyMomentum: -1.0000, taiex: 14200 },
-  { label: '2023/02', moneyMomentum: -1.2210, taiex: 15150 },
-  { label: '2023/03', moneyMomentum: -1.3990, taiex: 15400 },
-  { label: '2023/04', moneyMomentum: -1.3290, taiex: 15600 },
-  { label: '2023/05', moneyMomentum: -1.2350, taiex: 16000 },
-  { label: '2023/06', moneyMomentum: -1.1130, taiex: 16600 },
-  { label: '2023/07', moneyMomentum: -1.1630, taiex: 16950 },
-  { label: '2023/08', moneyMomentum: -1.0820, taiex: 16500 },
-  { label: '2023/09', moneyMomentum: -1.0570, taiex: 16100 },
-  { label: '2023/10', moneyMomentum: -0.8980, taiex: 17800 },
-  { label: '2023/11', moneyMomentum: -0.8800, taiex: 18600 },
-  { label: '2023/12', moneyMomentum: -0.7990, taiex: 18500 },
-  { label: '2024/01', moneyMomentum: -0.6320, taiex: 19700 },
-  { label: '2024/02', moneyMomentum: -0.5900, taiex: 20400 },
-  { label: '2024/03', moneyMomentum: -0.6370, taiex: 21100 },
-  { label: '2024/04', moneyMomentum: -0.6100, taiex: 22600 },
-  { label: '2024/05', moneyMomentum: -0.6000, taiex: 24500 },
-  { label: '2024/06', moneyMomentum: -0.7550, taiex: 23800 },
-  { label: '2024/07', moneyMomentum: -0.6810, taiex: 24100 },
-  { label: '2024/08', moneyMomentum: -0.5900, taiex: 23600 },
-  { label: '2024/09', moneyMomentum: -0.6500, taiex: 24500 },
-  { label: '2024/10', moneyMomentum: -0.5960, taiex: 25100 },
-  { label: '2024/11', moneyMomentum: -0.7000, taiex: 24700 },
-  { label: '2024/12', moneyMomentum: -0.6600, taiex: 22000 },
-  { label: '2025/01', moneyMomentum: -0.5110, taiex: 21000 },
-  { label: '2025/02', moneyMomentum: -0.4700, taiex: 22200 },
-  { label: '2025/03', moneyMomentum: -0.9320, taiex: 23200 },
-  { label: '2025/04', moneyMomentum: -0.8420, taiex: 24100 },
-  { label: '2025/05', moneyMomentum: -0.7000, taiex: 25800 },
-  { label: '2025/06', moneyMomentum: -0.6020, taiex: 27600 },
-  { label: '2025/07', moneyMomentum: -0.5120, taiex: 27100 },
-  { label: '2025/08', moneyMomentum: -0.4720, taiex: 28900 },
-  { label: '2025/09', moneyMomentum: -0.4430, taiex: 33000 },
-  { label: '2025/10', moneyMomentum: -0.4310, taiex: 36200 },
-  { label: '2025/11', moneyMomentum: -0.4300, taiex: 33000 },
-  { label: '2025/12', moneyMomentum: -0.3200, taiex: 39700 },
-  { label: '2026/01', moneyMomentum: -0.3130, taiex: 32063.8 },
-  { label: '2026/02', moneyMomentum: -0.0406, taiex: 35414.5 },
-  { label: '2026/03', moneyMomentum: -0.1934, taiex: 31723.0 },
-  { label: '2026/04', moneyMomentum: -0.1934, taiex: 38926.6 },
-  { label: '2026/05', moneyMomentum: -0.1934, taiex: 40769.3 },
-];
-
-const HOME_MARGIN_POINTS: MarginMaintenancePoint[] = [
-  { label: '2025/12/01', rate: 154.0 },
-  { label: '2025/12/08', rate: 153.2 },
-  { label: '2025/12/15', rate: 154.1 },
-  { label: '2025/12/22', rate: 154.5 },
-  { label: '2025/12/29', rate: 154.2 },
-  { label: '2026/01/05', rate: 155.7 },
-  { label: '2026/01/12', rate: 155.8 },
-  { label: '2026/01/19', rate: 156.2 },
-  { label: '2026/01/26', rate: 157.1 },
-  { label: '2026/02/02', rate: 159.5 },
-  { label: '2026/02/09', rate: 160.1 },
-  { label: '2026/02/16', rate: 155.5 },
-  { label: '2026/02/23', rate: 154.8 },
-  { label: '2026/03/02', rate: 158.0 },
-  { label: '2026/03/09', rate: 161.6 },
-  { label: '2026/03/16', rate: 151.2 },
-  { label: '2026/03/23', rate: 156.9 },
-  { label: '2026/03/30', rate: 159.7 },
-  { label: '2026/04/06', rate: 156.2 },
-  { label: '2026/04/13', rate: 150.8 },
-  { label: '2026/04/20', rate: 153.3 },
-  { label: '2026/04/27', rate: 157.6 },
-  { label: '2026/05/01', rate: 160.3 },
-];
-
-const TAIPEI_OFFSET_MS = 8 * 60 * 60 * 1000;
-const HOME_MARKET_SUMMARY_CACHE_KEY = 'ppbears_home_market_summary_daily_7am_v17';
-
-function getTaipeiShiftedDate(date = new Date()): Date {
-  return new Date(date.getTime() + TAIPEI_OFFSET_MS);
-}
-
-function getHomeMarketRefreshSlot(date = new Date()): string {
-  const taipei = getTaipeiShiftedDate(date);
-  return taipei.toISOString().slice(0, 10);
-}
-
-function getNextHomeMarketRefreshTime(date = new Date()): number {
-  const taipei = getTaipeiShiftedDate(date);
-  let nextTaipeiEight = Date.UTC(
-    taipei.getUTCFullYear(),
-    taipei.getUTCMonth(),
-    taipei.getUTCDate(),
-    7,
-    0,
-    0,
-    0
-  );
-  if (taipei.getTime() >= nextTaipeiEight) {
-    nextTaipeiEight += 24 * 60 * 60 * 1000;
-  }
-  return nextTaipeiEight - TAIPEI_OFFSET_MS;
-}
-
-function getHomeMarketSummaryCache(): HomeMarketSummary | null {
+/** Retired predictions are never read from local or shared caches. */
+function getHomeMarketSummaryCache(): null {
   try {
     for (const key of Object.keys(localStorage)) {
-      if (
-        (key.startsWith('ppbears_home_market_summary_daily_8am_')
-          || key.startsWith('ppbears_home_market_summary_daily_7am_'))
-        && key !== HOME_MARKET_SUMMARY_CACHE_KEY
-      ) {
-        localStorage.removeItem(key);
-      }
+      if (key.startsWith('ppbears_home_market_summary_')) localStorage.removeItem(key);
     }
-    const raw = localStorage.getItem(HOME_MARKET_SUMMARY_CACHE_KEY);
-    if (!raw) return null;
-    const parsed: { refreshSlot: string; expiry: number; data: HomeMarketSummary } = JSON.parse(raw);
-    const hasLegacyMood = !parsed.data?.marketMood?.reason
-      || String(parsed.data?.aiConclusion?.summary || '').includes('四個情緒可以同時成立')
-      || String(parsed.data?.aiConclusion?.summary || '').includes('分開判讀')
-      || String(parsed.data?.aiConclusion?.summary || '').includes('undefined')
-      || parsed.data?.marketMood?.indicators?.some(indicator => (
-      ['追價熱度', '趨勢信心', '槓桿安全', '波動穩定'].includes(String(indicator.label)) || 'score' in indicator
-    ));
-    if (hasLegacyMood) {
-      localStorage.removeItem(HOME_MARKET_SUMMARY_CACHE_KEY);
-      return null;
-    }
-    if (parsed.refreshSlot !== getHomeMarketRefreshSlot() || Date.now() > parsed.expiry) {
-      localStorage.removeItem(HOME_MARKET_SUMMARY_CACHE_KEY);
-      return null;
-    }
-    return parsed.data;
-  } catch {
-    return null;
-  }
-}
-
-function isValidHomeMarketSummary(data: unknown): data is HomeMarketSummary {
-  const summary = data as Partial<HomeMarketSummary> | null;
-  return !!summary
-    && typeof summary.updateDate === 'string'
-    && typeof summary.macroScore === 'number'
-    && !!summary.marketMood?.primary
-    && Array.isArray(summary.marketFundMomentum?.points)
-    && Array.isArray(summary.marginMaintenance?.points)
-    && typeof summary.marginMaintenance?.todayRate === 'number';
-}
-
-async function fetchCloudHomeMarketSummary(): Promise<HomeMarketSummary | null> {
-  try {
-    const response = await fetch('/api/app-cache?type=home-summary');
-    if (!response.ok) return null;
-    const json = await response.json();
-    const summary = json?.summary ?? json;
-    return isValidHomeMarketSummary(summary) ? summary : null;
-  } catch {
-    return null;
-  }
-}
-
-function setHomeMarketSummaryCache(data: HomeMarketSummary): void {
-  try {
-    localStorage.setItem(HOME_MARKET_SUMMARY_CACHE_KEY, JSON.stringify({
-      refreshSlot: getHomeMarketRefreshSlot(),
-      expiry: getNextHomeMarketRefreshTime(),
-      data,
-    }));
-  } catch {}
-}
-
-function parseMarketNumber(value: unknown): number {
-  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
-  const normalized = String(value ?? '')
-    .replace(/,/g, '')
-    .replace(/\+/g, '')
-    .replace(/%/g, '')
-    .trim();
-  const n = parseFloat(normalized);
-  return Number.isFinite(n) ? n : 0;
-}
-
-function clampMarketValue(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value));
-}
-
-function parseMonthlyForecast(value: unknown): number | undefined {
-  const forecast = parseMarketNumber(value);
-  return Number.isFinite(forecast) && forecast !== 0 ? forecast : undefined;
-}
-
-function getMonthlyDirectionScore(label: string, forecast?: number, fallbackScore = 50): number {
-  const normalized = String(label || '');
-  if (normalized.includes('偏多') || normalized.includes('多') || (forecast ?? 0) > 0) return 82;
-  if (normalized.includes('偏空') || normalized.includes('偏弱') || normalized.includes('空') || (forecast ?? 0) < 0) return 18;
-  if (normalized.includes('穩健')) return 62;
-  return Math.round(clampMarketValue(fallbackScore, 0, 100));
-}
-
-function toYmd(date: Date): string {
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}`;
-}
-
-function toIsoDate(date: Date): string {
-  const ymd = toYmd(date);
-  return `${ymd.slice(0, 4)}-${ymd.slice(4, 6)}-${ymd.slice(6, 8)}`;
-}
-
-function rocDateToIso(value: string): string {
-  const raw = String(value || '').replace(/\D/g, '');
-  if (raw.length !== 7) return value;
-  const year = Number(raw.slice(0, 3)) + 1911;
-  return `${year}-${raw.slice(3, 5)}-${raw.slice(5, 7)}`;
-}
-
-function rocDateToMonthLabel(value: string): string {
-  const iso = rocDateToIso(value);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return value;
-  return `${iso.slice(0, 4)}/${iso.slice(5, 7)}`;
-}
-
-function getRecentDates(days: number): Date[] {
-  const dates: Date[] = [];
-  const current = new Date();
-  for (let i = 0; i < days; i += 1) {
-    const d = new Date(current);
-    d.setDate(current.getDate() - i);
-    dates.push(d);
-  }
-  return dates;
-}
-
-async function fetchLatestSimonsSnapshot(): Promise<{ date: string; items: SimonsItem[] }> {
-  for (const date of getRecentDates(12)) {
-    if (date.getDay() === 0 || date.getDay() === 6) continue;
-    const iso = toIsoDate(date);
-    const items = await fetchSimonsData(iso);
-    if (items.length > 0) return { date: iso, items };
-  }
-  return { date: _todayStr(), items: [] };
-}
-
-async function fetchIfalgoIndexFirstZoneData(): Promise<IFAlgoIndexFirstZoneData | null> {
-  try {
-    const res = await fetch(`${IFALGO_BASE}/index/firstZoneData`, { cache: 'no-store' });
-    if (!res.ok) return null;
-    const json = await res.json();
-    return json.data?.first ?? null;
-  } catch {
-    return null;
-  }
-}
-
-async function fetchSimonsEwginData(coid = '2383'): Promise<Array<{ mdate: string; gin3: number; gin7: number; gin8: number }>> {
-  try {
-    const res = await fetch(`${IFALGO_BASE}/stock?coid=${coid}`, { cache: 'no-store' });
-    if (!res.ok) return [];
-    const json: IFAlgoStockPayload = await res.json();
-    const ewgin = json.data?.stock?.position?.ewgin || [];
-    return ewgin
-      .map(item => ({
-        mdate: item.mdate,
-        gin3: parseMarketNumber(item.gin3),
-        gin7: parseMarketNumber(item.gin7),
-        gin8: parseMarketNumber(item.gin8),
-      }))
-      .filter(item => item.mdate && Number.isFinite(item.gin8));
-  } catch {
-    return [];
-  }
-}
-
-function buildIfalgoMomentumPoints(firstZone: IFAlgoIndexFirstZoneData | null): MarketMomentumPoint[] {
-  const dates = firstZone?.forcastMonthlyDateList ?? [];
-  const momentum = firstZone?.currencyList ?? [];
-  const taiex = firstZone?.forcastMonthlyList ?? [];
-  const points = dates.map((date, index) => ({
-    label: String(date || '').slice(0, 7).replace('-', '/'),
-    moneyMomentum: parseMarketNumber(momentum[index]),
-    taiex: parseMarketNumber(taiex[index]),
-  })).filter(point => point.label && Number.isFinite(point.moneyMomentum) && point.taiex > 0);
-  return points.length > 0 ? points : HOME_MARKET_MOMENTUM_POINTS;
-}
-
-function buildIfalgoMarginPoints(firstZone: IFAlgoIndexFirstZoneData | null): MarginMaintenancePoint[] {
-  const rows = firstZone?.imrsetList ?? [];
-  const points = rows.map(row => ({
-    label: String(row.mdate || '').replace(/-/g, '/'),
-    rate: parseMarketNumber(row.lmrToday),
-  })).filter(point => point.label && point.rate > 0);
-  return points.length > 0 ? points : HOME_MARGIN_POINTS;
-}
-
-function buildIfalgoMarketScores(
-  firstZone: IFAlgoIndexFirstZoneData | null,
-  fallback: Pick<HomeMarketSummary, 'monthLabel' | 'macroScore' | 'monthlyPrediction' | 'dailyPrediction'>
-): Pick<HomeMarketSummary, 'monthLabel' | 'macroScore' | 'monthlyPrediction' | 'dailyPrediction'> {
-  const monthly = firstZone?.lastForecastMonthly ?? firstZone?.lastForcastMonthly;
-  const monthlyScore = parseMarketNumber(monthly?.conv1);
-  const monthlyForecast = parseMonthlyForecast(monthly?.mforecast);
-  const dailyScore = parseMarketNumber(firstZone?.lastPtsTw?.pts);
-  const monthDate = String(monthly?.mdate || firstZone?.lastPtsTw?.mdate || '');
-  const month = /^\d{4}-\d{2}-\d{2}$/.test(monthDate)
-    ? Number(monthDate.slice(5, 7))
-    : Number(fallback.monthLabel.replace(/\D/g, '')) || new Date().getMonth() + 1;
-
-  return {
-    monthLabel: `${month}月`,
-    macroScore: monthlyScore > 0 ? Math.round(clampMarketValue(monthlyScore, 0, 100)) : fallback.macroScore,
-    monthlyPrediction: monthlyScore > 0
-      ? {
-        score: Math.round(clampMarketValue(monthlyScore, 0, 100)),
-        label: monthly?.longshort || fallback.monthlyPrediction.label,
-        directionScore: getMonthlyDirectionScore(monthly?.longshort || fallback.monthlyPrediction.label, monthlyForecast, monthlyScore),
-        rawScore: Math.round(clampMarketValue(monthlyScore, 0, 100)),
-        forecast: monthlyForecast,
-      }
-      : fallback.monthlyPrediction,
-    dailyPrediction: dailyScore > 0
-      ? {
-        score: Math.round(clampMarketValue(dailyScore, 0, 8)),
-        maxScore: 8,
-      }
-      : fallback.dailyPrediction,
-  };
-}
-
-async function fetchSimonsDailyPrediction(items: SimonsItem[]): Promise<HomeMarketSummary['dailyPrediction'] | null> {
-  if (items.length === 0) return null;
-  const rows = await Promise.all(items.map(async item => {
-    const ewgin = await fetchSimonsEwginData(item.coid);
-    const latest = ewgin
-      .filter(point => !item.mdate || point.mdate <= item.mdate)
-      .sort((a, b) => a.mdate.localeCompare(b.mdate))
-      .pop();
-    return latest
-      ? {
-        coid: item.coid,
-        name: item.stkname,
-        mdate: latest.mdate,
-        gin8: latest.gin8,
-      }
-      : null;
-  }));
-  const best = rows
-    .filter((row): row is NonNullable<typeof row> => !!row && Number.isFinite(row.gin8))
-    .sort((a, b) => b.gin8 - a.gin8)[0];
-  if (!best) return null;
-  return {
-    score: Math.round(clampMarketValue(best.gin8, 0, 8)),
-    maxScore: 8,
-    sourceStock: `${best.coid} ${best.name}`,
-  };
-}
-
-async function fetchLatestTaiexPoint(): Promise<{ label: string; taiex: number } | null> {
-  for (const date of getRecentDates(10)) {
-    if (date.getDay() === 0 || date.getDay() === 6) continue;
-    try {
-      const res = await fetch(`/api/twse-report/FMTQIK?response=json&date=${toYmd(date)}`, { cache: 'no-store' });
-      if (!res.ok) continue;
-      const data: any[] = await res.json();
-      const latest = [...data]
-        .filter(item => parseMarketNumber(item?.TAIEX) > 0)
-        .sort((a, b) => String(a.Date).localeCompare(String(b.Date)))
-        .pop();
-      if (!latest) continue;
-      return {
-        label: rocDateToMonthLabel(String(latest.Date)),
-        taiex: parseMarketNumber(latest.TAIEX),
-      };
-    } catch {
-      continue;
-    }
-  }
+  } catch { /* Browser storage can be unavailable. */ }
   return null;
 }
 
-async function fetchMonthlyMarketMomentum(): Promise<MarketMomentumPoint[]> {
-  const latestTaiex = await fetchLatestTaiexPoint();
-  const points = HOME_MARKET_MOMENTUM_POINTS.map(point => ({ ...point }));
-  if (latestTaiex && latestTaiex.label === points[points.length - 1].label) {
-    const last = points[points.length - 1];
-    points[points.length - 1] = {
-      ...last,
-      taiex: latestTaiex.taiex,
-    };
-  }
-  return points;
-}
-
-function calculateSimonsMarketScores(
-  items: SimonsItem[],
-  dailyPrediction: HomeMarketSummary['dailyPrediction'] | null
-): Pick<HomeMarketSummary, 'monthLabel' | 'macroScore' | 'monthlyPrediction' | 'dailyPrediction'> {
-  if (items.length === 0) {
-    return {
-      monthLabel: `${new Date().getMonth() + 1}月`,
-      macroScore: 50,
-      monthlyPrediction: { score: 50, label: '觀望' },
-      dailyPrediction: { score: 4, maxScore: 8 },
-    };
-  }
-
-  const date = String(items[0]?.mdate || _todayStr());
-  const month = /^\d{4}-\d{2}-\d{2}$/.test(date) ? Number(date.slice(5, 7)) : new Date().getMonth() + 1;
-
-  const sampleSize = Math.max(items.length, 1);
-  const riseMonth = items.filter(item => item.ret_m === 'rise').length;
-  const dropMonth = items.filter(item => item.ret_m === 'drop').length;
-  const riseWeek = items.filter(item => item.ret_w === 'rise').length;
-  const yflowCount = items.filter(item => String(item.yflow).toUpperCase() === 'Y').length;
-  const avgPsr = items.reduce((sum, item) => sum + parseMarketNumber(item.psr), 0) / sampleSize;
-  const avgStrength = items.reduce((sum, item) => sum + parseMarketNumber(item.strength), 0) / sampleSize;
-
-  const monthlyScore = Math.round(clampMarketValue(
-    50
-      + ((riseMonth - dropMonth) / sampleSize) * 24
-      + ((yflowCount / sampleSize) - 0.5) * 18
-      + (avgPsr - 5) * 3
-      + (avgStrength - 0.8) * 8,
-    0,
-    100
-  ));
-
-  const dailyScore = dailyPrediction?.score ?? Math.round(clampMarketValue(
-      (yflowCount / sampleSize) * 2.5
-        + (riseWeek / sampleSize) * 2.5
-        + (items.filter(item => parseMarketNumber(item.psr) >= 7).length / sampleSize) * 1.5
-        + clampMarketValue(avgStrength / 1.6, 0, 1) * 1.5,
-      0,
-      8
-    ));
-
-  const normalizedDaily = (dailyScore / 8) * 100;
-  const macroScore = Math.round(clampMarketValue(monthlyScore * 0.65 + normalizedDaily * 0.35, 0, 100));
-  const label = monthlyScore >= 70 ? '偏多' : monthlyScore >= 55 ? '穩健' : monthlyScore >= 40 ? '觀望' : '偏弱';
-
-  return {
-    monthLabel: `${month}月`,
-    macroScore,
-    monthlyPrediction: {
-      score: monthlyScore,
-      label,
-      directionScore: getMonthlyDirectionScore(label, undefined, monthlyScore),
-      rawScore: monthlyScore,
-    },
-    dailyPrediction: dailyPrediction ?? { score: dailyScore, maxScore: 8 },
-  };
-}
-
-function calculateMarketMood(
-  points: MarketMomentumPoint[],
-  macroScore: number,
-  monthlyScore: number,
-  monthlyLabel: string,
-  dailyScore: number,
-  marginRate: number,
-  safeLine: number
-): HomeMarketSummary['marketMood'] {
-  const latest = points[points.length - 1] ?? { label: _todayStr().replace(/-/g, '/'), moneyMomentum: -0.8, taiex: 0 };
-  const previous = points[points.length - 2] ?? latest;
-  const dailyNormalized = clampMarketValue((dailyScore / 8) * 100, 0, 100);
-  const taiexChangePct = previous?.taiex > 0 ? ((latest.taiex - previous.taiex) / previous.taiex) * 100 : 0;
-  const marginGap = marginRate - safeLine;
-  const isMonthlyBullish = monthlyLabel.includes('偏多') || (macroScore >= 70 && monthlyScore >= 70);
-  const isMonthlyBearish = monthlyLabel.includes('偏空');
-  const isDailyHot = dailyNormalized >= 72;
-  const isDailyWeak = dailyNormalized <= 40;
-  const isIndexRunning = taiexChangePct >= 4;
-  const isMarginVeryLoose = marginGap >= 24;
-  const isMarginSafe = marginGap >= 8;
-  const isMarginTight = marginGap < 4;
-
-  let primary: HomeMarketSummary['marketMood']['primary'] = '冷靜';
-  let reason = '原始訊號沒有明顯偏熱或偏多，先以冷靜觀察為主。';
-
-  if (isMarginTight || (isMonthlyBearish && isDailyWeak && marginGap < 24)) {
-    primary = '冷靜';
-    reason = isMarginTight
-      ? `融資維持率 ${marginRate.toFixed(2)}% 接近安全線 ${safeLine.toFixed(2)}%，槓桿安全距離不夠，今日氛圍偏冷靜。`
-      : `AI 月預測為${monthlyLabel || '偏弱'}、AI 日預測 ${dailyScore}/8 偏低，短線與中期訊號不夠一致，今日氛圍偏冷靜。`;
-  } else if (isDailyHot && (isMonthlyBearish || macroScore < 70 || (!isMonthlyBullish && isIndexRunning))) {
-    primary = '貪婪';
-    reason = `AI 日預測 ${dailyScore}/8 偏熱，且月線或總體訊號沒有完全同步偏多，代表短線追價情緒較明顯。`;
-  } else if (isMonthlyBullish && isMarginVeryLoose) {
-    primary = '放鬆';
-    reason = `AI 月預測為${monthlyLabel || '偏多'}，且融資維持率 ${marginRate.toFixed(2)}% 明顯高於安全線 ${safeLine.toFixed(2)}%，槓桿壓力較低，今日氛圍偏放鬆。`;
-  } else if (isMonthlyBullish || isMarginSafe || macroScore >= 70) {
-    primary = '樂觀';
-    reason = `AI 月預測為${monthlyLabel || '觀察中'}，市場方向偏正面但沒有判定為短線過熱。`;
-  }
-
-  const descriptions: Record<HomeMarketSummary['marketMood']['primary'], string> = {
-    貪婪: '短線追價情緒明顯，通常來自 AI 日預測偏熱，但中期或總體訊號沒有完全同步。',
-    樂觀: '中期方向偏正面，市場方向不差，但尚未判斷為過熱追價或壓力完全放鬆。',
-    放鬆: 'AI 月預測偏多且融資維持率明顯高於安全線，槓桿壓力較低。',
-    冷靜: 'AI 日預測偏低、月線偏空或融資安全距離不足時，適合降低追價衝動。',
-  };
-  const labels: HomeMarketSummary['marketMood']['primary'][] = ['貪婪', '樂觀', '放鬆', '冷靜'];
-
-  return {
-    primary,
-    reason,
-    indicators: labels.map(label => ({
-      label,
-      active: label === primary,
-      description: descriptions[label],
-    })),
-  };
-}
-
-async function fetchCurrentMarginMaintenanceRate(): Promise<{ date: string; rate: number | null }> {
-  try {
-    const response = await fetch('/api/market-margin-maintenance', { cache: 'no-store' });
-    if (response.ok) {
-      const latest = await response.json();
-      const rate = parseMarketNumber(latest?.rate);
-      if (rate > 0 && typeof latest?.date === 'string') {
-        return { date: latest.date, rate };
-      }
-    }
-  } catch {
-    // Local Vite does not serve Vercel functions; fall through to TWSE client-side approximation.
-  }
-
-  const closes = await fetchTWSEAllStocks();
-  const closeMap = new Map(closes.map(item => [item.Code, parseMarketNumber(item.ClosingPrice)]));
-  for (const date of getRecentDates(10)) {
-    if (date.getDay() === 0 || date.getDay() === 6) continue;
-    const ymd = toYmd(date);
-    try {
-      const res = await fetch(`/api/twse-report/MI_MARGN?response=json&date=${ymd}&selectType=MS`, { cache: 'no-store' });
-      if (!res.ok) continue;
-      const rows: any[] = await res.json();
-      if (!Array.isArray(rows) || rows.length === 0) continue;
-      let marginMarketValue = 0;
-      for (const row of rows) {
-        const code = String(row?.['股票代號'] || '');
-        if (!/^\d{4}$/.test(code)) continue;
-        const close = closeMap.get(code) || 0;
-        const lots = parseMarketNumber(row?.['融資今日餘額']);
-        if (close <= 0 || lots <= 0) continue;
-        marginMarketValue += lots * close * 1000;
-      }
-      if (marginMarketValue <= 0) continue;
-      // Public sources define the rate as financed shares market value divided by margin financing balance.
-      // TWSE JSON exposes shares by security but not every account's original financing cost, so this is a
-      // live approximation anchored to the normal 60% listed-stock financing ratio.
-      const estimatedLoanBalance = marginMarketValue * 0.6;
-      return { date: toIsoDate(date), rate: Number(((marginMarketValue / estimatedLoanBalance) * 100).toFixed(2)) };
-    } catch {
-      continue;
-    }
-  }
-  return { date: _todayStr(), rate: null };
-}
-
-function buildMarginSeries(currentRate: number | null): MarginMaintenancePoint[] {
-  if (!currentRate) return HOME_MARGIN_POINTS;
-  const base = HOME_MARGIN_POINTS.slice(-22);
-  return [
-    ...base,
-    { label: _todayStr().replace(/-/g, '/'), rate: currentRate },
-  ];
-}
-
-function buildRuleBasedMarketConclusion(summary: HomeMarketSummary): NonNullable<HomeMarketSummary['aiConclusion']> {
-  const dailyPct = Math.round((summary.dailyPrediction.score / summary.dailyPrediction.maxScore) * 100);
-  const monthlyText = summary.monthlyPrediction.label
-    ? summary.monthlyPrediction.label
-    : `${summary.monthlyPrediction.score} 分`;
-  const title = `今天市場氛圍：${summary.marketMood.primary}`;
-
-  return {
-    title,
-    summary: `依今日原始數據判斷，市場氛圍四選一為「${summary.marketMood.primary}」。月預測 ${monthlyText}、日預測約 ${dailyPct} 分，融資維持率 ${summary.marginMaintenance.todayRate.toFixed(2)}%，${summary.marketMood.reason}`,
-    actionTone: summary.marketMood.primary === '貪婪'
-      ? '市場追價感較強，解讀時要特別避免把偏熱訊號當成無風險上漲。'
-      : summary.marketMood.primary === '樂觀'
-        ? '中期方向偏正面，可以觀察趨勢延續，但仍要留意追價風險。'
-        : summary.marketMood.primary === '放鬆'
-          ? '槓桿壓力相對不緊繃，今天可以用較穩定的心態觀察市場。'
-          : '訊號較不一致或風險需要觀察，先降低衝動，等待更清楚的方向。',
-    keyPoints: [
-      `今日氛圍只選一個：${summary.marketMood.primary}。`,
-      summary.marketMood.reason,
-      `融資維持率今日 ${summary.marginMaintenance.todayRate.toFixed(2)}%，安全線 ${summary.marginMaintenance.safeLine.toFixed(2)}%，可用來觀察槓桿壓力是否升高。`,
-    ],
-    generatedAt: new Date().toISOString(),
-    source: 'rules',
-  };
-}
-
-async function fetchHomeMarketAiConclusion(summary: HomeMarketSummary): Promise<NonNullable<HomeMarketSummary['aiConclusion']>> {
-  const fallback = buildRuleBasedMarketConclusion(summary);
-  try {
-    const response = await fetch('/api/home-market-analysis', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Cache-Control': 'no-store',
-      },
-      cache: 'no-store',
-      body: JSON.stringify({
-        updateDate: summary.updateDate,
-        monthLabel: summary.monthLabel,
-        monthlyPrediction: {
-          label: summary.monthlyPrediction.label,
-          directionScore: summary.monthlyPrediction.directionScore,
-          forecast: summary.monthlyPrediction.forecast,
-        },
-        dailyPrediction: summary.dailyPrediction,
-        marketMood: summary.marketMood,
-        marginMaintenance: {
-          todayRate: summary.marginMaintenance.todayRate,
-          safeLine: summary.marginMaintenance.safeLine,
-          minLine: summary.marginMaintenance.minLine,
-          unit: summary.marginMaintenance.unit,
-        },
-        latestMomentum: summary.marketFundMomentum.points[summary.marketFundMomentum.points.length - 1],
-        previousMomentum: summary.marketFundMomentum.points[summary.marketFundMomentum.points.length - 2],
-      }),
-    });
-    if (!response.ok) return fallback;
-    const data = await response.json();
-    if (!data?.title || !data?.summary || !Array.isArray(data?.keyPoints)) return fallback;
-    return {
-      title: String(data.title).slice(0, 80),
-      summary: String(data.summary).slice(0, 260),
-      actionTone: String(data.actionTone || fallback.actionTone).slice(0, 160),
-      keyPoints: data.keyPoints.slice(0, 4).map((point: unknown) => String(point).slice(0, 140)),
-      generatedAt: typeof data.generatedAt === 'string' ? data.generatedAt : new Date().toISOString(),
-      source: data.source === 'ai' ? 'ai' : 'rules',
-    };
-  } catch {
-    return fallback;
-  }
-}
-
 export async function fetchHomeMarketSummary(): Promise<HomeMarketSummary | null> {
-  const cached = getHomeMarketSummaryCache();
-  if (cached) return cached;
-
-  const cloudSummary = await fetchCloudHomeMarketSummary();
-  if (cloudSummary) {
-    setHomeMarketSummaryCache(cloudSummary);
-    return cloudSummary;
-  }
-
-  const [simons, firstZone, fallbackMomentumPoints, fallbackMargin] = await Promise.all([
-    fetchLatestSimonsSnapshot(),
-    fetchIfalgoIndexFirstZoneData(),
-    fetchMonthlyMarketMomentum(),
-    fetchCurrentMarginMaintenanceRate(),
-  ]);
-  const fallbackDailyPrediction = firstZone?.lastPtsTw?.pts ? null : await fetchSimonsDailyPrediction(simons.items);
-  const fallbackScores = calculateSimonsMarketScores(simons.items, fallbackDailyPrediction);
-  const scores = buildIfalgoMarketScores(firstZone, fallbackScores);
-  const points = firstZone ? buildIfalgoMomentumPoints(firstZone) : fallbackMomentumPoints;
-  const marginPoints = firstZone ? buildIfalgoMarginPoints(firstZone) : buildMarginSeries(fallbackMargin.rate);
-  const marginRates = marginPoints.map(point => point.rate).filter(value => value > 0);
-  const todayRate = parseMarketNumber(firstZone?.lastImrset?.lmrToday)
-    || fallbackMargin.rate
-    || HOME_MARGIN_POINTS[HOME_MARGIN_POINTS.length - 1].rate;
-  const safeLine = parseMarketNumber(firstZone?.lastImrset?.boundary) || 151.4;
-  const minLine = Math.min(...marginRates, 146.3);
-  const updateDate = firstZone?.lastPtsTw?.mdate
-    || firstZone?.lastImrset?.mdate
-    || (simons.items.length > 0 ? simons.date : fallbackMargin.date);
-  const summary: HomeMarketSummary = {
-    updateDate,
-    ...scores,
-    marketMood: calculateMarketMood(
-      points,
-      scores.macroScore,
-      scores.monthlyPrediction.score,
-      scores.monthlyPrediction.label,
-      scores.dailyPrediction.score,
-      todayRate,
-      safeLine
-    ),
-    marketFundMomentum: {
-      points,
-      momentumRange: [-1.5, 0],
-      taiexRange: [2000, 48000],
-    },
-    marginMaintenance: {
-      points: marginPoints,
-      todayRate,
-      safeLine,
-      minLine,
-      unit: '%',
-    },
-  };
-  summary.aiConclusion = await fetchHomeMarketAiConclusion(summary);
-  setHomeMarketSummaryCache(summary);
-  return summary;
+  return getHomeMarketSummaryCache();
 }
-
 // 【Premium 專屬】基於 Simons 量化模型計算評分
 export function calculateSimonsScore(
   item: SimonsItem,

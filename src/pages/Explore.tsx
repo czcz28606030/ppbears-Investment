@@ -9,6 +9,7 @@ import { getCache, setCache, CACHE_KEYS } from '../cache';
 import AdBanner from '../components/AdBanner';
 import MarketBadge from '../components/MarketBadge';
 import IndustryIcon from '../components/IndustryIcon';
+import { useStrategySignals } from '../hooks/useStrategySignals';
 import { canAutoRefreshPrices, formatPriceUpdateLabel, PRICE_AUTO_REFRESH_MS } from '../utils/priceAutoRefresh';
 import './Explore.css';
 
@@ -98,6 +99,8 @@ export default function Explore() {
       .map(item => ({ code: item.ticker, name: item.name, weekly: item }));
   }, [search, weekly, prices, onlyAdded]);
 
+  const { signals: strategySignals, loading: strategyLoading, error: strategyError, refresh: refreshStrategy } = useStrategySignals(filtered.map(row => row.code), hasFeature('ai_stock_picking'));
+
   useEffect(() => {
     if (loading || !savedState.current?.scrollY) return;
     const y = savedState.current.scrollY;
@@ -162,10 +165,11 @@ export default function Explore() {
             <span className="explore-data-meta-schedule">來源每週更新・回看 10 天・依來源排名排序</span>
             <span className="explore-data-meta-schedule">價格獨立更新；累積 AIT 值為來源指標</span>
           </div>
-          <button type="button" className="explore-refresh-btn" onClick={() => loadWeekly(true)} disabled={loading}>🔄 重新抓取</button>
+          <button type="button" className="explore-refresh-btn" onClick={() => Promise.all([loadWeekly(true), refreshStrategy()])} disabled={loading || strategyLoading}>🔄 重新抓取</button>
         </div>
         {loading && <div className="loading-spinner"><div className="spinner" /><div className="loading-text">週榜載入中... 🐻</div></div>}
         {error && <div className="empty-state"><div className="empty-state-title">{error}</div><button className="btn btn-primary btn-sm" onClick={() => loadWeekly(true)}>重試</button></div>}
+        {strategyError && <p role="alert">{strategyError}</p>}
         {!loading && (!error || search.trim()) && <div className="recommendation-list">
           {filtered.length === 0 && <div className="empty-state"><div className="empty-state-title">{search.trim() && priceLoading ? '正在搜尋全市場股票...' : onlyAdded ? '本週沒有新入榜股票' : search.trim() ? '找不到結果' : '來源目前沒有週榜資料'}</div></div>}
           {filtered.map(row => {
@@ -180,6 +184,7 @@ export default function Explore() {
                   <div className="rec-badges"><span className="badge badge-premium">週榜第 {item.rank} 名</span><span className="badge badge-neutral">{item.changeType === 'ADDED' ? '本週新入榜' : item.rankChange === null || item.rankChange === 0 ? '排名持平' : item.rankChange > 0 ? `排名上升 ${item.rankChange}` : `排名下降 ${Math.abs(item.rankChange)}`}</span></div>
                   <div className="quant-chips"><span className="quant-chip">累積 AIT 值 {item.aitValue.toLocaleString('zh-TW', { maximumFractionDigits: 2 })}</span>{item.previousRank !== null && <span className="quant-chip">前週第 {item.previousRank} 名</span>}</div>
                 </> : <div className="rec-meta">全市場搜尋結果</div>}
+                {hasFeature('ai_stock_picking') && <div className="quant-chips"><span className="quant-chip">{strategySignals[row.code]?.label || (strategyLoading ? '訊號計算中' : '資料不足')}</span><span className="quant-chip">{strategySignals[row.code]?.reason || '等待官方日K與帳戶資料'}</span></div>}
               </div>
               <button className={`wl-quick-btn wl-spotlight-btn ${watched || held ? 'wl-quick-active' : ''}`} title={held ? '已在庫存' : watched ? '已加入觀察名單' : '加入觀察名單'} aria-label={held ? '已在庫存' : watched ? '已加入觀察名單' : '加入觀察名單'} disabled={wlBusy !== null || held} onClick={async event => {
                 event.stopPropagation();

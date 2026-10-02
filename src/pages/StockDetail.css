@@ -2848,3 +2848,17 @@
   background: rgba(123, 44, 191, 0.06);
   box-shadow: none;
 }
+
+.strategy-detail-panel p { line-height: 1.7; }
+.strategy-detail-label { display: inline-block; padding: 8px 14px; border-radius: 12px; background: #f3f0ff; color: #6d28d9; font-size: 1.2rem; }
+.strategy-detail-label.strategy-add { color: #1d4ed8; background: #eff6ff; }
+.strategy-detail-label.strategy-reduce { color: #a16207; background: #fef9c3; }
+.strategy-detail-label.strategy-exit { color: #991b1b; background: #fee2e2; }
+.strategy-detail-label.strategy-unavailable { color: #4b5563; background: #f3f4f6; }
+.strategy-event-legend { display: flex; gap: 16px; flex-wrap: wrap; font-weight: 700; }
+.stock-detail-note { color: var(--text-light, #666); font-size: .85rem; line-height: 1.7; }
+.stock-detail .stock-detail-actions { flex-wrap: wrap; }
+.stock-detail .related-stock-card { text-align: left; }
+.stock-detail .trade-buttons > button { flex: 1; }
+.strategy-detail-panel details { margin-top: 16px; }
+.stock-detail .tv-chart-controls { flex-wrap: wrap; }

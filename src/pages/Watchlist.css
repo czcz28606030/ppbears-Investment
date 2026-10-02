@@ -1964,3 +1964,8 @@ button.wl-quant-chip:hover {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+.wl-strategy-details{display:flex;flex-direction:column;gap:6px;line-height:1.5;margin:8px 0;font-size:13px;overflow-wrap:anywhere}
+.wl-strategy-note{font-size:13px;color:var(--text-secondary);line-height:1.6}
+
+.wl-strategy-filters{display:flex;gap:12px;margin:16px 0;flex-wrap:wrap}.wl-strategy-filters input,.wl-strategy-filters select{padding:10px;border:1px solid var(--border-color);border-radius:8px;background:var(--bg-card);color:var(--text-primary)}

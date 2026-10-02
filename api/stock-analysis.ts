@@ -1,35 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
 
-type PricePoint = {
-  mdate: string;
-  close_d: string;
-  volume: number;
-  pe_ratio: string;
-  pb_ratio: string;
-  roia: string | null;
-};
-
-type SimonsLike = {
-  coid: string;
-  stkname: string;
-  close: string;
-  strength: string;
-  psr: number;
-  subindustry: string | null;
-  status: string | null;
-  unusual: string;
-  category: string;
-  ret_w: string;
-  ret_m: string;
-  wtcost: string;
-  fcost: string;
-  tcost: string | null;
-  dcost: string;
-  gvi: number;
-  tcr_today: string;
-  fcr_today: string;
-};
+import { getStrategyPrices } from '../src/server/strategy-service.js';
+import type { StockPrice as PricePoint } from '../src/types.js';
 
 type AnalysisResponse = {
   technical: string;
@@ -44,7 +17,7 @@ type CachedAnalysisRow = {
   payload: AnalysisResponse;
 };
 
-const LIVE_ANALYSIS_CACHE_TYPE = 'live_analysis_v2';
+const LIVE_ANALYSIS_CACHE_TYPE = 'live_analysis_official_v3';
 
 export const config = {
   maxDuration: 30,
@@ -180,56 +153,6 @@ async function saveCachedAnalysis(
   }
 }
 
-function getRecentBusinessDates(limit = 7): string[] {
-  const dates: string[] = [];
-  const cursor = new Date();
-  while (dates.length < limit) {
-    const day = cursor.getDay();
-    if (day !== 0 && day !== 6) {
-      dates.push(cursor.toISOString().split('T')[0]);
-    }
-    cursor.setDate(cursor.getDate() - 1);
-  }
-  return dates;
-}
-
-async function fetchIfalgoStock(code: string): Promise<{ name: string; status: string; industry: string; prices: PricePoint[] } | null> {
-  try {
-    const res = await fetchWithTimeout(`https://api.ifalgo.com.tw/frontapi/stock?coid=${code}`, {}, 6000);
-    if (!res.ok) return null;
-    const json = await res.json() as any;
-    const position = json?.data?.stock?.position;
-    if (!position) return null;
-    return {
-      name: position.stkname || code,
-      status: position.status || '',
-      industry: position.subindustry || '',
-      prices: Array.isArray(position.prices) ? position.prices.slice(-10) : [],
-    };
-  } catch {
-    return null;
-  }
-}
-
-async function fetchRecentSimonsItem(code: string): Promise<SimonsLike | null> {
-  const dates = getRecentBusinessDates(5);
-  const results = await Promise.all(
-    dates.map(async (date) => {
-      try {
-        const res = await fetchWithTimeout(`https://api.ifalgo.com.tw/frontapi/common/getSimonsData?searchDate=${date}`, {}, 4500);
-        if (!res.ok) return null;
-        const json = await res.json() as any;
-        const items = (json?.data?.dataItems || []) as SimonsLike[];
-        return items.find(item => item.coid === code) || null;
-      } catch {
-        return null;
-      }
-    })
-  );
-
-  return results.find((item): item is SimonsLike => !!item) || null;
-}
-
 async function fetchYahooHeadlines(code: string): Promise<string[]> {
   try {
     const res = await fetchWithTimeout(`https://tw.stock.yahoo.com/quote/${code}/news`, {}, 5000);
@@ -247,7 +170,6 @@ async function fetchYahooHeadlines(code: string): Promise<string[]> {
 
 function buildFallbackAnalysis(
   prices: PricePoint[],
-  simons: SimonsLike | null,
   headlines: string[]
 ): AnalysisResponse {
   const closes = prices.map(item => parseFloat(item.close_d)).filter(price => !Number.isNaN(price) && price > 0);
@@ -256,21 +178,10 @@ function buildFallbackAnalysis(
   const recentAvg = closes.length > 0 ? closes.reduce((sum, price) => sum + price, 0) / closes.length : lastClose;
   const trendUp = lastClose >= recentAvg && lastClose >= firstClose;
 
-  const wtcost = parseFloat(simons?.wtcost || '0');
-  const fcost = parseFloat(simons?.fcost || '0');
-  const tcost = parseFloat(simons?.tcost || '0');
-  const strength = parseFloat(simons?.strength || '0');
-  const validCosts = [wtcost, fcost, tcost].filter(cost => !Number.isNaN(cost) && cost > 0);
-  const lowerThanCosts = validCosts.filter(cost => lastClose < cost).length;
-
-  const technical = trendUp
-    ? `近期股價維持在相對高檔，收盤價高於短期平均，代表買盤仍有支撐。後續可觀察成交量是否同步放大，確認趨勢是否延續。`
-    : `近期股價波動較明顯，收盤價尚未穩定站上短期平均，技術面仍偏整理。建議先觀察是否出現量能回溫與價格轉強。`;
-
-  const chips = strength >= 2 && lowerThanCosts >= 1
-    ? `法人持股成本與目前股價接近，籌碼面仍有一定支撐。若 strength 維持在較高水準，代表資金承接力道相對穩定。`
-    : `目前法人籌碼優勢不算明顯，資金承接力道仍需觀察。若後續 strength 回升，才比較能確認籌碼面轉強。`;
-
+  const technical = closes.length === 0
+    ? '官方日 K 資料暫時不足，無法確認近期價格與量能變化。'
+    : `官方日 K 顯示最新收盤 ${lastClose.toFixed(2)} 元，近期 ${closes.length} 個交易日平均 ${recentAvg.toFixed(2)} 元，收盤${trendUp ? '高於或接近' : '低於'}近期平均。這是價格摘要，並非帳戶進出場訊號。`;
+  const chips = '目前這份摘要未提供三大法人實際買賣超或成本資料，不能從價格推定法人籌碼穩定度。請搭配個股頁的 Goodinfo 估算成本與 FinMind 買賣超紀錄觀察。';
   const news = headlines.length > 0
     ? `近期新聞重點為「${headlines[0]}」。消息面可作為輔助判斷，但仍需搭配營收、法人籌碼與股價反應一起評估。`
     : `目前奇摩股市未抓到明確最新新聞。消息面暫無重大訊號時，可優先回到營收、產業趨勢與籌碼變化判斷。`;
@@ -290,7 +201,6 @@ async function generateAiAnalysis(
   industry: string,
   status: string,
   prices: PricePoint[],
-  simons: SimonsLike | null,
   headlines: string[]
 ): Promise<AnalysisResponse | null> {
   const openaiKey = process.env.OPENAI_API_KEY;
@@ -298,6 +208,9 @@ async function generateAiAnalysis(
 
   const compactPrices = prices.map(item => ({
     date: item.mdate,
+    open: item.open_d,
+    high: item.high_d,
+    low: item.low_d,
     close: item.close_d,
     volume: item.volume,
     pe: item.pe_ratio,
@@ -311,10 +224,10 @@ async function generateAiAnalysis(
 
 規則：
 1. 每段 55 到 110 字，語氣要專業、直接、白話，不要使用小朋友口吻，不要出現「喔、叔叔阿姨、大家、很棒、快來」等童趣用語。
-2. 技術面：根據價格趨勢、成交量、PE/PB、報酬率等已提供資料描述，不可亂編技術指標數值。若提到 PE/PB，請用「估值」白話說明。
-3. 籌碼面：根據 strength、外資/投信/自營商成本與相關數據，解釋法人資金、成本區間與籌碼穩定度。只能稱為「法人」、「外資」、「投信」、「自營商」。
+2. 技術面：僅根據官方日 K 價格與成交量描述，不可亂編技術指標數值、估值或策略績效。缺少價格時須明確說明資料不足。
+3. 籌碼面：本次未提供法人持倉與買賣超資料，須明確說明資料不足，不能推測法人資金、成本或籌碼穩定度。引導查看個股頁的 Goodinfo 與 FinMind 實際資料。
 4. 消息面：根據奇摩股市新聞標題說明最近發生什麼事；若沒有新聞，明確說明目前沒找到新聞，不能捏造。
-5. 全程不寫停損價、不給明確買賣操作指令。
+5. 全程不寫停損價、不給明確買賣操作指令；這是公開行情摘要，不含使用者持倉與週榜資格，不能生成或宣稱任何當前交易訊號。
 6. 不要保證漲跌，不要使用煽動語句；重點是讓使用者知道目前資料透露的風險與觀察方向。
 
 請輸出格式：
@@ -331,20 +244,6 @@ ${JSON.stringify({
   industry,
   status,
   recentPrices: compactPrices,
-  simons: simons ? {
-    close: simons.close,
-    strength: simons.strength,
-    psr: simons.psr,
-    unusual: simons.unusual,
-    ret_w: simons.ret_w,
-    ret_m: simons.ret_m,
-    wtcost: simons.wtcost,
-    fcost: simons.fcost,
-    tcost: simons.tcost,
-    tcr_today: simons.tcr_today,
-    fcr_today: simons.fcr_today,
-    gvi: simons.gvi,
-  } : null,
   yahooHeadlines: headlines,
 }, null, 2)}`;
 
@@ -364,7 +263,7 @@ ${JSON.stringify({
     }, 12000);
 
     if (!res.ok) return null;
-    const data = await res.json() as any;
+    const data = await res.json() as { choices?: Array<{ message?: { content?: string } }> };
     const content = data?.choices?.[0]?.message?.content;
     if (!content) return null;
     const parsed = JSON.parse(content);
@@ -397,7 +296,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const { code, name, industry, status } = body;
 
-  if (!code) {
+  if (!code || !/^\d{4,6}$/.test(String(code).trim())) {
     return res.status(400).json({ error: 'Missing code' });
   }
 
@@ -410,19 +309,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json(cached);
     }
 
-    const [ifalgoStock, simons, headlines] = await Promise.all([
-      fetchIfalgoStock(normalizedCode),
-      fetchRecentSimonsItem(normalizedCode),
+    const [officialPrices, headlines] = await Promise.all([
+      getStrategyPrices(normalizedCode).catch(() => [] as PricePoint[]),
       fetchYahooHeadlines(normalizedCode),
     ]);
-
-    const stockName = ifalgoStock?.name || simons?.stkname || name || normalizedCode;
-    const stockIndustry = ifalgoStock?.industry || simons?.subindustry || industry || '';
-    const stockStatus = ifalgoStock?.status || simons?.status || status || '';
-    const prices = ifalgoStock?.prices || [];
-
-    const fallback = buildFallbackAnalysis(prices, simons, headlines);
-    const aiAnalysis = await generateAiAnalysis(normalizedCode, stockName, stockIndustry, stockStatus, prices, simons, headlines);
+    const prices = [...officialPrices].sort((a, b) => a.mdate.localeCompare(b.mdate)).slice(-10);
+    const stockName = name || normalizedCode;
+    const stockIndustry = industry || '';
+    const stockStatus = status || '';
+    const fallback = buildFallbackAnalysis(prices, headlines);
+    const aiAnalysis = await generateAiAnalysis(normalizedCode, stockName, stockIndustry, stockStatus, prices, headlines);
     const result = aiAnalysis || fallback;
     await cleanupStaleStockCache();
     await saveCachedAnalysis(normalizedCode, cacheDate, result, aiAnalysis ? 'openai' : 'rule_fallback');
