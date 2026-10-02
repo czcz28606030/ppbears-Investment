@@ -14,10 +14,14 @@ Tasks:
 - [x] 觀察、庫存頁切換共用訊號，移除舊量化卡、篩選與快取，保留報價、交易、名單功能。
 - [x] 個股/K線切換共用訊號，分開當前狀態與歷史事件，不虛構歷史箭頭。
 - [x] 找股票、store警示、快取排程、電子報與收集器切換；舊訊號端點退休且不再抓IFAlgo。
-- [ ] 功能測試、建置、來源殘留審查、Git/version/deployment、線上API驗證；不寄送測試郵件給真實會員。
+- [x] 功能測試、建置、來源殘留審查、Git/version/deployment、線上API驗證；不寄送測試郵件給真實會員。
 
 API contract: `fetchStrategySignals(codes: string[], options?: {forceFresh?: boolean}): Promise<StrategySignalsPayload | null>` from src/api.ts; `useStrategySignals(codes: string[], enabled?: boolean)` from src/hooks/useStrategySignals.ts returns `{signals: Record<string, StrategyDecision>, loading: boolean, error: string, refresh: () => Promise<void>}`.
 
 StrategyDecision (src/utils/trendStrategy.ts): `code, action: entry|neutral|add|hold|reduce|exit|unavailable, label, reason, dataDate, source='weekly-trend-v1', held, close, ma20, ma60, breakoutPrice, atr, initialRisk, protectionPrice, addTriggerPrice, suggestedQuantity, events: StrategyEvent[], weeklyRank, weeklyDate, status: ready|unavailable`. Nullable numeric indicators use null. StrategyEvent: `{date, action: entry|add|reduce|exit, label, reason}`. Payload: `{source:'weekly-trend-v1', generatedAt, signals:Record<string,StrategyDecision>}`.
 
-Validation before deployment: 86 tests passed; frontend production build, backend TypeScript checks and targeted ESLint passed. Live official TWSE 2330 / TPEx 6488 each returned 159 bars (2026-02-02 through 2026-10-01). Signal event persistence reuses own RLS cache with in-worker serialization; cross-worker saves are best effort. No emails or trades executed.
+Validation before deployment: 87 tests passed; frontend production build, backend TypeScript checks and targeted ESLint passed. Live official TWSE 2330 / TPEx 6488 each returned 159 bars (2026-02-02 through 2026-10-01). Signal event persistence reuses own RLS cache with in-worker serialization; cross-worker saves are best effort. No emails or trades executed.
+
+Production verification: deployment dpl_2fkBj2hYWSVaKLxVZwW19WkScNFN READY; runtime commit 59311a8; production alias https://ppbears-investment.vercel.app. Official price map includes 6488 OTC and its real date/volume; default-market 6488 and 3529 each return 159 bars through 2026-10-01. Retired IFAlgo endpoint returns 410; unauthenticated strategy access returns 401. Signed-in Explore shows all 10 current candidates (9 neutral, owned 2303 hold), including all four OTC candidates. Signed-in Portfolio displays actual reduction/exit/hold rules, data dates and protection/2R levels. No trades or test emails were executed.
+
+Limitations: strategy parameters are initial rules, not validated profitability. Official candles are raw exchange OHLC; corporate-action-adjusted backtesting and full split/dividend adjustment are not claimed. Sudden >25% latest moves and inconsistent account cost histories suspend advice. Missing monthly history, old quotes and incomplete first-entry trades suppress position sizing. A cross-instance journal merge remains best effort with the current cache schema.
