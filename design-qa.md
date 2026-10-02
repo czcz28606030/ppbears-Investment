@@ -30,3 +30,4 @@ State: actual Portfolio component rendered in a local-only two-position fixture.
 - The generated mock's tagline and icon refinements are not product requirements. No new graphic assets or unrelated navigation changes introduced.
 
 final result: passed
+`nProduction follow-through: v1.24.120 deployment Ready and aliased to ppbears-investment.vercel.app. Authenticated live page confirmed all 7 position metrics, strategy dates/levels, signal badges and half-year charts loaded in the redesigned structure; existing six navigation links remain present.
