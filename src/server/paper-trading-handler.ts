@@ -1,6 +1,5 @@
 import type {VercelRequest,VercelResponse} from '@vercel/node';
-import {runPaperTrading} from '../src/server/paper-trading-service.js';
-export const config={maxDuration:300};
+import {runPaperTrading} from './paper-trading-service.js';
 export default async function handler(req:VercelRequest,res:VercelResponse) {
   res.setHeader('Cache-Control','no-store');
   if(req.method!=='GET'&&req.method!=='POST')return res.status(405).json({error:'Method not allowed'});

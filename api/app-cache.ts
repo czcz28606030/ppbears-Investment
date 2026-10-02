@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import handleInstitutionCost from '../src/server/institution-cost.js';
 import { getStrategySignalsForUser, getStrategyPrices, getStrategyMarketMap, getStrategyWeekly, collectWeeklyStrategySnapshot } from '../src/server/strategy-service.js';
 import { buildAndSaveUserMarketCaches } from '../src/server/user-market-cache.js';
+import handlePaperTrading from '../src/server/paper-trading-handler.js';
 export const config = { maxDuration: 300 };
 const RETIRED = new Set(['ifalgo-stock','stock-trading-signals','stock-quant','stock-quant-history','stock-quant-snapshot','simons','simons-rec-counts','simons-institution-cost']);
 const todayTaipei = () => new Date(Date.now()+8*3600000).toISOString().slice(0,10);
@@ -204,6 +205,7 @@ export default async function handler(req:VercelRequest,res:VercelResponse) {
  res.setHeader('Cache-Control','no-store, max-age=0');
  if(RETIRED.has(type))return res.status(410).json({error:'舊 IFAlgo 訊號來源已停用，請更新頁面使用週榜趨勢訊號',source:'retired',items:[],signals:[]});
  try {
+  if(type==='paper-trading-run')return await handlePaperTrading(req,res);
   if(type==='institution-cost')return await handleInstitutionCost(req,res);
   if(type==='weekly-top'){res.setHeader('Cache-Control','s-maxage=3600');return res.status(200).json(await getStrategyWeekly());}
   if(type==='strategy-signals') {

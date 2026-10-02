@@ -35,6 +35,10 @@
   ],
   "rewrites": [
     {
+      "source": "/api/cron-paper-trading",
+      "destination": "/api/app-cache?type=paper-trading-run"
+    },
+    {
       "source": "/api/institution-cost",
       "destination": "/api/app-cache?type=institution-cost"
     },

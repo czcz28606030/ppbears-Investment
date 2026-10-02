@@ -17,6 +17,7 @@ function fixture(options={}) {
   getStrategyPrices:async()=>{calls.push({kind:'prices'});if(options.priceFailure)throw new Error('official provider unavailable');return [];},
   getStrategyMarketMap:async()=>{calls.push({kind:'map'});if(options.priceFailure)throw new Error('official provider unavailable');return {};},getStrategyWeekly:async()=>({items:[],weekEndDate:'2026-10-02'}),collectWeeklyStrategySnapshot:async()=>{calls.push({kind:'snapshot'});return {saved:true};}};
  const dependencies={'@supabase/supabase-js':{createClient:()=>client},'../src/server/strategy-service.js':services,
+  '../src/server/paper-trading-handler.js':{default:async(req,res)=>res.status(401).json({error:'Unauthorized'})},
   '../src/server/institution-cost.js':{default:()=>{throw new Error('unexpected institution endpoint');}},'../src/server/user-market-cache.js':{buildAndSaveUserMarketCaches:async()=>{calls.push({kind:'warmup'});return {};}}};
  const exports={};const context={exports,require:name=>{assert.ok(dependencies[name],`unexpected dependency ${name}`);return dependencies[name];},process:{env:{NODE_ENV:'production',...(options.env||{})}},console,Date,Set,Map,Number,String,Array,Math,Promise,Error,AbortSignal,
   fetch:async()=>{providerCalls++;throw new Error('official fetch unavailable');}};
