@@ -1852,3 +1852,6 @@ button.holding-quant-chip:hover {
 
 .holding-strategy-details{display:flex;flex-direction:column;gap:6px;line-height:1.5;margin:8px 0;font-size:13px;overflow-wrap:anywhere}
 .pf-strategy-note{font-size:13px;color:var(--text-secondary);line-height:1.6}
+
+.holding-chart-row{display:flex;justify-content:flex-end;min-width:0;margin-top:8px;}
+@media(max-width:640px){.holding-chart-row .half-year-kline-panel{width:100%;}.holding-chart-row .half-year-kline-svg{height:auto;max-height:160px;}}

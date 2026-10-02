@@ -1,9 +1,10 @@
+import HalfYearKlineChart from '../components/HalfYearKlineChart';
 import StrategySignalBadge from '../components/StrategySignalBadge';
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent, type WheelEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore, formatMoney, formatPrice } from '../store';
-import type { Holding } from '../types';
-import { fetchOfficialPriceMap, fetchStockData, clearOfficialPriceMapCache, fetchActiveEtfRadarMap } from '../api';
+import type { Holding, StockPrice } from '../types';
+import { fetchOfficialPriceMap, fetchStockData, fetchStrategyPrices, getCachedStrategyPrices, clearOfficialPriceMapCache, fetchActiveEtfRadarMap } from '../api';
 import type { ActiveEtfRadarItem, OfficialPriceMapEntry } from '../api';
 import MarketBadge from '../components/MarketBadge';
 import IndustryIcon from '../components/IndustryIcon';
@@ -134,6 +135,25 @@ export default function Portfolio(){
     };
   }, [holdings]);
 
+
+ const holdingCodesKey=holdings.map(h=>h.stockCode).sort().join(',');
+ const [klineMap,setKlineMap]=useState<Record<string,StockPrice[]>>(()=>Object.fromEntries(holdings.flatMap(h=>{const prices=getCachedStrategyPrices(h.stockCode);return prices?[[h.stockCode,prices]]:[]})));
+ useEffect(()=>{
+   if(!dataReady)return;
+   let active=true;
+   const codes=holdingCodesKey.split(',').filter(Boolean);
+   async function load(){
+     for(let i=0;i<codes.length;i+=4){
+       await Promise.all(codes.slice(i,i+4).map(async code=>{
+         const prices=await fetchStrategyPrices(code).catch(()=>null);
+         if(active&&prices)setKlineMap(previous=>({...previous,[code]:prices}));
+       }));
+       if(!active)return;
+     }
+   }
+   void load();
+   return()=>{active=false};
+ },[holdingCodesKey,dataReady]);
 
  const [priceRefreshing,setPriceRefreshing]=useState(false);
  const [priceRefreshError,setPriceRefreshError]=useState<string|null>(null);
@@ -421,7 +441,7 @@ export default function Portfolio(){
       </div>
       <div className="pf-data-source"><span>週榜趨勢訊號｜官方日 K｜收盤判斷</span><button className="pf-refresh-btn" disabled={isRefreshing} onClick={async()=>{if(manualRefreshRef.current)return;manualRefreshRef.current=true;setManualRefreshing(true);try{await Promise.all([refresh(),runPriceRefresh(true,'正在更新持股價格…')]);}finally{manualRefreshRef.current=false;setManualRefreshing(false)}}}>重新抓取</button></div>
       {(strategyError||priceRefreshError)&&<p role="alert">{strategyError||priceRefreshError}</p>}
-      <p className="pf-strategy-note">策略訊號每天取得一次；同日返回直接使用快取。加碼需首次進場價 + 2R、平均成本獲利與風險額度；資料不足時停止加碼。訊號不會自動下單。</p>
+      <p className="pf-strategy-note">策略訊號與半年 K 線每天取得一次；同日返回直接使用快取。加碼需首次進場價 + 2R、平均成本獲利與風險額度；資料不足時停止加碼。訊號不會自動下單。</p>
       {holdingAllocation.categories.length > 0 && (
         <div className="portfolio-category-tabs-shell">
           <div
@@ -555,6 +575,9 @@ export default function Portfolio(){
                         ({itemIsProfit ? '+' : ''}{itemPLPct.toFixed(1)}%)
                       </div>
                     </div>
+                  </div>
+                  <div className="holding-chart-row">
+                    <HalfYearKlineChart stockCode={h.stockCode} currentPrice={h.currentPrice} prices={klineMap[h.stockCode]||[]}/>
                   </div>
                   <div className="holding-trade-actions" aria-label={`${h.stockName} 快速交易`}>
                     <button

@@ -1,0 +1,76 @@
+.half-year-kline-panel {
+  width: 230px;
+  margin-top: 10px;
+  padding: 7px 0 0;
+  color: #4B5563;
+}
+
+.half-year-kline-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 0 2px 3px;
+  font-size: 11px;
+  line-height: 1.2;
+  font-weight: 900;
+  color: #6B7280;
+}
+
+.half-year-kline-svg {
+  display: block;
+  width: 100%;
+  height: 112px;
+  overflow: visible;
+}
+
+.half-year-kline-grid {
+  stroke: rgba(148, 163, 184, 0.22);
+  stroke-width: 1;
+}
+
+.half-year-kline-ma {
+  stroke: #F59E0B;
+  stroke-width: 1.6;
+  opacity: 0.9;
+}
+
+.half-year-kline-up line,
+.half-year-kline-up rect {
+  stroke: #16A34A;
+  fill: #22C55E;
+}
+
+.half-year-kline-down line,
+.half-year-kline-down rect {
+  stroke: #DC2626;
+  fill: #EF4444;
+}
+
+.half-year-kline-date {
+  fill: #9CA3AF;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.half-year-kline-empty {
+  min-height: 118px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  text-align: center;
+}
+
+.half-year-kline-title {
+  font-size: 11px;
+  font-weight: 900;
+  color: #6B7280;
+}
+
+.half-year-kline-placeholder {
+  margin-top: 14px;
+  font-size: 12px;
+  font-weight: 800;
+  color: #9CA3AF;
+}
+.half-year-kline-panel{max-width:100%;}

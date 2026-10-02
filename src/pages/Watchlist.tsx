@@ -1,3 +1,4 @@
+import HalfYearKlineChart from '../components/HalfYearKlineChart';
 import StrategySignalBadge from '../components/StrategySignalBadge';
 import {useCallback,useEffect,useState} from 'react';
 import {useNavigate} from 'react-router-dom';
@@ -84,120 +85,7 @@ export default function Watchlist(){
     );
   }
 
-  function renderHalfYearKlineChart(stockCode: string, currentPrice: number) {
-    const rawRows = klineMap[stockCode] || [];
-    const points = rawRows
-      .map(row => ({
-        date: row.mdate,
-        open: parseFloat(row.open_d),
-        high: parseFloat(row.high_d),
-        low: parseFloat(row.low_d),
-        close: parseFloat(row.close_d),
-      }))
-      .filter(row =>
-        row.date &&
-        Number.isFinite(row.open) &&
-        Number.isFinite(row.high) &&
-        Number.isFinite(row.low) &&
-        Number.isFinite(row.close) &&
-        row.high >= row.low
-      )
-      .slice(-126);
 
-    if (points.length < 12) {
-      return (
-        <div className="wl-kline-panel wl-kline-empty" aria-label="半年 K 線資料不足">
-          <div className="wl-kline-title">半年K線</div>
-          <div className="wl-kline-placeholder">資料累積中</div>
-        </div>
-      );
-    }
-
-    const width = 230;
-    const height = 112;
-    const padX = 8;
-    const padTop = 8;
-    const padBottom = 15;
-    const chartHeight = height - padTop - padBottom;
-    const highs = points.map(point => point.high);
-    const lows = points.map(point => point.low);
-    const maxPrice = Math.max(...highs);
-    const minPrice = Math.min(...lows);
-    const range = Math.max(maxPrice - minPrice, maxPrice * 0.02, 1);
-    const y = (value: number) => padTop + ((maxPrice - value) / range) * chartHeight;
-    const xStep = (width - padX * 2) / Math.max(points.length - 1, 1);
-    const candleWidth = Math.max(1, Math.min(5, xStep * 0.64));
-    const firstClose = points[0].close;
-    const lastClose = points[points.length - 1].close || currentPrice;
-    const halfYearChange = firstClose > 0 ? ((lastClose - firstClose) / firstClose) * 100 : 0;
-    const isTrendUp = halfYearChange >= 0;
-    const ma20 = points.map((_, index) => {
-      if (index < 19) return null;
-      const window = points.slice(index - 19, index + 1);
-      return window.reduce((sum, point) => sum + point.close, 0) / window.length;
-    });
-    const maPath = ma20
-      .map((value, index) => value === null ? '' : `${padX + index * xStep},${y(value)}`)
-      .filter(Boolean)
-      .join(' ');
-    const startLabel = points[0].date.slice(5).replace('-', '/');
-    const endLabel = points[points.length - 1].date.slice(5).replace('-', '/');
-
-    return (
-      <div className="wl-kline-panel" aria-label={`${stockCode} 半年日 K 線`}>
-        <div className="wl-kline-head">
-          <span>半年K線</span>
-          <span className={isTrendUp ? 'text-profit' : 'text-loss'}>
-            {isTrendUp ? '+' : ''}{halfYearChange.toFixed(1)}%
-          </span>
-        </div>
-        <svg className="wl-kline-svg" viewBox={`0 0 ${width} ${height}`} role="img">
-          {[0.25, 0.5, 0.75].map(level => (
-            <line
-              key={level}
-              x1={padX}
-              x2={width - padX}
-              y1={padTop + chartHeight * level}
-              y2={padTop + chartHeight * level}
-              className="wl-kline-grid"
-            />
-          ))}
-          {maPath && (
-            <polyline
-              points={maPath}
-              className="wl-kline-ma"
-              fill="none"
-              vectorEffect="non-scaling-stroke"
-            />
-          )}
-          {points.map((point, index) => {
-            const x = padX + index * xStep;
-            const openY = y(point.open);
-            const closeY = y(point.close);
-            const highY = y(point.high);
-            const lowY = y(point.low);
-            const up = point.close >= point.open;
-            const bodyY = Math.min(openY, closeY);
-            const bodyHeight = Math.max(Math.abs(closeY - openY), 1.4);
-            return (
-              <g key={`${point.date}-${index}`} className={up ? 'wl-kline-up' : 'wl-kline-down'}>
-                <line x1={x} x2={x} y1={highY} y2={lowY} vectorEffect="non-scaling-stroke" />
-                <rect
-                  x={x - candleWidth / 2}
-                  y={bodyY}
-                  width={candleWidth}
-                  height={bodyHeight}
-                  rx="0.8"
-                />
-              </g>
-            );
-          })}
-          <text x={padX} y={height - 3} className="wl-kline-date">{startLabel}</text>
-          <text x={width - padX} y={height - 3} textAnchor="end" className="wl-kline-date">{endLabel}</text>
-        </svg>
-      </div>
-    );
-  }
 
 
  async function handleRemove(code:string){await removeFromWatchlist(code);setRemoveConfirm(null)}
@@ -207,7 +95,7 @@ export default function Watchlist(){
  {(error||priceError)&&<p role="alert">{error||priceError}</p>}
  <p className="wl-strategy-note">訊號與半年 K 線每天取得一次；同日返回直接使用快取。已持有股票顯示持倉管理訊號；週榜候選資格不回填歷史。收盤策略不會自動下單。</p>
  <div className="wl-strategy-filters"><input aria-label="搜尋觀察名單" value={search} onChange={e=>setSearch(e.target.value)} placeholder="搜尋名稱或代號"/>{hasAiFeature&&<select aria-label="訊號篩選" value={filter} onChange={e=>setFilter(e.target.value)}>{[['all','全部'],['entry','進場'],['neutral','觀察'],['add','加碼'],['hold','續抱'],['reduce','減碼'],['exit','出場'],['unavailable','資料不足']].map(([value,label])=><option key={value} value={value}>{label}</option>)}</select>}</div>
- <div className="wl-list">{rows.map(w=>{const signal=signals[w.stockCode];const quote=marketMap[w.stockCode];const price=Number(quote?.close)||w.addedPrice;const change=Number(quote?.change)||0;const held=holdings.some(h=>h.stockCode===w.stockCode&&h.totalShares>0);return <div key={w.stockCode} className={`wl-card strategy-${signal?.action||'unavailable'}`} onClick={()=>navigate(`/stock/${w.stockCode}`)}><div className="wl-card-header"><div className="wl-stock-info"><div className="wl-stock-name-row"><IndustryIcon stockCode={w.stockCode} compact/><span className="wl-stock-name">{w.stockName}</span>{held&&<small>已持有</small>}</div><div className="wl-stock-code-row"><MarketBadge market={quote?.market} compact/><span>{w.stockCode}</span></div>{hasAiFeature&&<div className="wl-strategy-details"><StrategySignalBadge action={signal?.action} loading={!signal && loading}/><span>{signal?.reason||'等待完整價格、週榜或交易資料'}</span><small>資料日：{signal?.dataDate||'尚未取得'}{signal?.weeklyDate?`｜週榜：${signal.weeklyDate}`:''}</small>{signal?.protectionPrice!=null&&<span>保護線 {formatPrice(signal.protectionPrice)}</span>}{signal?.addTriggerPrice!=null&&<span>2R 加碼門檻 {formatPrice(signal.addTriggerPrice)}</span>}{signal?.suggestedQuantity!=null&&<span>建議股數 {signal.suggestedQuantity}</span>}</div>}{renderActiveEtfRadarChip(w.stockCode,w.stockName,true)}</div><div className="wl-price-info"><div className="wl-price">NT$ {formatPrice(price)}</div><div className={change>=0?'text-profit':'text-loss'}>{change>=0?'+':''}{formatPrice(change)}</div><small>{quote?.date||'加入價參考'}</small>{renderHalfYearKlineChart(w.stockCode,price)}</div></div><div className="wl-card-body"><span>加入價 NT$ {formatPrice(w.addedPrice)}</span><span>自加入漲跌 {w.addedPrice>0?((price-w.addedPrice)/w.addedPrice*100).toFixed(2):'—'}%</span></div><div className="wl-card-actions">{removeConfirm===w.stockCode?<div className="wl-remove-confirm"><span>確定移除？</span><button onClick={e=>{e.stopPropagation();void handleRemove(w.stockCode)}}>是</button><button onClick={e=>{e.stopPropagation();setRemoveConfirm(null)}}>否</button></div>:<button className="wl-remove-btn" onClick={e=>{e.stopPropagation();setRemoveConfirm(w.stockCode)}}>移除</button>}</div></div>})}</div>
+ <div className="wl-list">{rows.map(w=>{const signal=signals[w.stockCode];const quote=marketMap[w.stockCode];const price=Number(quote?.close)||w.addedPrice;const change=Number(quote?.change)||0;const held=holdings.some(h=>h.stockCode===w.stockCode&&h.totalShares>0);return <div key={w.stockCode} className={`wl-card strategy-${signal?.action||'unavailable'}`} onClick={()=>navigate(`/stock/${w.stockCode}`)}><div className="wl-card-header"><div className="wl-stock-info"><div className="wl-stock-name-row"><IndustryIcon stockCode={w.stockCode} compact/><span className="wl-stock-name">{w.stockName}</span>{held&&<small>已持有</small>}</div><div className="wl-stock-code-row"><MarketBadge market={quote?.market} compact/><span>{w.stockCode}</span></div>{hasAiFeature&&<div className="wl-strategy-details"><StrategySignalBadge action={signal?.action} loading={!signal && loading}/><span>{signal?.reason||'等待完整價格、週榜或交易資料'}</span><small>資料日：{signal?.dataDate||'尚未取得'}{signal?.weeklyDate?`｜週榜：${signal.weeklyDate}`:''}</small>{signal?.protectionPrice!=null&&<span>保護線 {formatPrice(signal.protectionPrice)}</span>}{signal?.addTriggerPrice!=null&&<span>2R 加碼門檻 {formatPrice(signal.addTriggerPrice)}</span>}{signal?.suggestedQuantity!=null&&<span>建議股數 {signal.suggestedQuantity}</span>}</div>}{renderActiveEtfRadarChip(w.stockCode,w.stockName,true)}</div><div className="wl-price-info"><div className="wl-price">NT$ {formatPrice(price)}</div><div className={change>=0?'text-profit':'text-loss'}>{change>=0?'+':''}{formatPrice(change)}</div><small>{quote?.date||'加入價參考'}</small><HalfYearKlineChart stockCode={w.stockCode} currentPrice={price} prices={klineMap[w.stockCode]||[]}/></div></div><div className="wl-card-body"><span>加入價 NT$ {formatPrice(w.addedPrice)}</span><span>自加入漲跌 {w.addedPrice>0?((price-w.addedPrice)/w.addedPrice*100).toFixed(2):'—'}%</span></div><div className="wl-card-actions">{removeConfirm===w.stockCode?<div className="wl-remove-confirm"><span>確定移除？</span><button onClick={e=>{e.stopPropagation();void handleRemove(w.stockCode)}}>是</button><button onClick={e=>{e.stopPropagation();setRemoveConfirm(null)}}>否</button></div>:<button className="wl-remove-btn" onClick={e=>{e.stopPropagation();setRemoveConfirm(w.stockCode)}}>移除</button>}</div></div>})}</div>
  {rows.length===0&&<div className="empty-state">{watchlist.length?'沒有符合篩選的股票':'尚未加入觀察股票'}</div>}
  {activeEtfDialog&&<div className="wl-info-overlay" onClick={()=>setActiveEtfDialog(null)}><div className="wl-info-dialog" role="dialog" aria-modal="true" aria-label="ETF 支撐" onClick={e=>e.stopPropagation()}><button onClick={()=>setActiveEtfDialog(null)} aria-label="關閉">×</button><h3>{activeEtfDialog.stockName} {activeEtfDialog.stockCode}｜ETF 支撐</h3><p>{getActiveEtfDetailText(activeEtfDialog.radar)}</p><p>ETF 持股異動是獨立參考，不代表週榜趨勢訊號。</p></div></div>}
  </div>;
