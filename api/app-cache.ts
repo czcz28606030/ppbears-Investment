@@ -227,14 +227,15 @@ export default async function handler(req:VercelRequest,res:VercelResponse) {
    res.setHeader('Cache-Control','s-maxage=900');
    return res.status(200).json({coid:code,prices,latestDate:prices.at(-1)?.mdate||'',source:'official-daily',generatedAt:new Date().toISOString()});
   }
-  if(type==='official-prices'){
-   // Preserve the client quote map contract, including real daily volume/change.
-   const [twse,tpex]=await Promise.allSettled([
-    fetch('https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL',{signal:AbortSignal.timeout(15000)}).then(r=>r.json()),
-    fetch('https://www.tpex.org.tw/openapi/v1/tpex_mainboard_daily_close_quotes',{signal:AbortSignal.timeout(15000)}).then(r=>r.json())]);
-   const prices:Record<string,unknown>={};
-   [twse,tpex].forEach((result,i)=>{if(result.status!=='fulfilled'||!Array.isArray(result.value))return;result.value.forEach(row=>{const code=String(i===0?row.Code:row.SecuritiesCompanyCode);const close=i===0?row.ClosingPrice:row.Close;if(!code||!close||close==='--')return;const raw=String(row.Date||'').replace(/\D/g,'');const date=raw.length===7?`${Number(raw.slice(0,3))+1911}${raw.slice(3)}`:raw;prices[code]={name:i===0?row.Name:row.CompanyName,close:String(close),change:String(row.Change||0),volume:Math.floor(Number(String(i===0?row.TradeVolume:row.TradingShares).replace(/,/g,''))/1000),date,market:i===0?'listed':'otc'};});});
-   if(!Object.keys(prices).length)throw new Error('官方行情暫時無法取得');res.setHeader('Cache-Control','s-maxage=300');return res.status(200).json({cacheDate:todayTaipei(),count:Object.keys(prices).length,prices});
+  if(type==='official-prices') {
+   const map = await getStrategyMarketMap();
+   const prices = Object.fromEntries(Object.entries(map).map(([code, quote]) => [code, {
+    name: quote.name, close: String(quote.close), change: quote.change,
+    volume: Math.floor(quote.volume), date: quote.date.replace(/-/g, ''), market: quote.market,
+   }]));
+   if (!Object.keys(prices).length) throw new Error('官方行情暫時無法取得');
+   res.setHeader('Cache-Control', 's-maxage=300');
+   return res.status(200).json({ cacheDate: todayTaipei(), count: Object.keys(prices).length, prices });
   }
   if(type==='active-etf-radar'){res.setHeader('Cache-Control','s-maxage=1800');const codes=String(req.query.coids||'').split(',').filter(c=>/^\d{4,6}$/.test(c));return res.status(200).json(await getActiveEtfRadar(codes,Number(req.query.days||5)));}
   if(type==='home-summary')return res.status(503).json({error:'舊市場預測來源已停用；個股改採週榜趨勢規則',source:'unavailable'});

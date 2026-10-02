@@ -9,7 +9,7 @@ import { evaluateTrendStrategy, STRATEGY_SOURCE, type StrategyTrade, type Strate
 
 const taipeiDate = (timestamp = Date.now()) => new Date(timestamp + 8 * 3600000).toISOString().slice(0, 10);
 const db = () => createClient(process.env.VITE_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false, autoRefreshToken: false }, global: { fetch: (url, init) => fetch(url, { ...init, signal: AbortSignal.timeout(15000) }) } });
-type MarketPrice = { name: string; close: number; date: string; market: 'listed' | 'otc' };
+type MarketPrice = { name: string; close: number; date: string; market: 'listed' | 'otc'; change: string; volume: number };
 let priceMapCache: { at: number; value: Record<string, MarketPrice> } | null = null;
 let weeklyCache: { at: number; value: WeeklyTopPayload } | null = null;
 const priceCache = new Map<string, { at: number; value: StockPrice[] }>();
@@ -38,11 +38,23 @@ export async function getStrategyMarketMap(): Promise<Record<string, MarketPrice
       const code = String(i === 0 ? row.Code : row.SecuritiesCompanyCode);
       const close = num(i === 0 ? row.ClosingPrice : row.Close);
       const date = isoDate(row.Date);
-      if (/^\d{4,6}$/.test(code) && close > 0 && date) map[code] = { name: String(i === 0 ? row.Name : row.CompanyName), close, date, market: i === 0 ? 'listed' : 'otc' };
+      if (/^\d{4,6}$/.test(code) && close > 0 && date) map[code] = { name: String(i === 0 ? row.Name : row.CompanyName), close, date, market: i === 0 ? 'listed' : 'otc', change: String(row.Change || 0), volume: num(i === 0 ? row.TradeVolume : row.TradingShares) / 1000 };
     });
   });
+  // The OpenAPI host may reject cloud reads. Keep OTC market identification on the
+  // exchange's own after-trading endpoint rather than silently treating OTC codes as absent.
+  if (!Object.values(map).some(price => price.market === 'otc')) {
+    const fallback = await json('https://www.tpex.org.tw/www/zh-tw/afterTrading/dailyQuotes?response=json').catch(() => null) as { date?: string; stat?: string; tables?: Array<{ data?: unknown[][] }> } | null;
+    const date = isoDate(fallback?.date);
+    if (String(fallback?.stat).toLowerCase() === 'ok' && date) {
+      for (const row of fallback?.tables?.[0]?.data || []) {
+        const code = String(row[0]); const close = num(row[2]);
+        if (/^\d{4,6}$/.test(code) && close > 0) map[code] = { name: String(row[1]), close, date, market: 'otc', change: String(row[3] || 0), volume: num(row[8]) / 1000 };
+      }
+    }
+  }
   if (!Object.keys(map).length) throw new Error('官方收盤來源暫時無法讀取');
-  priceMapCache = { at: Date.now(), value: map };
+  if (Object.values(map).some(price => price.market === 'listed') && Object.values(map).some(price => price.market === 'otc')) priceMapCache = { at: Date.now(), value: map };
   return map;
 }
 export async function getStrategyWeekly(): Promise<WeeklyTopPayload> {

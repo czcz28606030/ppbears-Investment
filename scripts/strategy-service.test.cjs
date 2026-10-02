@@ -45,3 +45,21 @@ test('concurrent identical stock reads share only official provider requests', a
   assert.equal(a.length, 1);
   assert.equal(a[0].volume, 1000);
 });
+test('official OTC after-trading fallback repairs cloud OpenAPI failure with date and share units', async () => {
+  const urls = [];
+  const api = service(async url => {
+    urls.push(url);
+    if (url.includes('tpex_mainboard')) throw Error('cloud source failure');
+    const payload = url.includes('dailyQuotes')
+      ? { stat: 'ok', date: '20261001', tables: [{ data: [['6488', '環球晶', '1085.00', '+50.00', '', '', '', '', '24,330,441']] }] }
+      : [{ Code: '2330', Name: '台積電', Date: '1151001', ClosingPrice: '2510.00', TradeVolume: '1000000', Change: '10' }];
+    return { ok: true, json: async () => payload };
+  });
+  const map = await api.getStrategyMarketMap();
+  assert.equal(map['6488'].market, 'otc');
+  assert.equal(map['6488'].date, '2026-10-01');
+  assert.equal(map['6488'].volume, 24330.441);
+  assert.equal(map['2330'].volume, 1000);
+  await api.getStrategyMarketMap();
+  assert.equal(urls.length, 3, 'only a complete two-market map may be cached');
+});

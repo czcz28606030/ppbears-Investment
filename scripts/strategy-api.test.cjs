@@ -15,7 +15,7 @@ function fixture(options={}) {
  }};
  const services={getStrategySignalsForUser:async(user,codes)=>{calls.push({kind:'signals',user,codes});return {source:'weekly-trend-v1',signals:{}};},
   getStrategyPrices:async()=>{calls.push({kind:'prices'});if(options.priceFailure)throw new Error('official provider unavailable');return [];},
-  getStrategyMarketMap:async()=>({}),getStrategyWeekly:async()=>({items:[],weekEndDate:'2026-10-02'}),collectWeeklyStrategySnapshot:async()=>{calls.push({kind:'snapshot'});return {saved:true};}};
+  getStrategyMarketMap:async()=>{calls.push({kind:'map'});if(options.priceFailure)throw new Error('official provider unavailable');return {};},getStrategyWeekly:async()=>({items:[],weekEndDate:'2026-10-02'}),collectWeeklyStrategySnapshot:async()=>{calls.push({kind:'snapshot'});return {saved:true};}};
  const dependencies={'@supabase/supabase-js':{createClient:()=>client},'../src/server/strategy-service.js':services,
   '../src/server/institution-cost.js':{default:()=>{throw new Error('unexpected institution endpoint');}},'../src/server/user-market-cache.js':{buildAndSaveUserMarketCaches:async()=>{calls.push({kind:'warmup'});return {};}}};
  const exports={};const context={exports,require:name=>{assert.ok(dependencies[name],`unexpected dependency ${name}`);return dependencies[name];},process:{env:{NODE_ENV:'production',...(options.env||{})}},console,Date,Set,Map,Number,String,Array,Math,Promise,Error,AbortSignal,
@@ -55,5 +55,5 @@ test('warmup without configured cron secret refuses even a forged bearer',async(
 test('official provider failure returns non-cacheable 502',async()=>{
  const f=fixture({priceFailure:true});const response=await f.request('official-stock-history',{coid:'2330'});
  assert.equal(response.statusCode,502);assert.equal(response.headers['Cache-Control'],'no-store, max-age=0');assert.equal(response.body.error,'official provider unavailable');
- const all=await f.request('official-prices');assert.equal(all.statusCode,502);assert.equal(all.headers['Cache-Control'],'no-store, max-age=0');assert.equal(f.providers(),2);
+ const all=await f.request('official-prices');assert.equal(all.statusCode,502);assert.equal(all.headers['Cache-Control'],'no-store, max-age=0');assert.equal(f.calls.filter(call=>call.kind==='map').length,1);assert.equal(f.providers(),0);
 });
