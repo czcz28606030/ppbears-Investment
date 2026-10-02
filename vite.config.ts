@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { defineConfig, loadEnv, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
+import { getWeeklyTop } from './src/server/weekly-top'
 import * as fs from 'fs'
 import {
   getOfficialHistoryMonths,
@@ -113,6 +114,14 @@ function ppbearsDevApiPlugin(env: Record<string, string>): Plugin {
     configureServer(server) {
       server.middlewares.use(async (req, res, next) => {
         const url = new URL(req.url || '', 'http://127.0.0.1')
+
+        if (req.method === 'GET' && url.pathname === '/api/app-cache' && url.searchParams.get('type') === 'weekly-top') {
+          try {
+            return sendJson(res, 200, await getWeeklyTop(env.STOXGAUGE_ACCESS_TOKEN))
+          } catch (err) {
+            return sendJson(res, 502, { error: err instanceof Error ? err.message : '週榜來源讀取失敗' })
+          }
+        }
 
         if (
           req.method === 'GET'

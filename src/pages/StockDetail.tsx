@@ -291,7 +291,7 @@ export default function StockDetail() {
 
   // ─── Explore 推薦股票滑塊 ─────────────────────────────
   type ExploreStock = { coid: string; name: string; close: string; aiRemark: string | null; cumRet: string | null; chipPts: number | null };
-  type ExploreStockListPayload = { _dataVersion?: string; items: ExploreStock[] };
+  type ExploreStockListPayload = { _dataVersion?: string; source?: string; items: ExploreStock[] };
   const [exploreStockList, setExploreStockList] = useState<ExploreStock[]>([]);
   useEffect(() => {
     try {
@@ -300,14 +300,16 @@ export default function StockDetail() {
 
       const parsedRaw = JSON.parse(raw) as ExploreStock[] | ExploreStockListPayload;
       const parsedVersion = Array.isArray(parsedRaw) ? undefined : parsedRaw._dataVersion;
+      const isWeeklyList = !Array.isArray(parsedRaw) && parsedRaw.source === 'stoxgauge-weekly';
       const parsed = Array.isArray(parsedRaw) ? parsedRaw : parsedRaw.items;
       const currentVersion = getKnownDailyAiCacheVersion('stock-detail');
-      if (!Array.isArray(parsed) || (currentVersion && parsedVersion !== currentVersion)) {
+      if (!Array.isArray(parsed) || (!isWeeklyList && currentVersion && parsedVersion !== currentVersion)) {
         sessionStorage.removeItem('explore_stock_list');
         return;
       }
 
       setExploreStockList(parsed);
+      if (isWeeklyList) return;
       const missing = parsed.filter(s => s.coid !== code && s.aiRemark === null).slice(0, 15);
       if (missing.length > 0) {
         Promise.all(missing.map(async s => {

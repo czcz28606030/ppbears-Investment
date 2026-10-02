@@ -10,6 +10,7 @@ import {
   saveTodayCache,
 } from '../src/server/newsletter-utils.js';
 import handleInstitutionCost from '../src/server/institution-cost.js';
+import { getWeeklyTop } from '../src/server/weekly-top.js';
 import { buildAndSaveUserMarketCaches } from '../src/server/user-market-cache.js';
 import {
   getOfficialHistoryMonths,
@@ -1499,6 +1500,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
+    if (type === 'weekly-top') {
+      // Read the provider's latest published weekly snapshot; price updates remain independent.
+      res.setHeader('Cache-Control', 's-maxage=3600');
+      return res.status(200).json(await getWeeklyTop());
+    }
     if (type === 'warmup') return await handleWarmup(req, res);
     if (type === 'user-market-cache') return await handleUserMarketCache(req, res);
     if (type === 'official-stock-history') {
