@@ -2,49 +2,58 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { fetchStrategySignals } from '../api';
 import { useStore } from '../store';
 import type { StrategyDecision } from '../utils/trendStrategy';
+import { createDailyResourceCache } from '../utils/dailyResourceCache';
+
+type CachedSignal = { decision: StrategyDecision; journalUnavailable: boolean };
+const dailySignals = createDailyResourceCache<CachedSignal>('ppbears_strategy_daily_v2');
+const decisions = (items: Record<string, CachedSignal>) => Object.fromEntries(Object.entries(items).map(([code, item]) => [code, item.decision]));
 
 export function useStrategySignals(codes: string[], enabled = true) {
-  const { user, holdings, trades, session } = useStore();
+  const { user, holdings, trades, session, dataReady } = useStore();
   const codesKey = [...new Set(codes)].sort().join(',');
   const accountKey = `${user?.id || ''}|${user?.availableBalance || 0}|${holdings.map(h => `${h.stockCode}:${h.totalShares}:${h.avgCost}`).sort().join(',')}|${trades.length}:${trades[0]?.timestamp || 0}`;
-  const [signals, setSignals] = useState<Record<string, StrategyDecision>>({});
+  const active = Boolean(enabled && session?.access_token && user && dataReady);
+  const initial = active ? dailySignals.peek(accountKey, codesKey.split(',')) : {};
+  const [signals, setSignals] = useState<Record<string, StrategyDecision>>(() => decisions(initial));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [warning, setWarning] = useState('');
   const sequence = useRef(0);
-  const mounted = useRef(true);
-  const token = session?.access_token;
-  const refresh = useCallback(async () => {
+  const load = useCallback(async (force = false) => {
     const request = ++sequence.current;
-    if (!enabled || !token || !codesKey) { setSignals({}); setLoading(false); setError(''); setWarning(''); return; }
-    setLoading(true); setError(''); setWarning('');
+    if (!active || !codesKey) { setSignals({}); setLoading(false); setError(''); setWarning(''); return; }
+    const requested = codesKey.split(',');
+    const cached = dailySignals.peek(accountKey, requested);
+    setSignals(decisions(cached));
+    setLoading(force || requested.some(code => !cached[code])); setError('');
     try {
-      const results: Record<string, StrategyDecision> = {};
-      const requested = codesKey.split(',');
-      let journalUnavailable = false;
-      for (let start = 0; start < requested.length; start += 20) {
-        const payload = await fetchStrategySignals(requested.slice(start, start + 20), { forceFresh: true });
-        if (!payload || payload.source !== 'weekly-trend-v1') throw new Error('週榜趨勢訊號暫時無法取得');
-        Object.assign(results, payload.signals);
-        journalUnavailable ||= payload.journalStatus === 'unavailable';
+      const result = await dailySignals.load(accountKey, requested, async missing => {
+        const collected: Record<string, CachedSignal> = {};
+        for (let start = 0; start < missing.length; start += 20) {
+          const payload = await fetchStrategySignals(missing.slice(start, start + 20), { forceFresh: force });
+          if (!payload || payload.source !== 'weekly-trend-v1') throw new Error('週榜趨勢訊號暫時無法取得');
+          for (const [code, decision] of Object.entries(payload.signals)) collected[code] = { decision, journalUnavailable: payload.journalStatus === 'unavailable' };
+        }
+        return collected;
+      }, force);
+      if (request === sequence.current) {
+        setSignals(decisions(result));
+        setWarning(Object.values(result).some(item => item.journalUnavailable) ? '策略歷史保存暫時無法完成；歷史箭頭可能不完整。' : '');
       }
-      if (mounted.current && request === sequence.current) { setSignals(results); setWarning(journalUnavailable ? '策略歷史保存暫時無法完成；目前顯示本次判斷，歷史箭頭可能不完整。' : ''); }
     } catch (failure) {
-      if (mounted.current && request === sequence.current) { setSignals({}); setError(failure instanceof Error ? failure.message : '訊號讀取失敗'); }
-    } finally { if (mounted.current && request === sequence.current) setLoading(false); }
-  // accountKey invalidates recommendations after actual buys/sells/cash changes.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, token, codesKey, accountKey]);
+      if (request === sequence.current) setError(failure instanceof Error ? failure.message : '訊號讀取失敗');
+    } finally { if (request === sequence.current) setLoading(false); }
+  }, [active, codesKey, accountKey]);
+  const refresh = useCallback(() => load(true), [load]);
   useEffect(() => {
-    mounted.current = true;
-    setSignals({});
-    void refresh();
-    const timer = window.setInterval(() => { if (document.visibilityState === 'visible') void refresh(); }, 15 * 60 * 1000);
-    const show = () => { if (document.visibilityState === 'visible') void refresh(); };
+    void load();
+    // Checks the Taipei day locally. Same-day visibility and timer events never re-fetch valid results.
+    const show = () => { if (document.visibilityState === 'visible') void load(); };
+    const timer = window.setInterval(show, 60000);
     document.addEventListener('visibilitychange', show);
-    // This counter invalidates requests; it is not a DOM reference captured by the effect.
+    // Invalidate async requests rather than capture a DOM ref.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    return () => { mounted.current = false; ++sequence.current; window.clearInterval(timer); document.removeEventListener('visibilitychange', show); };
-  }, [refresh]);
+    return () => { ++sequence.current; window.clearInterval(timer); document.removeEventListener('visibilitychange', show); };
+  }, [load]);
   return { signals, loading, error, warning, refresh };
 }

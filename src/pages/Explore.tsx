@@ -1,3 +1,4 @@
+import StrategySignalBadge from '../components/StrategySignalBadge';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fetchOfficialClosePrice, fetchOfficialPriceMap } from '../api';
@@ -184,7 +185,7 @@ export default function Explore() {
                   <div className="rec-badges"><span className="badge badge-premium">週榜第 {item.rank} 名</span><span className="badge badge-neutral">{item.changeType === 'ADDED' ? '本週新入榜' : item.rankChange === null || item.rankChange === 0 ? '排名持平' : item.rankChange > 0 ? `排名上升 ${item.rankChange}` : `排名下降 ${Math.abs(item.rankChange)}`}</span></div>
                   <div className="quant-chips"><span className="quant-chip">累積 AIT 值 {item.aitValue.toLocaleString('zh-TW', { maximumFractionDigits: 2 })}</span>{item.previousRank !== null && <span className="quant-chip">前週第 {item.previousRank} 名</span>}</div>
                 </> : <div className="rec-meta">全市場搜尋結果</div>}
-                {hasFeature('ai_stock_picking') && <div className="quant-chips"><span className="quant-chip">{strategySignals[row.code]?.label || (strategyLoading ? '訊號計算中' : '資料不足')}</span><span className="quant-chip">{strategySignals[row.code]?.reason || '等待官方日K與帳戶資料'}</span></div>}
+                {hasFeature('ai_stock_picking') && <div className="quant-chips"><StrategySignalBadge action={strategySignals[row.code]?.action} loading={!strategySignals[row.code] && strategyLoading}/><span className="quant-chip">{strategySignals[row.code]?.reason || '等待官方日K與帳戶資料'}</span></div>}
               </div>
               <button className={`wl-quick-btn wl-spotlight-btn ${watched || held ? 'wl-quick-active' : ''}`} title={held ? '已在庫存' : watched ? '已加入觀察名單' : '加入觀察名單'} aria-label={held ? '已在庫存' : watched ? '已加入觀察名單' : '加入觀察名單'} disabled={wlBusy !== null || held} onClick={async event => {
                 event.stopPropagation();

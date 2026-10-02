@@ -1,3 +1,4 @@
+import StrategySignalBadge from '../components/StrategySignalBadge';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { fetchStockData, fetchStrategyPrices, fetchInstitutionCostData, fetchTWSEStockPrice, fetchTPEXStockPrice, getOrGenerateKidFriendlyDesc, fetchTWSEDividendYields, getFreshStockAnalysis, fetchActiveEtfRadarMap } from '../api';
@@ -143,7 +144,7 @@ export default function StockDetail() {
     </div>
     <section className="card strategy-detail-panel" aria-busy={strategyLoading}>
       <div className="section-header"><h2 className="section-title">週榜趨勢訊號</h2><button className="btn btn-outline" disabled={!enabled || strategyLoading} onClick={() => void refresh()}>更新訊號</button></div>
-      <strong className={`strategy-detail-label strategy-${strategy?.action || 'unavailable'}`}>{!enabled ? '登入並啟用策略功能後查看' : strategyLoading ? '計算中…' : strategy?.label || '資料不足'}</strong>
+      {enabled ? <StrategySignalBadge action={strategy?.action} loading={!strategy && strategyLoading}/> : <strong>登入並啟用策略功能後查看</strong>}
       <p>{strategyError || strategy?.reason || '尚無完整的價格、候選資格與帳戶資料。'}</p>
       {strategy && <>
         <p className="stock-detail-note">當前狀態 · 資料日 {strategy.dataDate || '--'} · {strategy.held ? '已有持倉' : '未持倉'} · 週榜 {strategy.weeklyDate || '--'}{strategy.weeklyRank != null ? ` 第 ${strategy.weeklyRank} 名` : ''}</p>

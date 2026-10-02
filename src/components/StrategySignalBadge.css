@@ -1,0 +1,9 @@
+.strategy-signal-badge{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:6px 12px;border-radius:14px;font-size:13px;font-weight:800;line-height:1.25;flex-shrink:0;color:#334155;background:#e2e8f0;border:1px solid rgba(0,0,0,.06)}
+.strategy-signal-icon{font-size:21px;font-weight:900;line-height:1}
+.strategy-signal-entry{background:#ef4444;color:#fff}.strategy-signal-add{background:#db2777;color:#fff}
+.strategy-signal-hold{background:#2563eb;color:#fff}.strategy-signal-reduce{background:#fbbf24;color:#713f12}
+.strategy-signal-exit{background:#16a34a;color:#fff}.strategy-signal-neutral{background:#e2e8f0;color:#475569}
+.strategy-signal-unavailable,.strategy-signal-loading{background:#f1f5f9;color:#64748b}
+.strategy-signal-tile{flex-direction:column;width:76px;min-height:76px;padding:8px;border-radius:18px;box-shadow:0 3px 10px rgba(0,0,0,.08)}
+.strategy-signal-tile .strategy-signal-icon{font-size:32px}
+@media(max-width:600px){.strategy-signal-tile{width:62px;min-height:66px;font-size:12px}.strategy-signal-tile .strategy-signal-icon{font-size:28px}}

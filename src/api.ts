@@ -1,3 +1,4 @@
+import { createDailyResourceCache } from './utils/dailyResourceCache';
 import { fetchMarketResponse } from './utils/marketRequest';
 import type { StockData, StockPrice, SimonsItem, StockQuote, StockRecommendation, AIAdvice, StockLiveAnalysis, StockTradingSignal } from './types';
 import { supabase } from './supabase';
@@ -814,15 +815,21 @@ export async function fetchStrategySignals(codes: string[], options: { forceFres
   return payload;
 }
 
+const dailyPriceHistory = createDailyResourceCache<StockPrice[]>('ppbears_official_history_daily_v1');
+export const getCachedStrategyPrices = (code: string) => dailyPriceHistory.peek('public', [code])[code];
 export async function fetchStrategyPrices(code: string, market?: 'listed' | 'otc'): Promise<StockPrice[]> {
   if (!/^\d{4,6}$/.test(code)) throw new Error('股票代號格式錯誤');
-  const params = new URLSearchParams({ type: 'strategy-prices', coid: code });
-  if (market) params.set('market', market);
-  const response = await fetch(`/api/app-cache?${params.toString()}`, { cache: 'no-store', headers: { accept: 'application/json' } });
-  if (!response.ok) throw new Error(`官方日 K 讀取失敗 (${response.status})`);
-  const payload = await response.json() as { source?: string; prices?: StockPrice[] };
-  if (payload.source !== 'official-daily' || !Array.isArray(payload.prices)) throw new Error('官方日 K 資料格式錯誤');
-  return payload.prices;
+  const result = await dailyPriceHistory.load('public', [code], async () => {
+    const params = new URLSearchParams({ type: 'strategy-prices', coid: code });
+    if (market) params.set('market', market);
+    const response = await fetch(`/api/app-cache?${params.toString()}`, { cache: 'no-store', headers: { accept: 'application/json' } });
+    if (!response.ok) throw new Error(`官方日 K 讀取失敗 (${response.status})`);
+    const payload = await response.json() as { source?: string; prices?: StockPrice[] };
+    if (payload.source !== 'official-daily' || !Array.isArray(payload.prices)) throw new Error('官方日 K 資料格式錯誤');
+    if (!payload.prices.length) throw new Error('官方日 K 尚未取得完整資料');
+    return { [code]: payload.prices };
+  });
+  return result[code];
 }
 
 export async function fetchStockData(coid: string): Promise<StockData | null> {
@@ -999,7 +1006,18 @@ export interface ActiveEtfRadarItem {
   source: string;
 }
 
+const dailyEtfRadar = createDailyResourceCache<ActiveEtfRadarItem | null>('ppbears_etf_radar_daily_v1');
 export async function fetchActiveEtfRadarMap(coids: string[], days = 5): Promise<Record<string, ActiveEtfRadarItem>> {
+  const codes = [...new Set(coids)].filter(code => /^\d{4,6}$/.test(code));
+  try {
+    const result = await dailyEtfRadar.load(`public:${days}`, codes, async missing => {
+      const map = await requestActiveEtfRadarMap(missing, days);
+      return Object.fromEntries(missing.map(code => [code, map[code] || null]));
+    });
+    return Object.fromEntries(Object.entries(result).filter((entry): entry is [string, ActiveEtfRadarItem] => entry[1] !== null));
+  } catch { return {}; }
+}
+async function requestActiveEtfRadarMap(coids: string[], days = 5): Promise<Record<string, ActiveEtfRadarItem>> {
   const uniqueCoids = [...new Set(coids.map(code => String(code || '').trim()).filter(Boolean))];
   if (uniqueCoids.length === 0) return {};
 

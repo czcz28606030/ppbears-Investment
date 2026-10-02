@@ -1,3 +1,4 @@
+import StrategySignalBadge from '../components/StrategySignalBadge';
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent, type WheelEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore, formatMoney, formatPrice } from '../store';
@@ -420,7 +421,7 @@ export default function Portfolio(){
       </div>
       <div className="pf-data-source"><span>週榜趨勢訊號｜官方日 K｜收盤判斷</span><button className="pf-refresh-btn" disabled={isRefreshing} onClick={async()=>{if(manualRefreshRef.current)return;manualRefreshRef.current=true;setManualRefreshing(true);try{await Promise.all([refresh(),runPriceRefresh(true,'正在更新持股價格…')]);}finally{manualRefreshRef.current=false;setManualRefreshing(false)}}}>重新抓取</button></div>
       {(strategyError||priceRefreshError)&&<p role="alert">{strategyError||priceRefreshError}</p>}
-      <p className="pf-strategy-note">加碼需首次進場價 + 2R、平均成本獲利與風險額度；資料不足時停止加碼。訊號不會自動下單。</p>
+      <p className="pf-strategy-note">策略訊號每天取得一次；同日返回直接使用快取。加碼需首次進場價 + 2R、平均成本獲利與風險額度；資料不足時停止加碼。訊號不會自動下單。</p>
       {holdingAllocation.categories.length > 0 && (
         <div className="portfolio-category-tabs-shell">
           <div
@@ -524,7 +525,7 @@ export default function Portfolio(){
                 >
                   <div className="holding-main-row">
                     <div className="holding-left">
-                      <div className="signal-badge"><span className="signal-badge-text">{hasAiFeature?(signal?.label||(signalsLoading?'讀取中':'資料不足')):'持股'}</span></div>
+                      {hasAiFeature && <StrategySignalBadge action={signal?.action} loading={!signal && signalsLoading} tile />}
                       <div className="holding-info">
                         <div className="holding-name-line">
                           <IndustryIcon stockCode={h.stockCode} industry={h.industry} compact />
