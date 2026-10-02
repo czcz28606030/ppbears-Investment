@@ -343,9 +343,7 @@ export default function Portfolio(){
  async function preparePortfolioSnapshotContext(h:Holding,base:TradeSnapshotPayload):Promise<Partial<TradeSnapshotPayload>>{const data=await fetchStockData(h.stockCode).catch(()=>null);const row=data?.prices?.at(-1);return {chartPrices:data?.prices,open:base.open??row?.open_d??null,high:base.high??row?.high_d??null,low:base.low??row?.low_d??null,volume:base.volume??row?.volume??null,priceDate:base.priceDate||row?.mdate};}
   return (
     <div className="portfolio">
-      <div className="page-header">
-        <h1 className="page-title">💼 我的庫存</h1>
-      </div>
+      <div className="page-header pf-designed-header"><div className="pf-brand"><img src="/ppbear.png" alt=""/><div><strong>PPBears</strong><span>小熊投資家</span></div></div><h1 className="page-title">我的庫存 <small className="pf-holding-count">{holdings.length} 檔</small></h1><div className="pf-header-refresh"><button className="pf-refresh-btn" disabled={isRefreshing} onClick={async()=>{if(manualRefreshRef.current)return;manualRefreshRef.current=true;setManualRefreshing(true);try{await Promise.all([refresh(),runPriceRefresh(true,'正在更新持股價格…')]);}finally{manualRefreshRef.current=false;setManualRefreshing(false)}}}>重新抓取</button>{priceUpdatedLabel&&<small className="pf-quote-date">行情{priceUpdatedLabel}</small>}</div></div>
 
       {isRefreshing && holdings.length > 0 && (
         <div className={`pf-loading-bar ${priceRefreshing ? 'pf-loading-bar-price' : ''}`}>
@@ -357,7 +355,7 @@ export default function Portfolio(){
 
       {/* 總覽卡片 */}
       <div className={`card portfolio-summary-card ${summary.totalCost > 0 ? (isProfit ? 'card-profit' : 'card-loss') : 'card-primary'}`}>
-        <div className="portfolio-asset-label">我的總資產 💰</div>
+        <div className="portfolio-asset-label">總資產</div>
         <div className="portfolio-asset-value">
           <span className="portfolio-asset-currency">NT$</span>
           <span className="portfolio-asset-number">{formatMoney(summary.totalAssets)}</span>
@@ -365,21 +363,21 @@ export default function Portfolio(){
 
         <div className="portfolio-asset-details portfolio-asset-details-three">
           <div className="portfolio-asset-detail">
-            <span className="portfolio-asset-detail-label">💵 可用現金</span>
+            <span className="portfolio-asset-detail-label">現金</span>
             <span className="portfolio-asset-detail-value">
               <span className="portfolio-asset-currency">NT$</span>
               <span className="portfolio-asset-number">{formatMoney(summary.cashBalance)}</span>
             </span>
           </div>
           <div className="portfolio-asset-detail">
-            <span className="portfolio-asset-detail-label">📈 股票市值</span>
+            <span className="portfolio-asset-detail-label">持股市值</span>
             <span className="portfolio-asset-detail-value">
               <span className="portfolio-asset-currency">NT$</span>
               <span className="portfolio-asset-number">{formatMoney(summary.totalMarketValue)}</span>
             </span>
           </div>
           <div className="portfolio-asset-detail">
-            <span className="portfolio-asset-detail-label">📊 未平倉損益</span>
+            <span className="portfolio-asset-detail-label">未平倉損益</span>
             <span className={`portfolio-asset-detail-value ${pl > 0 ? 'portfolio-asset-pnl-profit' : pl < 0 ? 'portfolio-asset-pnl-loss' : ''}`}>
               <span className="portfolio-asset-number-row">
                 <span>{pl > 0 ? '+' : ''}</span>
@@ -392,7 +390,7 @@ export default function Portfolio(){
         </div>
 
         {holdingAllocation.totalMarketValue > 0 && (
-          <div className="portfolio-stock-mix" aria-label="庫存類別組成">
+          <details className="pf-allocation-details"><summary>庫存類別組成 · {holdingAllocation.itemCount} 類</summary><div className="portfolio-stock-mix" aria-label="庫存類別組成">
             <div
               className="portfolio-stock-mix-chart"
               style={{ background: holdingAllocation.gradient }}
@@ -430,18 +428,14 @@ export default function Portfolio(){
                 ))}
               </div>
             </div>
-          </div>
+          </div></details>
         )}
       </div>
 
-      <div className="section-header" style={{ marginTop: '24px', marginBottom: '4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h2 className="section-title" style={{ margin: 0 }}>
-          📊 持股清單 ({holdings.length})
-        </h2>
-      </div>
-      <div className="pf-data-source"><span>週榜趨勢訊號｜官方日 K｜收盤判斷</span><button className="pf-refresh-btn" disabled={isRefreshing} onClick={async()=>{if(manualRefreshRef.current)return;manualRefreshRef.current=true;setManualRefreshing(true);try{await Promise.all([refresh(),runPriceRefresh(true,'正在更新持股價格…')]);}finally{manualRefreshRef.current=false;setManualRefreshing(false)}}}>重新抓取</button></div>
+
+
       {(strategyError||priceRefreshError)&&<p role="alert">{strategyError||priceRefreshError}</p>}
-      <p className="pf-strategy-note">策略訊號與半年 K 線每天取得一次；同日返回直接使用快取。加碼需首次進場價 + 2R、平均成本獲利與風險額度；資料不足時停止加碼。訊號不會自動下單。</p>
+      <details className="pf-strategy-explainer"><summary>每日收盤策略 · 同日使用快取</summary><p className="pf-strategy-note">策略訊號與半年 K 線每天取得一次；同日返回直接使用快取。加碼需首次進場價 + 2R、平均成本獲利與風險額度；資料不足時停止加碼。訊號不會自動下單。</p></details>
       {holdingAllocation.categories.length > 0 && (
         <div className="portfolio-category-tabs-shell">
           <div
@@ -543,39 +537,27 @@ export default function Portfolio(){
                   className={`holding-item${signal ? ` strategy-${signal.action}` : ''}${isStopLossAlert ? ' holding-item-stop-loss' : ''}`}
                   onClick={() => navigate(`/stock/${h.stockCode}`)}
                 >
-                  <div className="holding-main-row">
-                    <div className="holding-left">
+                  <div className="pf-position-header">
+                    <div className="pf-position-identity">
                       {hasAiFeature && <StrategySignalBadge action={signal?.action} loading={!signal && signalsLoading} tile />}
-                      <div className="holding-info">
-                        <div className="holding-name-line">
-                          <IndustryIcon stockCode={h.stockCode} industry={h.industry} compact />
-                          <span className="holding-name">{h.stockName}</span>
-                          <MarketBadge market={marketMap[h.stockCode]?.market} compact />
-                        </div>
-                        <div className="holding-code-market-line">
-                          <span className="holding-code">{h.stockCode}</span>
-                        </div>
-                        {hasAiFeature&&<div className="holding-strategy-details"><span>{signal?.reason||'等待完整交易與價格資料'}</span><small>資料日：{signal?.dataDate||'尚未取得'}</small>{signal?.protectionPrice!=null&&<span>保護線 {formatPrice(signal.protectionPrice)}</span>}{signal?.addTriggerPrice!=null&&<span>2R 加碼門檻 {formatPrice(signal.addTriggerPrice)}</span>}{signal?.suggestedQuantity!=null&&<span>建議股數 {signal.suggestedQuantity}</span>}</div>}
-                        <div className="holding-rec-line">{renderActiveEtfRadarChip(h.stockCode,h.stockName)}</div>
+                      <div className="pf-position-name">
+                        <div><span className="holding-name">{h.stockName}</span><span className="holding-code">{h.stockCode}</span></div>
+                        <div className="pf-position-tags"><IndustryIcon stockCode={h.stockCode} industry={h.industry} compact/><MarketBadge market={marketMap[h.stockCode]?.market} compact/>{renderActiveEtfRadarChip(h.stockCode,h.stockName)}</div>
                       </div>
                     </div>
-                    <div className="holding-center">
-                      <div className="holding-shares">{formatHoldingShares(h.totalShares)}</div>
-                      <div className="holding-avg">成本 {formatPrice(h.avgCost)}</div>
-                    </div>
-                    <div className="holding-right">
-                      {priceUpdatedLabel && (
-                        <div className="holding-price-updated">{priceUpdatedLabel}</div>
-                      )}
-                      <div className="holding-current">NT$ {formatPrice(h.currentPrice)}</div>
-                      <div className={`holding-pl ${itemIsProfit ? 'text-profit' : 'text-loss'}`}>
-                        {itemIsProfit ? '+' : ''}{formatMoney(itemPL)}
-                      </div>
-                      <div className={`holding-pl-pct ${itemIsProfit ? 'text-profit' : 'text-loss'}`}>
-                        ({itemIsProfit ? '+' : ''}{itemPLPct.toFixed(1)}%)
-                      </div>
-                    </div>
+                    {hasAiFeature&&<div className="pf-position-reason"><small>策略日期 {signal?.dataDate||'尚未取得'}</small><p>{signal?.reason||'等待完整交易與價格資料'}</p></div>}
                   </div>
+                  <div className="pf-position-metrics">
+                    <div><span>目前股價</span><strong>NT$ {formatPrice(h.currentPrice)}</strong></div>
+                    <div><span>持有股數</span><strong>{formatHoldingShares(h.totalShares)}</strong></div>
+                    <div><span>平均成本</span><strong>{formatPrice(h.avgCost)}</strong></div>
+                    <div><span>損益</span><strong className={itemIsProfit?'text-profit':'text-loss'}>{itemIsProfit?'+':''}{formatMoney(itemPL)}</strong><small className={itemIsProfit?'text-profit':'text-loss'}>({itemIsProfit?'+':''}{itemPLPct.toFixed(1)}%)</small></div>
+                  </div>
+                  {hasAiFeature&&<div className="pf-position-levels">
+                    <div><span>保護線</span><strong>{signal?.protectionPrice!=null?formatPrice(signal.protectionPrice):'—'}</strong></div>
+                    <div><span>2R 加碼門檻</span><strong>{signal?.addTriggerPrice!=null?formatPrice(signal.addTriggerPrice):'—'}</strong></div>
+                    <div><span>建議股數</span><strong>{signal?.suggestedQuantity!=null?formatHoldingShares(signal.suggestedQuantity):'—'}</strong></div>
+                  </div>}
                   <div className="holding-chart-row">
                     <HalfYearKlineChart stockCode={h.stockCode} currentPrice={h.currentPrice} prices={klineMap[h.stockCode]||[]}/>
                   </div>
