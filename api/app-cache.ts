@@ -29,7 +29,7 @@ async function strategyAccess(req:VercelRequest) {
   if(overrideError)throw new Error('無法確認訊號權限');
   const parent=ids.length>1?(await client.from('users').select('id,role,parent_id,tier,is_admin,subscription_expires_at').eq('id',account.parent_id!).maybeSingle<AccountRow>()).data:null;
   const allowed=(key:string)=>{if(account.is_admin)return true;const own=overrides?.find(o=>o.user_id===account.id&&o.feature_key===key);if(own)return Boolean(own.enabled);if(premium(account))return true;const inherited=overrides?.find(o=>o.user_id===parent?.id&&o.feature_key===key);return inherited?Boolean(inherited.enabled):premium(parent);};
-  return {id:account.id,picking:Boolean(account.paper_trading_enabled)||allowed('ai_stock_picking'),portfolio:Boolean(account.paper_trading_enabled)||allowed('ai_portfolio_advice')};
+  return {id:account.id,paper:Boolean(account.paper_trading_enabled),picking:Boolean(account.paper_trading_enabled)||allowed('ai_stock_picking'),portfolio:Boolean(account.paper_trading_enabled)||allowed('ai_portfolio_advice')};
 }
 type ActiveEtfAction = 'added' | 'increased' | 'decreased' | 'removed' | 'held';
 type ActiveEtfRadarItem = {
@@ -244,6 +244,7 @@ export default async function handler(req:VercelRequest,res:VercelResponse) {
   if(type==='ai-cache-version'){const weekly=await getStrategyWeekly();return res.status(200).json({version:`weekly-trend-v1:${weekly.weekEndDate}`,source:'weekly-trend-v1',generatedAt:new Date().toISOString()});}
   if(type==='user-market-cache'){
    const access=await strategyAccess(req);if(!access)return res.status(401).json({error:'Unauthorized'});
+   if(access.paper)return res.status(404).json({error:'paper account uses immutable simulation journal'});
    const surface=String(req.query.surface||'');if(!['watchlist','portfolio'].includes(surface))return res.status(400).json({error:'Invalid surface'});
    if(surface==='watchlist'?!access.picking:!access.portfolio)return res.status(403).json({error:'Feature unavailable'});
    const {data,error}=await getAdminClient().from('user_market_daily_cache').select('*').eq('user_id',access.id).eq('surface',surface).eq('cache_date',todayTaipei()).maybeSingle();
