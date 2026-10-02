@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import { supabase } from './supabase';
 import type { Session } from '@supabase/supabase-js';
 import type { UserAccount, Trade, TradeAttachment, TradeAttachmentKind, Holding, WithdrawalRequest, FeatureOverride, SystemSettings, LessonResult, RewardRule, RewardTriggerType, WalletTransaction, RewardShopItem, RedemptionRequest, WatchlistItem, WatchlistSignal, WatchlistWarning, DividendPayment, StockData } from './types';
+import type { PaperState } from './utils/paperTrading';
+import {paperReceivables} from './utils/paperTrading';
 import { fetchStockData, fetchOfficialPriceMap, fetchOfficialClosePrice } from './api';
 import type { OfficialClosePrice, OfficialPriceMap } from './api';
 
@@ -116,6 +118,8 @@ export interface LearningWallet {
 }
 
 interface InvestmentStore {
+  paperAccount: {state:PaperState;last_run_at:string|null;last_error:string|null}|null;
+  loadPaperAccount: () => Promise<void>;
   session: Session | null;
   user: UserAccount | null;
   children: UserAccount[];
@@ -289,6 +293,7 @@ function rowToUser(row: Record<string, unknown>): UserAccount {
     stopLossAlertPct: row.stop_loss_alert_pct !== undefined ? Number(row.stop_loss_alert_pct) : 20,
     parentId: (row.parent_id as string) || undefined,
     newsletterStrategy: (row.newsletter_strategy as string) || undefined,
+    paperTrading: Boolean(row.paper_trading_enabled),
   };
 }
 
@@ -451,6 +456,20 @@ export const useStore = create<InvestmentStore>((set, get) => ({
 
   // ─── Watchlist ──────────────────────────────
   watchlist: [],
+  paperAccount: null,
+  loadPaperAccount: async () => {
+    const {user}=get();if(!supabase||!user?.paperTrading)return;
+    const {data,error}=await supabase.from('paper_trading_accounts').select('state,last_run_at,last_error').eq('user_id',user.id).single();
+    if(error||!data)throw new Error('模擬帳本讀取失敗，請稍後重試');
+    const state=data.state as PaperState;
+    const latest=state.weeks.at(-1);
+    set({paperAccount:{state,last_run_at:data.last_run_at,last_error:data.last_error},user:{...user,availableBalance:state.cash,initialBalance:state.initialCash,
+      brokerFeeRate:state.config.feeRate,brokerMinFee:state.config.minFee,brokerTaxRate:state.config.taxRate},
+      holdings:state.positions.map(p=>({stockCode:p.code,stockName:p.name,totalShares:p.quantity,avgCost:p.avgCost,currentPrice:p.currentPrice})),
+      trades:[...state.trades].reverse().map(t=>({id:t.id,stockCode:t.code,stockName:t.name,tradeType:t.type,quantity:t.quantity,price:t.price,totalAmount:t.totalAmount,profit:t.profit??undefined,reason:`模擬${{entry:'進場',add:'加碼',reduce:'減碼',exit:'出場'}[t.action]}｜訊號 ${t.signalDate}｜費用 ${t.fee}、稅 ${t.tax}｜${t.reason}`,timestamp:t.timestamp,attachments:[]})),
+      watchlist:state.watchlist.filter(w=>latest?.codes.includes(w.code)&&!state.positions.some(p=>p.code===w.code)).map(w=>({id:`paper:${w.code}`,stockCode:w.code,stockName:w.name,addedPrice:w.addedPrice,createdAt:`${w.addedDate}T00:00:00+08:00`,note:'週榜自動觀察'})),
+      dividendPayments:state.dividends.filter(d=>d.quantity>0).map(d=>({id:d.id,userId:user.id,stockCode:d.code,stockName:state.watchlist.find(w=>w.code===d.code)?.name||d.code,exDate:d.exDate,lastBuyDate:d.exDate,payDate:d.payDate,cashDividend:d.perShare,eligibleShares:d.quantity,amount:d.amount,status:d.paid?'paid':'scheduled',paidAt:d.paid?`${d.payDate}T00:00:00+08:00`:undefined,source:'paper-yahoo',createdAt:`${d.exDate}T00:00:00+08:00`})),withdrawalRequests:[]});
+  },
   watchlistSignals: [],
   watchlistWarnings: [],
   watchlistSignalsLoading: false,
@@ -1333,6 +1352,7 @@ export const useStore = create<InvestmentStore>((set, get) => ({
   },
 
   logout: async () => {
+    set({paperAccount:null});
     // 先立即清除本地狀態（UI 立即回應），signOut 網路請求在背景執行不阻塞
     set({ user: null, session: null, children: [], holdings: [], trades: [], dividendPayments: [], withdrawalRequests: [], featureOverrides: [], allUsers: [], learningProfile: null, learningWallet: null, learningWalletTxs: [], childrenTxLog: [], completedLessonIds: [], todayCompletedLessonCount: 0, rewardRules: [], shopItems: [], redemptions: [], watchlist: [], watchlistSignals: [], watchlistWarnings: [] });
     if (supabase) supabase.auth.signOut({ scope: 'local' }).catch(() => {}); // 清除本機 session，失敗不影響 UI
@@ -1360,7 +1380,13 @@ export const useStore = create<InvestmentStore>((set, get) => ({
       }
 
       const currentUser = rowToUser(userRes.data);
-      set({ user: currentUser });
+      set({ user: currentUser, paperAccount:null });
+      if(currentUser.paperTrading) {
+        set({holdings:[],trades:[],watchlist:[],dividendPayments:[],withdrawalRequests:[],dataReady:false});
+        await get().loadPaperAccount();
+        set({loading:false,dataReady:true});
+        return;
+      }
 
       // 取得基本資料後，平行查詢其餘資料以加速登入；每段獨立保護，避免單一慢查詢鎖死下單。
       await Promise.allSettled([
@@ -1464,6 +1490,7 @@ export const useStore = create<InvestmentStore>((set, get) => ({
     if (!supabase) return;
     const { user } = get();
     if (!user) return;
+    if(user.paperTrading){await get().loadPaperAccount();return;}
     try {
       const { data, error } = await supabase
         .from('dividend_payments')
@@ -1696,6 +1723,7 @@ export const useStore = create<InvestmentStore>((set, get) => ({
   requestWithdrawal: async (amount, reason) => {
     if (!supabase) return { error: '資料庫未連線' };
     const { user } = get();
+    if(user?.paperTrading)return {error:'一年模擬帳號不接受出金或補入資金。'};
     if (!user || user.role !== 'child') return { error: '只有副帳號可以申請出金' };
     if (!user.parentId) return { error: '找不到主帳號' };
     if (amount <= 0) return { error: '申請金額必須大於 0' };
@@ -1727,6 +1755,7 @@ export const useStore = create<InvestmentStore>((set, get) => ({
   // ─── Price Refresh ──────────────────────────
   refreshHoldingPrices: async (options = {}) => {
     const { user, holdings } = get();
+    if(user?.paperTrading){await get().loadPaperAccount();return {checkedCount:holdings.length,priceFoundCount:holdings.length,updatedCount:0};}
     if (!supabase || !user || holdings.length === 0) {
       return { checkedCount: 0, priceFoundCount: 0, updatedCount: 0 };
     }
@@ -1823,6 +1852,7 @@ export const useStore = create<InvestmentStore>((set, get) => ({
   // ─── Trade Note ────────────────────────────
   updateTradeNote: async (tradeId, note) => {
     const { user } = get();
+    if(user?.paperTrading)return {error:'自動模擬紀錄由系統保存，不能手動修改。'};
     if (!user || !supabase) return { error: '尚未登入' };
     const { error } = await supabase
       .from('trades')
@@ -1839,6 +1869,7 @@ export const useStore = create<InvestmentStore>((set, get) => ({
 
   uploadTradeAttachments: async (tradeId, stockCode, files, kind = 'manual', snapshotMeta) => {
     const { user, trades } = get();
+    if(user?.paperTrading)return {attachments:[],error:'自動模擬紀錄不接受手動補充附件。'};
     if (!user || !supabase) return { attachments: [], error: '尚未登入' };
     if (!files.length) return { attachments: [], error: null };
 
@@ -1953,6 +1984,7 @@ export const useStore = create<InvestmentStore>((set, get) => ({
   // ─── Trading ───────────────────────────────
   executeBuy: async (stockCode, stockName, quantity, price, industry, reason) => {
     const { user, holdings, trades, watchlist } = get();
+    if(user?.paperTrading)return {success:false,message:'這是一年自動模擬帳號，由排程依訊號交易，不能手動買入。'};
     if (!user || !supabase) return { success: false, message: '尚未登入' };
     if (quantity <= 0) return { success: false, message: '至少要買 1 股喔！' };
 
@@ -2035,6 +2067,7 @@ export const useStore = create<InvestmentStore>((set, get) => ({
 
   executeSell: async (stockCode, quantity, price, reason) => {
     const { user, holdings, trades } = get();
+    if(user?.paperTrading)return {success:false,message:'這是一年自動模擬帳號，由排程依訊號交易，不能手動賣出。'};
     if (!user || !supabase) return { success: false, message: '尚未登入' };
     const holding = holdings.find(h => h.stockCode === stockCode);
     if (!holding) return { success: false, message: '你沒有持有這檔股票喔！' };
@@ -2364,6 +2397,7 @@ export const useStore = create<InvestmentStore>((set, get) => ({
   hasFeature: (featureKey) => {
     const { user, featureOverrides } = get();
     if (!user) return false;
+    if(user.paperTrading&&['ai_stock_picking','ai_portfolio_advice'].includes(featureKey))return true;
     if (user.isAdmin) return true;
 
     // 1. 先查 override
@@ -2386,6 +2420,7 @@ export const useStore = create<InvestmentStore>((set, get) => ({
     if (!supabase) return;
     const { user } = get();
     if (!user) return;
+    if(user.paperTrading){await get().loadPaperAccount();return;}
     const { data } = await supabase
       .from('watchlist')
       .select('*')
@@ -2406,6 +2441,7 @@ export const useStore = create<InvestmentStore>((set, get) => ({
     if (!supabase) return { error: '資料庫未連線' };
     const { user, watchlist, holdings } = get();
     if (!user) return { error: '尚未登入' };
+    if(user.paperTrading)return {error:'模擬帳號由每週榜單自動加入觀察，不接受手動新增。'};
     if (holdings.some(h => h.stockCode === stockCode && h.totalShares > 0)) {
       return { error: '這檔股票已經在庫存中，不需要再加入觀察名單' };
     }
@@ -2448,6 +2484,7 @@ export const useStore = create<InvestmentStore>((set, get) => ({
     if (!supabase) return { error: '資料庫未連線' };
     const { user } = get();
     if (!user) return { error: '尚未登入' };
+    if(user.paperTrading)return {error:'模擬觀察名單由週榜自動管理，不接受手動移除。'};
     const { error } = await supabase
       .from('watchlist')
       .delete()
@@ -2474,6 +2511,7 @@ export const useStore = create<InvestmentStore>((set, get) => ({
     const totalCost = holdings.reduce((s, h) => s + h.avgCost * h.totalShares, 0);
     const totalProfitLoss = totalMarketValue - totalCost;
     const profitLossPct = totalCost > 0 ? (totalProfitLoss / totalCost) * 100 : 0;
-    return { totalMarketValue, totalCost, totalProfitLoss, profitLossPct, cashBalance: user.availableBalance, totalAssets: user.availableBalance + totalMarketValue };
+    const receivables=user.paperTrading&&get().paperAccount?paperReceivables(get().paperAccount!.state):0;
+    return { totalMarketValue, totalCost, totalProfitLoss, profitLossPct, cashBalance: user.availableBalance, totalAssets: user.availableBalance + totalMarketValue+receivables };
   },
 }));

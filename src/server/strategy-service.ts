@@ -135,9 +135,14 @@ async function loadMembershipHistory(): Promise<WeeklyMembership[]> {
 export async function getStrategySignalsForUser(userId: string, codes: string[]): Promise<StrategySignalsPayload> {
   const wanted = [...new Set(codes)].filter(code => /^\d{4,6}$/.test(code)).slice(0, 60);
   const client = db();
-  const [holdingsResult, accountResult, mapResult, weeklyResult] = await Promise.all([
+  const accountResult=await client.from('users').select('available_balance,paper_trading_enabled').eq('id',userId).single();
+  if(accountResult.error||!accountResult.data)throw new Error('無法讀取登入帳戶的現金');
+  if(accountResult.data.paper_trading_enabled) {
+    const {getPaperSignals}=await import('./paper-account.js');
+    return getPaperSignals(userId,wanted);
+  }
+  const [holdingsResult, mapResult, weeklyResult] = await Promise.all([
     client.from('holdings').select('stock_code,total_shares,avg_cost,current_price').eq('user_id', userId),
-    client.from('users').select('available_balance').eq('id', userId).single(),
     getStrategyMarketMap().catch(() => ({} as Record<string, MarketPrice>)),
     getStrategyWeekly().catch(() => null),
   ]);

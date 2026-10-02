@@ -30,6 +30,8 @@ import AdminDashboard from './pages/AdminDashboard';
 import ForgotPassword from './pages/ForgotPassword';
 import UpdatePassword from './pages/UpdatePassword';
 import Watchlist from './pages/Watchlist';
+import PaperTrading from './pages/PaperTrading';
+import PaperTradingBanner from './components/PaperTradingBanner';
 
 import './App.css';
 
@@ -110,6 +112,7 @@ function AppContent() {
   return (
     <div className="app-layout">
       <main className="app-content">
+        {user?.paperTrading&&!isAuthRoute&&<PaperTradingBanner/>}
         <Routes>
           {/* Auth Routes */}
           <Route path="/login" element={<Login />} />
@@ -130,6 +133,7 @@ function AppContent() {
           <Route path="/history" element={<TradeHistory />} />
           <Route path="/dividends" element={<DividendHistory />} />
           <Route path="/backtest" element={<Backtest />} />
+          <Route path="/paper-trading" element={<PaperTrading />} />
 
           {/* Parent-only Routes */}
           <Route path="/manage-children" element={<ManageChildren />} />

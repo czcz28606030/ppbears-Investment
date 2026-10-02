@@ -1969,3 +1969,4 @@ button.wl-quant-chip:hover {
 .wl-strategy-note{font-size:13px;color:var(--text-secondary);line-height:1.6}
 
 .wl-strategy-filters{display:flex;gap:12px;margin:16px 0;flex-wrap:wrap}.wl-strategy-filters input,.wl-strategy-filters select{padding:10px;border:1px solid var(--border-color);border-radius:8px;background:var(--bg-card);color:var(--text-primary)}
+.paper-mode .wl-card-actions{display:none}

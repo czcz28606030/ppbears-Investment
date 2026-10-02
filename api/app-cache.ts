@@ -14,21 +14,21 @@ function clampMarketValue(value:number,min:number,max:number){return Math.max(mi
 function normalizeIsoSignalDate(value:unknown):string {const raw=String(value??'').replace(/\//g,'-');return /^\d{8}$/.test(raw)?`${raw.slice(0,4)}-${raw.slice(4,6)}-${raw.slice(6,8)}`:raw.slice(0,10);}
 function normalizeActiveEtfAction(value:unknown):ActiveEtfAction {const raw=String(value||'').toLowerCase();return raw==='added'||raw==='new'?'added':raw==='increased'||raw==='increase'?'increased':raw==='decreased'||raw==='decrease'?'decreased':raw==='removed'||raw==='remove'?'removed':'held';}
 
-type AccountRow = {id:string;role:string;parent_id:string|null;tier:string;is_admin:boolean;subscription_expires_at:string|null};
+type AccountRow = {id:string;role:string;parent_id:string|null;tier:string;is_admin:boolean;subscription_expires_at:string|null;paper_trading_enabled?:boolean};
 function premium(row:AccountRow|null){return !!row&&(row.is_admin||(row.tier==='premium'&&(!row.subscription_expires_at||new Date(row.subscription_expires_at)>new Date())));}
 async function strategyAccess(req:VercelRequest) {
   const token=String(req.headers.authorization||'').replace(/^Bearer\s+/i,'');
   if(!token)return null;
   const client=getAdminClient();const {data,error}=await client.auth.getUser(token);
   if(error||!data.user)return null;
-  const {data:account,error:accountError}=await client.from('users').select('id,role,parent_id,tier,is_admin,subscription_expires_at').eq('id',data.user.id).single<AccountRow>();
+  const {data:account,error:accountError}=await client.from('users').select('id,role,parent_id,tier,is_admin,subscription_expires_at,paper_trading_enabled').eq('id',data.user.id).single<AccountRow>();
   if(accountError||!account)throw new Error('無法讀取帳戶權限');
   const ids=[account.id,...(account.role==='child'&&account.parent_id?[account.parent_id]:[])];
   const {data:overrides,error:overrideError}=await client.from('feature_overrides').select('user_id,feature_key,enabled').in('user_id',ids).in('feature_key',['ai_stock_picking','ai_portfolio_advice']);
   if(overrideError)throw new Error('無法確認訊號權限');
   const parent=ids.length>1?(await client.from('users').select('id,role,parent_id,tier,is_admin,subscription_expires_at').eq('id',account.parent_id!).maybeSingle<AccountRow>()).data:null;
   const allowed=(key:string)=>{if(account.is_admin)return true;const own=overrides?.find(o=>o.user_id===account.id&&o.feature_key===key);if(own)return Boolean(own.enabled);if(premium(account))return true;const inherited=overrides?.find(o=>o.user_id===parent?.id&&o.feature_key===key);return inherited?Boolean(inherited.enabled):premium(parent);};
-  return {id:account.id,picking:allowed('ai_stock_picking'),portfolio:allowed('ai_portfolio_advice')};
+  return {id:account.id,picking:Boolean(account.paper_trading_enabled)||allowed('ai_stock_picking'),portfolio:Boolean(account.paper_trading_enabled)||allowed('ai_portfolio_advice')};
 }
 type ActiveEtfAction = 'added' | 'increased' | 'decreased' | 'removed' | 'held';
 type ActiveEtfRadarItem = {

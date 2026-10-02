@@ -1,12 +1,13 @@
 {
   "name": "ppbears-investment",
   "private": true,
-  "version": "1.24.120",
+  "version": "1.24.121",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
     "test:weekly-top": "node --test --test-isolation=none --experimental-strip-types src/utils/weeklyTop.test.ts",
+    "test:paper": "node --import ./scripts/typescript-test-loader.mjs --test --test-isolation=none --experimental-strip-types src/utils/paperTrading.test.ts scripts/paper-trading-api.test.cjs",
     "test:trend": "node --test --test-isolation=none --experimental-strip-types src/utils/trendStatus.test.ts",
     "test:watchlist-priority": "node --test --test-isolation=none --experimental-strip-types src/utils/watchlistLoadPriority.test.ts",
     "test:official-history": "node --test --test-isolation=none --experimental-strip-types src/utils/officialStockHistory.test.ts",

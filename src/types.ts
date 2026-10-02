@@ -121,6 +121,7 @@ export interface UserAccount {
   stopLossAlertPct: number;  // 買入前風險提醒跌幅百分比 (e.g., 20)
   parentId?: string;
   newsletterStrategy?: string; // 電子報策略：'A'~'F' 或 null（使用 AI 選股）
+  paperTrading?: boolean;
 }
 
 export interface ChildAccount extends UserAccount {

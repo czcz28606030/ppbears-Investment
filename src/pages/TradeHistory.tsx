@@ -124,7 +124,7 @@ function buildStockGroups(trades: Trade[], holdings: Holding[], visibleTradeIds:
 
 export default function TradeHistory() {
   const navigate = useNavigate();
-  const { trades, holdings, updateTradeNote, uploadTradeAttachments, deleteTradeAttachment } = useStore();
+  const { trades, holdings, updateTradeNote, uploadTradeAttachments, deleteTradeAttachment,user } = useStore();
   const [search, setSearch] = useState('');
   const [rangeKey, setRangeKey] = useState<RangeKey>('ALL');
   const [customFrom, setCustomFrom] = useState('');
@@ -243,8 +243,8 @@ export default function TradeHistory() {
             </div>
           </div>
         ) : (
-          <div className="trade-reason-box" onClick={() => startEdit(t.id, t.reason)}>
-            <span className="trade-reason-label">投資心得 <span className="trade-note-edit-hint">（點擊編輯）</span></span>
+          <div className="trade-reason-box" onClick={() => {if(!user?.paperTrading)startEdit(t.id, t.reason);}}>
+            <span className="trade-reason-label">{user?.paperTrading?'模擬成交原因與成本':<>投資心得 <span className="trade-note-edit-hint">（點擊編輯）</span></>}</span>
             {t.reason ? t.reason : <span className="trade-note-empty">尚未填寫，點此記錄心得...</span>}
           </div>
         )}
@@ -279,7 +279,7 @@ export default function TradeHistory() {
             <button className="btn-stock-detail" onClick={() => navigate(`/stock/${t.stockCode}`)}>
               查看個股內容
             </button>
-            <label className="btn-attach-upload">
+            {!user?.paperTrading&&<label className="btn-attach-upload">
               {uploadingTradeId === t.id ? '上傳中...' : '＋ 補充附件'}
               <input
                 type="file"
@@ -291,7 +291,7 @@ export default function TradeHistory() {
                   e.currentTarget.value = '';
                 }}
               />
-            </label>
+            </label>}
           </div>
         )}
       </div>

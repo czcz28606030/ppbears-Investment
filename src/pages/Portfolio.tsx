@@ -62,7 +62,7 @@ function formatHoldingShares(shares: number): string {
 
 export default function Portfolio(){
  const navigate=useNavigate();
- const {holdings,dataReady,getPortfolioSummary,hasFeature,refreshHoldingPrices}=useStore();
+ const {holdings,dataReady,getPortfolioSummary,hasFeature,refreshHoldingPrices,user}=useStore();
  const hasAiFeature=hasFeature('ai_portfolio_advice');
  const {signals,loading:signalsLoading,error:strategyError,refresh}=useStrategySignals(holdings.map(h=>h.stockCode),hasAiFeature);
   const summary = getPortfolioSummary();
@@ -435,7 +435,7 @@ export default function Portfolio(){
 
 
       {(strategyError||priceRefreshError)&&<p role="alert">{strategyError||priceRefreshError}</p>}
-      <details className="pf-strategy-explainer"><summary>每日收盤策略 · 同日使用快取</summary><p className="pf-strategy-note">策略訊號與半年 K 線每天取得一次；同日返回直接使用快取。加碼需首次進場價 + 2R、平均成本獲利與風險額度；資料不足時停止加碼。訊號不會自動下單。</p></details>
+      <details className="pf-strategy-explainer"><summary>每日收盤策略 · 同日使用快取</summary><p className="pf-strategy-note">{user?.paperTrading?'模擬帳號依收盤訊號自動建立加碼、減碼與出場委託，下一有效交易日開盤模擬成交。手動買賣已停用；資料不足時暫停並留下原因。':'策略訊號與半年 K 線每天取得一次；同日返回直接使用快取。加碼需首次進場價 + 2R、平均成本獲利與風險額度；資料不足時停止加碼。訊號不會自動下單。'}</p></details>
       {holdingAllocation.categories.length > 0 && (
         <div className="portfolio-category-tabs-shell">
           <div
@@ -565,7 +565,7 @@ export default function Portfolio(){
                     <button
                       type="button"
                       className="holding-trade-btn holding-trade-btn-buy"
-                      disabled={!dataReady}
+                      disabled={!dataReady||user?.paperTrading}
                       onClick={(event) => {
                         event.stopPropagation();
                         setSelectedTrade({ mode: 'buy', holding: h });
@@ -576,7 +576,7 @@ export default function Portfolio(){
                     <button
                       type="button"
                       className="holding-trade-btn holding-trade-btn-sell"
-                      disabled={!dataReady || h.totalShares <= 0}
+                      disabled={!dataReady || h.totalShares <= 0||user?.paperTrading}
                       onClick={(event) => {
                         event.stopPropagation();
                         setSelectedTrade({ mode: 'sell', holding: h });
